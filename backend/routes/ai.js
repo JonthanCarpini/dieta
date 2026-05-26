@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash'];
 
 async function getGeminiKey() {
   const res = await db.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
@@ -11,20 +11,28 @@ async function getGeminiKey() {
 }
 
 async function callGemini(apiKey, payload) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) {
+  let lastError;
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('Resposta vazia do Gemini');
+      console.log(`Gemini OK com modelo: ${model}`);
+      return text;
+    }
     const errBody = await res.text();
-    throw new Error(`Gemini ${res.status}: ${errBody}`);
+    lastError = `Gemini ${res.status} (${model}): ${errBody}`;
+    console.warn(lastError);
+    // só faz fallback em sobrecarga (503) ou rate limit (429)
+    if (res.status !== 503 && res.status !== 429) break;
   }
-  const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('Resposta vazia do Gemini');
-  return text;
+  throw new Error(lastError);
 }
 
 // POST /api/ai/analyze-food
