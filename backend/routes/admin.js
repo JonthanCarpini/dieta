@@ -273,8 +273,8 @@ router.post('/users/:id/plan', async (req, res) => {
     const updated = await db.query(
       `UPDATE users 
        SET plan = $1::varchar, 
-           premium_expires_at = CASE WHEN $1::varchar = 'trial' THEN NULL ELSE $2 END, 
-           trial_expires_at = CASE WHEN $1::varchar = 'trial' THEN $3 ELSE trial_expires_at END
+           premium_expires_at = (CASE WHEN $1::varchar = 'trial' THEN NULL ELSE $2::timestamp END), 
+           trial_expires_at = (CASE WHEN $1::varchar = 'trial' THEN $3::timestamp ELSE trial_expires_at END)
        WHERE id = $4 RETURNING id, email, name, plan, premium_expires_at`,
       [dbPlan.name, expiresAt, dbPlan.name === 'trial' ? expiresAt : null, userId]
     );
