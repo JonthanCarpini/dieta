@@ -3145,13 +3145,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('dashboard-cal-consumed').innerText = calConsumed.toLocaleString('pt-BR');
         document.getElementById('dashboard-cal-remaining').innerText = calRemaining.toLocaleString('pt-BR');
 
-        // Macros
-        document.getElementById('target-protein').innerText = protTarget;
-        document.getElementById('consumed-protein').innerText = protConsumed;
-        document.getElementById('target-carbs').innerText = carbsTarget;
-        document.getElementById('consumed-carbs').innerText = carbsConsumed;
-        document.getElementById('target-fat').innerText = fatTarget;
-        document.getElementById('consumed-fat').innerText = fatConsumed;
+        // Macros (arredondados — evita 23.400000000)
+        document.getElementById('target-protein').innerText = Math.round(protTarget);
+        document.getElementById('consumed-protein').innerText = Math.round(protConsumed);
+        document.getElementById('target-carbs').innerText = Math.round(carbsTarget);
+        document.getElementById('consumed-carbs').innerText = Math.round(carbsConsumed);
+        document.getElementById('target-fat').innerText = Math.round(fatTarget);
+        document.getElementById('consumed-fat').innerText = Math.round(fatConsumed);
 
         // Círculo SVG robusto
         const circle = document.getElementById('calorie-progress-circle');
@@ -3186,7 +3186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             listEl.innerHTML = `
                 <div class="empty-state">
                     <i data-lucide="salad" class="empty-icon"></i>
-                    <p>Nenhuma refeição registrada hoje. Adicione clicando no scanner ou buscando alimentos.</p>
+                    <p>Nenhuma refeição registrada hoje. Use o scanner ou busca de alimentos.</p>
                 </div>
             `;
         } else {
@@ -3194,23 +3194,32 @@ document.addEventListener('DOMContentLoaded', () => {
             todaysMeals.forEach(meal => {
                 const item = document.createElement('div');
                 item.className = 'meal-item';
-                const summary = meal.items.map(i => i.name).join(', ');
-                const cleanSummary = summary.length > 35 ? summary.substring(0, 35) + '...' : summary;
+
+                const foodItems = (meal.items || []).map(i =>
+                    `<div class="mdi-item">
+                        <span class="mdi-name">${i.name}</span>
+                        <span class="mdi-info">${i.weight_g}g &nbsp;·&nbsp; ${Math.round(i.calories)} kcal</span>
+                    </div>`
+                ).join('');
 
                 item.innerHTML = `
-                    <div class="meal-info">
-                        <span class="meal-title">${meal.name}</span>
-                        <span class="meal-time">${meal.time} • ${cleanSummary}</span>
-                        <div class="meal-macros-summary">
-                            <span>P: ${meal.total.protein}g</span>
-                            <span>C: ${meal.total.carbs}g</span>
-                            <span>G: ${meal.total.fat}g</span>
+                    <div class="meal-item-top">
+                        <div class="meal-info">
+                            <span class="meal-title">${meal.name}</span>
+                            <span class="meal-time">${meal.time}</span>
+                        </div>
+                        <div class="meal-item-right">
+                            <span class="meal-cal-badge">${Math.round(meal.total.calories)}<span>kcal</span></span>
+                            <button class="meal-delete-btn"><i data-lucide="trash-2"></i></button>
                         </div>
                     </div>
-                    <div class="meal-item-right">
-                        <span class="meal-cal-badge">${meal.total.calories}<span>kcal</span></span>
-                        <button class="meal-delete-btn"><i data-lucide="trash-2"></i></button>
+                    <div class="meal-tags-row">
+                        <span class="mmtag mmtag-p">P ${Math.round(meal.total.protein)}g</span>
+                        <span class="mmtag mmtag-c">C ${Math.round(meal.total.carbs)}g</span>
+                        <span class="mmtag mmtag-f">G ${Math.round(meal.total.fat)}g</span>
+                        <button class="meal-expand-btn" title="Ver alimentos"><i data-lucide="chevron-down"></i></button>
                     </div>
+                    <div class="meal-items-detail hidden">${foodItems || '<div class="mdi-item"><span class="mdi-name" style="color:var(--color-text-muted)">Sem itens detalhados</span></div>'}</div>
                 `;
 
                 item.querySelector('.meal-delete-btn').addEventListener('click', (e) => {
@@ -3224,6 +3233,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
+                const expandBtn = item.querySelector('.meal-expand-btn');
+                const detail = item.querySelector('.meal-items-detail');
+                const toggleExpand = () => {
+                    detail.classList.toggle('hidden');
+                    expandBtn.classList.toggle('open');
+                };
+                expandBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleExpand(); });
+                item.querySelector('.meal-item-top').addEventListener('click', toggleExpand);
+
                 listEl.appendChild(item);
             });
         }
@@ -3234,10 +3252,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderHistoryPage() {
         if (!state.userProfile) return;
 
-        document.getElementById('hist-target-cal').innerText = `${state.userProfile.targetCalories} kcal`;
-        document.getElementById('hist-target-p').innerText = `${state.userProfile.targetProtein}g`;
-        document.getElementById('hist-target-c').innerText = `${state.userProfile.targetCarbs}g`;
-        document.getElementById('hist-target-f').innerText = `${state.userProfile.targetFat}g`;
+        const prof = state.userProfile;
+        const goalLabels = { lose: 'Emagrecer', gain: 'Ganhar Massa', maintain: 'Manutenção' };
+        const goalBadge = document.getElementById('hist-goal-badge');
+        if (goalBadge) goalBadge.innerText = goalLabels[prof.goal] || 'Meta Ativa';
+
+        document.getElementById('hist-target-cal').innerText = `${Math.round(prof.targetCalories)} kcal`;
+        document.getElementById('hist-target-p').innerText = `${Math.round(prof.targetProtein)}g`;
+        document.getElementById('hist-target-c').innerText = `${Math.round(prof.targetCarbs)}g`;
+        document.getElementById('hist-target-f').innerText = `${Math.round(prof.targetFat)}g`;
 
         const chartLabels = [];
         const chartDataConsumed = [];
@@ -3294,39 +3317,94 @@ document.addEventListener('DOMContentLoaded', () => {
             grouped[m.date].push(m);
         });
 
+        const daysOfWeekShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        const daysOfWeekFull  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
         const sorted = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
         if (sorted.length === 0) {
             container.innerHTML = `<div class="empty-state"><p>Nenhum histórico disponível.</p></div>`;
         } else {
             sorted.forEach(dt => {
-                const parts = dt.split('-');
-                const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                const [yr, mt, dy] = dt.split('-');
+                const dateObj = new Date(parseInt(yr), parseInt(mt) - 1, parseInt(dy));
+                const dayName = daysOfWeekFull[dateObj.getDay()];
+                const formatted = `${dy}/${mt}/${yr}`;
+
                 const meals = grouped[dt];
-                
                 let sumC = 0, sumP = 0, sumCr = 0, sumF = 0;
                 meals.forEach(m => {
-                    sumC += m.total.calories;
-                    sumP += m.total.protein;
+                    sumC  += m.total.calories;
+                    sumP  += m.total.protein;
                     sumCr += m.total.carbs;
-                    sumF += m.total.fat;
+                    sumF  += m.total.fat;
                 });
+
+                const target = state.userProfile.targetCalories;
+                const pct = target ? Math.round((sumC / target) * 100) : 0;
+                const barW = Math.min(pct, 100);
+                const calColor = pct > 105 ? '#ef4444' : pct >= 85 ? '#22c55e' : '#3b82f6';
+
+                const mealsHtml = meals
+                    .sort((a,b) => b.time.localeCompare(a.time))
+                    .map(m => `
+                        <div class="hdc-meal-item">
+                            <div class="hdc-meal-top">
+                                <span class="hdc-meal-name">${m.name}</span>
+                                <span class="hdc-meal-kcal">${Math.round(m.total.calories)} kcal</span>
+                            </div>
+                            <div class="hdc-meal-meta">
+                                <span>${m.time}</span>
+                                <span>P ${Math.round(m.total.protein)}g</span>
+                                <span>C ${Math.round(m.total.carbs)}g</span>
+                                <span>G ${Math.round(m.total.fat)}g</span>
+                            </div>
+                        </div>
+                    `).join('');
 
                 const card = document.createElement('div');
                 card.className = 'history-day-card';
                 card.innerHTML = `
-                    <div class="day-card-header">
-                        <span class="day-date">${formatted}</span>
-                        <span class="day-cal-total">${sumC} kcal</span>
+                    <div class="hdc-main">
+                        <div class="hdc-header">
+                            <div class="hdc-date-info">
+                                <span class="hdc-day-name">${dayName}</span>
+                                <span class="hdc-date-str">${formatted}</span>
+                            </div>
+                            <div class="hdc-cal-block">
+                                <span class="hdc-cal-val" style="color:${calColor}">${Math.round(sumC)}</span>
+                                <span class="hdc-cal-pct">${pct}% da meta</span>
+                            </div>
+                        </div>
+                        <div class="hdc-bar-track">
+                            <div class="hdc-bar-fill" style="width:${barW}%;background:${calColor}"></div>
+                        </div>
+                        <div class="hdc-bottom">
+                            <div class="hdc-macros">
+                                <span class="mmtag mmtag-p">P ${Math.round(sumP)}g</span>
+                                <span class="mmtag mmtag-c">C ${Math.round(sumCr)}g</span>
+                                <span class="mmtag mmtag-f">G ${Math.round(sumF)}g</span>
+                            </div>
+                            <button class="hdc-toggle-btn">
+                                <i data-lucide="chevron-down"></i>
+                                ${meals.length} refeição${meals.length !== 1 ? 'ões' : ''}
+                            </button>
+                        </div>
                     </div>
-                    <div class="day-macros-strip">
-                        <span>P: <strong>${Math.round(sumP)}g</strong></span>
-                        <span>C: <strong>${Math.round(sumCr)}g</strong></span>
-                        <span>G: <strong>${Math.round(sumF)}g</strong></span>
-                    </div>
+                    <div class="hdc-meals-list hidden">${mealsHtml}</div>
                 `;
+
+                const btn = card.querySelector('.hdc-toggle-btn');
+                const mealsList = card.querySelector('.hdc-meals-list');
+                btn.addEventListener('click', () => {
+                    mealsList.classList.toggle('hidden');
+                    btn.classList.toggle('open');
+                    lucide.createIcons();
+                });
+
                 container.appendChild(card);
             });
         }
+        lucide.createIcons();
     }
 
     // 21. PÁGINA DE PERFIL E OPÇÕES (SUMMARY)

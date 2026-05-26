@@ -270,31 +270,31 @@
                     </div>
                 </div>
 
-                <!-- Cards dos Macronutrientes -->
-                <div class="macro-grid">
-                    <!-- Proteínas -->
-                    <div class="macro-card border-protein">
-                        <div class="macro-header-row">
-                            <span class="macro-name">Proteína</span>
-                            <span class="macro-val"><strong id="consumed-protein">0</strong>/<span id="target-protein">150</span>g</span>
+                <!-- Painel de Macronutrientes -->
+                <div class="macro-panel">
+                    <div class="macro-panel-row">
+                        <div class="mpr-label">
+                            <span class="mpr-dot" style="background:var(--color-protein)"></span>
+                            <span class="mpr-name">Proteína</span>
                         </div>
-                        <div class="bar-bg"><div class="bar-fill bg-protein" id="bar-protein" style="width: 0%"></div></div>
+                        <div class="bar-bg mpr-bar"><div class="bar-fill bg-protein" id="bar-protein" style="width:0%"></div></div>
+                        <div class="mpr-val"><strong id="consumed-protein">0</strong>/<span id="target-protein">150</span>g</div>
                     </div>
-                    <!-- Carboidratos -->
-                    <div class="macro-card border-carbs">
-                        <div class="macro-header-row">
-                            <span class="macro-name">Carboidratos</span>
-                            <span class="macro-val"><strong id="consumed-carbs">0</strong>/<span id="target-carbs">220</span>g</span>
+                    <div class="macro-panel-row">
+                        <div class="mpr-label">
+                            <span class="mpr-dot" style="background:var(--color-carbs)"></span>
+                            <span class="mpr-name">Carbos</span>
                         </div>
-                        <div class="bar-bg"><div class="bar-fill bg-carbs" id="bar-carbs" style="width: 0%"></div></div>
+                        <div class="bar-bg mpr-bar"><div class="bar-fill bg-carbs" id="bar-carbs" style="width:0%"></div></div>
+                        <div class="mpr-val"><strong id="consumed-carbs">0</strong>/<span id="target-carbs">220</span>g</div>
                     </div>
-                    <!-- Gorduras -->
-                    <div class="macro-card border-fat">
-                        <div class="macro-header-row">
-                            <span class="macro-name">Gordura</span>
-                            <span class="macro-val"><strong id="consumed-fat">0</strong>/<span id="target-fat">70</span>g</span>
+                    <div class="macro-panel-row">
+                        <div class="mpr-label">
+                            <span class="mpr-dot" style="background:var(--color-fat)"></span>
+                            <span class="mpr-name">Gordura</span>
                         </div>
-                        <div class="bar-bg"><div class="bar-fill bg-fat" id="bar-fat" style="width: 0%"></div></div>
+                        <div class="bar-bg mpr-bar"><div class="bar-fill bg-fat" id="bar-fat" style="width:0%"></div></div>
+                        <div class="mpr-val"><strong id="consumed-fat">0</strong>/<span id="target-fat">70</span>g</div>
                     </div>
                 </div>
 
@@ -641,22 +641,25 @@
 
             <div class="scrollable-content history-content">
                 <div class="stats-overview-card">
-                    <h4>Meta Diária Estabelecida</h4>
+                    <div class="soc-header">
+                        <h4>Meta Diária</h4>
+                        <span class="soc-goal-badge" id="hist-goal-badge">—</span>
+                    </div>
                     <div class="target-stats-grid">
                         <div class="t-stat">
                             <span class="t-val" id="hist-target-cal">2.100 kcal</span>
                             <span class="t-lbl">Calorias</span>
                         </div>
                         <div class="t-stat">
-                            <span class="t-val" id="hist-target-p">150g</span>
+                            <span class="t-val text-protein" id="hist-target-p">150g</span>
                             <span class="t-lbl">Proteína</span>
                         </div>
                         <div class="t-stat">
-                            <span class="t-val" id="hist-target-c">220g</span>
-                            <span class="t-lbl">Carbo</span>
+                            <span class="t-val text-carbs" id="hist-target-c">220g</span>
+                            <span class="t-lbl">Carbos</span>
                         </div>
                         <div class="t-stat">
-                            <span class="t-val" id="hist-target-f">70g</span>
+                            <span class="t-val text-fat" id="hist-target-f">70g</span>
                             <span class="t-lbl">Gordura</span>
                         </div>
                     </div>
@@ -664,8 +667,8 @@
 
                 <div class="chart-container-card">
                     <div class="chart-header">
-                        <h3>Acompanhamento Semanal</h3>
-                        <span class="chart-sub">Calorias diárias consumidas</span>
+                        <h3>Últimos 7 Dias</h3>
+                        <span class="chart-sub">Calorias consumidas vs meta</span>
                     </div>
                     <div class="chart-wrapper">
                         <canvas id="weekly-calories-chart"></canvas>
@@ -673,7 +676,7 @@
                 </div>
 
                 <div class="diary-archive-section">
-                    <h3>Registros Anteriores</h3>
+                    <h3>Registros por Dia</h3>
                     <div class="history-days-list" id="history-days-container"></div>
                 </div>
             </div>
