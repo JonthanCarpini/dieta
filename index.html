@@ -22,6 +22,9 @@
 
     <!-- Google Identity Services (Login Social) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- Jitsi Meet External API -->
+    <script src="https://meet.jit.si/external_api.js"></script>
 </head>
 <body class="dark-theme">
     
@@ -1353,6 +1356,17 @@
                 <button class="btn-primary flex-1" id="btn-save-book-appointment">Confirmar</button>
             </div>
         </div>
+    </div>
+
+    <!-- Tela: Videochamada Integrada (Jitsi API) -->
+    <div class="app-screen" id="screen-video-call" style="background:#000; padding:0; display:none; flex-direction:column; height:100vh; width:100vw; position:fixed; top:0; left:0; z-index:9999; justify-content:center; align-items:center;">
+        <div id="video-call-header" style="position:absolute; top:16px; left:16px; z-index:10000; display:flex; gap:12px; align-items:center; background:rgba(0,0,0,0.5); padding:8px 16px; border-radius:30px; backdrop-filter:blur(8px);">
+            <button class="icon-btn" id="btn-close-video-call" style="background:rgba(255,255,255,0.1); color:#fff; border-radius:50%; width:32px; height:32px; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                <i data-lucide="x" style="width:16px; height:16px;"></i>
+            </button>
+            <span style="color:#fff; font-size:13px; font-weight:600;">Consulta por Vídeo</span>
+        </div>
+        <div id="video-call-container" style="flex:1; width:100%; height:100%;"></div>
     </div>
 
     <!-- Scripts do App -->

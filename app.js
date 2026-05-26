@@ -150,7 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
         history: document.getElementById('screen-history'),
         settings: document.getElementById('screen-settings'),
         'food-search': document.getElementById('screen-food-search'),
-        'my-professionals': document.getElementById('screen-my-professionals')
+        'my-professionals': document.getElementById('screen-my-professionals'),
+        'video-call': document.getElementById('screen-video-call')
     };
 
     const nav = document.getElementById('main-navigation');
@@ -1313,6 +1314,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
 
+                    const startCallBtn = appointmentCard.querySelector('.btn-start-video-call-trigger');
+                    if (startCallBtn) {
+                        startCallBtn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            const link = e.currentTarget.dataset.videoLink;
+                            startVideoCall(link);
+                        });
+                    }
+
                     appContainer.appendChild(appointmentCard);
                 });
             }
@@ -1569,7 +1579,7 @@ document.addEventListener('DOMContentLoaded', () => {
         targetScreen.classList.add('active');
 
         // Exibição do Bottom Nav
-        const noNavScreens = ['screen-login', 'screen-onboarding', 'screen-scanner', 'screen-results', 'screen-food-search', 'screen-professional', 'screen-admin'];
+        const noNavScreens = ['screen-login', 'screen-onboarding', 'screen-scanner', 'screen-results', 'screen-food-search', 'screen-professional', 'screen-admin', 'screen-video-call'];
         if (noNavScreens.includes(screenId)) {
             nav.style.display = 'none';
         } else {
@@ -4172,5 +4182,75 @@ document.addEventListener('DOMContentLoaded', () => {
                 bookAppointmentForm.dispatchEvent(submitEvent);
             });
         }
+
+        // Listener do botão de fechar vídeo chamada
+        const btnCloseVideoCall = document.getElementById('btn-close-video-call');
+        if (btnCloseVideoCall) {
+            btnCloseVideoCall.addEventListener('click', () => {
+                if (confirm('Deseja realmente encerrar a videochamada?')) {
+                    closeVideoCall();
+                }
+            });
+        }
+    }
+
+    let activeJitsiMeetApi = null;
+
+    function startVideoCall(link) {
+        let roomName = 'nutrir-room';
+        try {
+            const urlObj = new URL(link);
+            // Pega a parte após a barra (removendo qualquer hash ou barra inicial)
+            roomName = urlObj.pathname.substring(1).split('#')[0].split('?')[0];
+        } catch(e) {
+            roomName = link.replace('https://meet.jit.si/', '').split('#')[0].split('?')[0];
+        }
+
+        const container = document.getElementById('video-call-container');
+        container.innerHTML = ''; // Limpa container
+
+        const domain = 'meet.jit.si';
+        const options = {
+            roomName: roomName,
+            width: '100%',
+            height: '100%',
+            parentNode: container,
+            lang: 'pt-BR',
+            configOverwrite: {
+                prejoinPageEnabled: false,
+                disableDeepLinking: true,
+                startWithAudioMuted: false,
+                startWithVideoMuted: false
+            },
+            interfaceConfigOverwrite: {
+                MOBILE_APP_PROMO: false
+            }
+        };
+
+        try {
+            showScreen('screen-video-call');
+            activeJitsiMeetApi = new JitsiMeetExternalAPI(domain, options);
+            activeJitsiMeetApi.addEventListener('readyToClose', () => {
+                closeVideoCall();
+            });
+        } catch(err) {
+            console.error('Erro ao iniciar Jitsi Meet External API:', err);
+            alert('Não foi possível carregar a chamada de vídeo. Certifique-se de que possui conexão com a internet.');
+            closeVideoCall();
+        }
+    }
+
+    function closeVideoCall() {
+        if (activeJitsiMeetApi) {
+            try {
+                activeJitsiMeetApi.dispose();
+            } catch(e) {
+                console.error(e);
+            }
+            activeJitsiMeetApi = null;
+        }
+        document.getElementById('video-call-container').innerHTML = '';
+        showScreen('screen-my-professionals');
+        renderMyProfessionalsScreen();
     }
 });
