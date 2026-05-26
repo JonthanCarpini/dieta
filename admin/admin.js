@@ -1188,8 +1188,85 @@ document.addEventListener('DOMContentLoaded', () => {
         lucide.createIcons();
     }
 
-    // 11. MÉTODOS DA ABA: AGENDA DE DISPONIBILIDADE
-    const DAYS_OF_WEEK = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    // 11. MÉTODOS DA ABA: AGENDA DE DISPONIBILIDADE (GRADE VISUAL)
+    const SCHEDULE_TIMES = [];
+    for (let h = 7; h <= 20; h++) {
+        SCHEDULE_TIMES.push(`${String(h).padStart(2,'0')}:00`);
+        SCHEDULE_TIMES.push(`${String(h).padStart(2,'0')}:30`);
+    }
+
+    const GRID_DAYS = [
+        { dow: 1, short: 'Seg', full: 'Segunda-feira' },
+        { dow: 2, short: 'Ter', full: 'Terça-feira' },
+        { dow: 3, short: 'Qua', full: 'Quarta-feira' },
+        { dow: 4, short: 'Qui', full: 'Quinta-feira' },
+        { dow: 5, short: 'Sex', full: 'Sexta-feira' },
+        { dow: 6, short: 'Sáb', full: 'Sábado' },
+        { dow: 0, short: 'Dom', full: 'Domingo' },
+    ];
+
+    let _selectedCells = new Set();
+    let _dragState = null;
+
+    function timeToMinutes(t) {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    function addMinutesToTime(t, mins) {
+        const total = timeToMinutes(t) + mins;
+        const h = Math.floor(total / 60);
+        const m = total % 60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+
+    function slotsToSelectedCells(slots) {
+        const cells = new Set();
+        slots.forEach(s => {
+            const startMins = timeToMinutes((s.start_time || '00:00').substring(0, 5));
+            const endMins   = timeToMinutes((s.end_time   || '00:00').substring(0, 5));
+            SCHEDULE_TIMES.forEach(t => {
+                if (timeToMinutes(t) >= startMins && timeToMinutes(t) < endMins) {
+                    cells.add(`${s.day_of_week}|${t}`);
+                }
+            });
+        });
+        return cells;
+    }
+
+    function selectedCellsToSlots(cells) {
+        const dayGroups = {};
+        cells.forEach(key => {
+            const pipe = key.indexOf('|');
+            const dow = parseInt(key.substring(0, pipe));
+            const t   = key.substring(pipe + 1);
+            if (!dayGroups[dow]) dayGroups[dow] = [];
+            dayGroups[dow].push(t);
+        });
+
+        const slots = [];
+        Object.entries(dayGroups).forEach(([dow, times]) => {
+            times.sort();
+            let rangeStart = null;
+            let lastTime   = null;
+            times.forEach(t => {
+                if (!rangeStart) {
+                    rangeStart = t;
+                    lastTime   = t;
+                } else {
+                    if (timeToMinutes(t) - timeToMinutes(lastTime) > 30) {
+                        slots.push({ day_of_week: parseInt(dow), start_time: rangeStart, end_time: addMinutesToTime(lastTime, 30) });
+                        rangeStart = t;
+                    }
+                    lastTime = t;
+                }
+            });
+            if (rangeStart) {
+                slots.push({ day_of_week: parseInt(dow), start_time: rangeStart, end_time: addMinutesToTime(lastTime, 30) });
+            }
+        });
+        return slots;
+    }
 
     async function loadScheduleData() {
         try {
@@ -1198,158 +1275,175 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!res.ok) throw new Error('Não foi possível carregar a agenda.');
             const slots = await res.json();
-            renderScheduleEditor(slots);
+            renderScheduleGrid(slots);
         } catch (err) {
             console.error(err);
             alert(err.message);
         }
     }
 
-    function createSlotHtml(startTime, endTime) {
-        return `
-            <div class="schedule-slot-row">
-                <input type="time" class="slot-start-time schedule-time-input" value="${startTime || '08:00'}">
-                <span class="slot-separator">até</span>
-                <input type="time" class="slot-end-time schedule-time-input" value="${endTime || '18:00'}">
-                <button class="btn-remove-slot" type="button" title="Remover horário">
-                    <i data-lucide="x"></i>
-                </button>
-            </div>
-        `;
-    }
-
-    function renderScheduleEditor(existingSlots) {
+    function renderScheduleGrid(existingSlots) {
         const container = document.getElementById('schedule-days-container');
         if (!container) return;
 
-        // Agrupa slots por dia da semana
-        const dayMap = {};
-        existingSlots.forEach(s => {
-            const d = s.day_of_week;
-            if (!dayMap[d]) dayMap[d] = [];
-            dayMap[d].push(s);
-        });
+        _selectedCells = slotsToSelectedCells(existingSlots);
+        _dragState = null;
 
-        container.innerHTML = '';
-
-        for (let day = 0; day < 7; day++) {
-            const daySlots = dayMap[day] || [];
-            const isEnabled = daySlots.length > 0;
-
-            const existingSlotsHtml = isEnabled
-                ? daySlots.map(s => createSlotHtml(
-                    s.start_time ? s.start_time.substring(0, 5) : '08:00',
-                    s.end_time ? s.end_time.substring(0, 5) : '18:00'
-                  )).join('')
-                : createSlotHtml('08:00', '18:00');
-
-            const dayRow = document.createElement('div');
-            dayRow.className = 'schedule-day-row';
-            dayRow.dataset.day = day;
-
-            dayRow.innerHTML = `
-                <div class="schedule-day-header">
-                    <label class="schedule-toggle-label">
-                        <input type="checkbox" class="day-toggle-cb" data-day="${day}" ${isEnabled ? 'checked' : ''}>
-                        <span class="schedule-toggle-track">
-                            <span class="schedule-toggle-thumb"></span>
-                        </span>
-                        <span class="schedule-day-name">${DAYS_OF_WEEK[day]}</span>
-                    </label>
-                    <span class="schedule-day-badge ${isEnabled ? 'active' : 'inactive'}">${isEnabled ? 'Disponível' : 'Fechado'}</span>
-                </div>
-                <div class="schedule-slots-container ${!isEnabled ? 'hidden' : ''}" data-day="${day}">
-                    ${existingSlotsHtml}
-                    <button class="btn-add-slot" data-day="${day}" type="button">
-                        <i data-lucide="plus"></i> Adicionar horário
+        const headerCells = GRID_DAYS.map(d => `
+            <th class="sg-day-header">
+                <div class="sg-day-inner">
+                    <span class="sg-day-label">${d.short}</span>
+                    <button class="sg-day-toggle" data-dow="${d.dow}" title="Alternar ${d.full}">
+                        <i data-lucide="flip-vertical-2"></i>
                     </button>
                 </div>
-            `;
+            </th>`).join('');
 
-            container.appendChild(dayRow);
-        }
+        const bodyRows = SCHEDULE_TIMES.map(t => {
+            const isHour = t.endsWith(':00');
+            const tds = GRID_DAYS.map(d => {
+                const key = `${d.dow}|${t}`;
+                const sel = _selectedCells.has(key);
+                return `<td class="sg-cell${sel ? ' sg-selected' : ''}" data-key="${key}" data-dow="${d.dow}" data-time="${t}"></td>`;
+            }).join('');
+            return `<tr class="sg-row${isHour ? ' sg-hour-mark' : ''}">
+                <td class="sg-time-label">${isHour ? t : ''}</td>${tds}
+            </tr>`;
+        }).join('');
 
-        bindScheduleEvents(container);
+        container.innerHTML = `
+            <div class="sched-presets">
+                <button class="sched-preset-btn" id="sched-weekdays">
+                    <i data-lucide="briefcase"></i> Dias Úteis 8h–18h
+                </button>
+                <button class="sched-preset-btn" id="sched-fullweek">
+                    <i data-lucide="calendar"></i> Semana Completa 8h–18h
+                </button>
+                <button class="sched-preset-btn sched-preset-danger" id="sched-clear">
+                    <i data-lucide="trash-2"></i> Limpar Tudo
+                </button>
+                <span class="sched-info" id="sched-info"></span>
+            </div>
+            <div class="sg-legend">
+                <span class="sg-legend-item sg-legend-free">Disponível</span>
+                <span class="sg-legend-item sg-legend-blocked">Bloqueado</span>
+                <span class="sg-legend-hint">Clique para alternar · Arraste para selecionar múltiplos</span>
+            </div>
+            <div class="sg-scroll-wrap">
+                <table class="sg-table" id="sg-table" cellspacing="0" cellpadding="0">
+                    <thead>
+                        <tr>
+                            <th class="sg-corner"></th>
+                            ${headerCells}
+                        </tr>
+                    </thead>
+                    <tbody>${bodyRows}</tbody>
+                </table>
+            </div>`;
+
+        updateSchedInfo();
+        bindGridEvents(container);
         lucide.createIcons();
     }
 
-    function bindScheduleEvents(container) {
-        // Toggle de dia
-        container.querySelectorAll('.day-toggle-cb').forEach(cb => {
-            cb.addEventListener('change', (e) => {
-                const day = e.target.dataset.day;
-                const dayRow = container.querySelector(`.schedule-day-row[data-day="${day}"]`);
-                const slotsContainer = container.querySelector(`.schedule-slots-container[data-day="${day}"]`);
-                const badge = dayRow.querySelector('.schedule-day-badge');
-
-                slotsContainer.classList.toggle('hidden', !e.target.checked);
-                if (badge) {
-                    badge.textContent = e.target.checked ? 'Disponível' : 'Fechado';
-                    badge.className = `schedule-day-badge ${e.target.checked ? 'active' : 'inactive'}`;
-                }
-            });
-        });
-
-        // Adicionar horário
-        container.querySelectorAll('.btn-add-slot').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const day = btn.dataset.day;
-                const slotsContainer = container.querySelector(`.schedule-slots-container[data-day="${day}"]`);
-                const wrapper = document.createElement('div');
-                wrapper.innerHTML = createSlotHtml('08:00', '18:00');
-                slotsContainer.insertBefore(wrapper.firstElementChild, btn);
-                bindRemoveSlotEvents(slotsContainer);
-                lucide.createIcons();
-            });
-        });
-
-        // Remover horário
-        container.querySelectorAll('.btn-remove-slot').forEach(btn => {
-            btn.addEventListener('click', () => btn.closest('.schedule-slot-row').remove());
-        });
+    function updateSchedInfo() {
+        const el = document.getElementById('sched-info');
+        if (!el) return;
+        const count = _selectedCells.size;
+        if (count === 0) {
+            el.textContent = 'Nenhum horário selecionado';
+            el.className = 'sched-info sched-info-empty';
+        } else {
+            const hrs = (count * 0.5).toFixed(1).replace('.', ',');
+            el.textContent = `${count} slots · ${hrs}h / semana`;
+            el.className = 'sched-info sched-info-active';
+        }
     }
 
-    function bindRemoveSlotEvents(container) {
-        container.querySelectorAll('.btn-remove-slot').forEach(btn => {
-            btn.addEventListener('click', () => btn.closest('.schedule-slot-row').remove());
-        });
-    }
-
-    // Botão de salvar agenda (vinculado após renderização)
-    document.addEventListener('click', async (e) => {
-        if (e.target.closest('#btn-save-schedule')) {
-            const slots = [];
-            const container = document.getElementById('schedule-days-container');
-            if (!container) return;
-
-            container.querySelectorAll('.schedule-day-row').forEach(dayRow => {
-                const day = parseInt(dayRow.dataset.day);
-                const cb = dayRow.querySelector('.day-toggle-cb');
-                if (!cb || !cb.checked) return;
-
-                dayRow.querySelectorAll('.schedule-slot-row').forEach(slotRow => {
-                    const start = slotRow.querySelector('.slot-start-time').value;
-                    const end = slotRow.querySelector('.slot-end-time').value;
-                    if (start && end && end > start) {
-                        slots.push({ day_of_week: day, start_time: start, end_time: end });
-                    }
+    function applyPreset(preset) {
+        _selectedCells.clear();
+        if (preset === 'weekdays' || preset === 'fullweek') {
+            const days = preset === 'weekdays' ? [1,2,3,4,5] : [0,1,2,3,4,5,6];
+            days.forEach(dow => {
+                SCHEDULE_TIMES.forEach(t => {
+                    const mins = timeToMinutes(t);
+                    if (mins >= 8 * 60 && mins < 18 * 60) _selectedCells.add(`${dow}|${t}`);
                 });
             });
+        }
+        document.querySelectorAll('.sg-cell').forEach(c => {
+            c.classList.toggle('sg-selected', _selectedCells.has(c.dataset.key));
+        });
+        updateSchedInfo();
+    }
 
+    function bindGridEvents(container) {
+        document.getElementById('sched-weekdays')?.addEventListener('click', () => applyPreset('weekdays'));
+        document.getElementById('sched-fullweek')?.addEventListener('click', () => applyPreset('fullweek'));
+        document.getElementById('sched-clear')?.addEventListener('click', () => applyPreset('clear'));
+
+        container.querySelectorAll('.sg-day-toggle').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                const dow = btn.dataset.dow;
+                const dayCells = [...container.querySelectorAll(`.sg-cell[data-dow="${dow}"]`)];
+                const anySelected = dayCells.some(c => _selectedCells.has(c.dataset.key));
+                dayCells.forEach(c => {
+                    if (anySelected) { _selectedCells.delete(c.dataset.key); c.classList.remove('sg-selected'); }
+                    else             { _selectedCells.add(c.dataset.key);    c.classList.add('sg-selected'); }
+                });
+                updateSchedInfo();
+            });
+        });
+
+        const table = document.getElementById('sg-table');
+        if (!table) return;
+
+        table.addEventListener('mousedown', e => {
+            const cell = e.target.closest('.sg-cell');
+            if (!cell) return;
+            e.preventDefault();
+            _dragState = { willSelect: !_selectedCells.has(cell.dataset.key) };
+            toggleCellState(cell, cell.dataset.key, _dragState.willSelect);
+            updateSchedInfo();
+        });
+
+        table.addEventListener('mouseover', e => {
+            if (!_dragState) return;
+            const cell = e.target.closest('.sg-cell');
+            if (!cell) return;
+            toggleCellState(cell, cell.dataset.key, _dragState.willSelect);
+            updateSchedInfo();
+        });
+
+        document.addEventListener('mouseup', () => { _dragState = null; });
+    }
+
+    function toggleCellState(cell, key, select) {
+        if (select) { _selectedCells.add(key);    cell.classList.add('sg-selected'); }
+        else         { _selectedCells.delete(key); cell.classList.remove('sg-selected'); }
+    }
+
+    // Botão de salvar agenda
+    document.addEventListener('click', async (e) => {
+        if (e.target.closest('#btn-save-schedule')) {
+            const slots = selectedCellsToSlots(_selectedCells);
             try {
+                const btn = document.getElementById('btn-save-schedule');
+                if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader"></i> Salvando...'; lucide.createIcons(); }
                 const res = await fetch(`${API_URL}/admin/availability`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${adminState.token}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
                     body: JSON.stringify({ slots })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Erro ao salvar agenda.');
-                alert('Disponibilidade salva com sucesso!');
+                alert(`Disponibilidade salva com sucesso! ${slots.length} intervalo(s) configurado(s).`);
             } catch (err) {
                 alert(err.message);
+            } finally {
+                const btn = document.getElementById('btn-save-schedule');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="save"></i> Salvar Disponibilidade'; lucide.createIcons(); }
             }
         }
     });
