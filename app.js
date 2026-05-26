@@ -1170,6 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!linkedRes.ok) throw new Error('Falha ao buscar profissionais vinculados.');
             const linkedPros = await linkedRes.json();
+            state.linkedProfessionals = linkedPros;
 
             const feedbacksRes = await fetch(`${API_URL}/user/professional-feedbacks`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -1436,33 +1437,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const busySlots = busyRes.ok ? await busyRes.json() : [];
 
-                let slotsHtml = daySlots.map(slot => `
-                    <div style="margin-bottom:4px;">
-                        • ${slot.start_time.slice(0, 5)} às ${slot.end_time.slice(0, 5)}
-                    </div>
-                `).join('');
+                let slotsHtml = daySlots.map(slot => {
+                    const start = slot.start_time.slice(0, 5);
+                    const end = slot.end_time.slice(0, 5);
+                    return `
+                        <div class="selectable-time-slot" data-start="${start}" data-end="${end}" 
+                             style="background:rgba(34,197,94,0.05); border:1px solid rgba(34,197,94,0.15); padding:8px 12px; border-radius:8px; margin-bottom:6px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:all 0.2s;"
+                             onmouseover="this.style.background='rgba(34,197,94,0.12)'; this.style.borderColor='var(--color-primary)';"
+                             onmouseout="this.style.background='rgba(34,197,94,0.05)'; this.style.borderColor='rgba(34,197,94,0.15)';">
+                            <span style="font-weight:600; color:var(--color-text);">${start} às ${end}</span>
+                            <span style="font-size:10px; font-weight:700; text-transform:uppercase; color:#22c55e; letter-spacing:0.05em;">Selecionar</span>
+                        </div>
+                    `;
+                }).join('');
 
-                let busyHtml = '<span style="color:#22c55e;">Nenhuma consulta agendada neste dia (Livre).</span>';
+                let busyHtml = '<span style="color:#22c55e; font-size:11px;">Nenhuma consulta agendada neste dia (Livre).</span>';
                 if (busySlots.length > 0) {
                     busyHtml = busySlots.map(busy => `
-                        <div style="background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.1); color:#ef4444; display:inline-block; padding:3px 8px; border-radius:6px; font-size:11px; margin-right:6px; margin-top:4px;">
+                        <div style="background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.15); color:#ef4444; display:inline-block; padding:4px 8px; border-radius:6px; font-size:11px; margin-right:6px; margin-top:4px; font-weight:500;">
                             ${busy.start_time.slice(0, 5)} - ${busy.end_time.slice(0, 5)}
                         </div>
                     `).join('');
                 }
 
                 detailContainer.innerHTML = `
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:8px; font-size:12px; margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:8px; font-size:12px; margin-top:10px; display:flex; flex-direction:column; gap:10px;">
                         <div>
-                            <span style="opacity:0.6; display:block; margin-bottom:4px; font-size:10px; font-weight:600; text-transform:uppercase;">Janelas de Atendimento:</span>
-                            <div style="font-weight:600;">${slotsHtml}</div>
+                            <span style="opacity:0.6; display:block; margin-bottom:8px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Horários de Atendimento Disponíveis (Clique para escolher):</span>
+                            <div>${slotsHtml}</div>
                         </div>
-                        <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:8px;">
-                            <span style="opacity:0.6; display:block; margin-bottom:4px; font-size:10px; font-weight:600; text-transform:uppercase;">Agendados (Indisponíveis):</span>
+                        <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:10px;">
+                            <span style="opacity:0.6; display:block; margin-bottom:6px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Horários Ocupados no Dia:</span>
                             <div>${busyHtml}</div>
                         </div>
                     </div>
                 `;
+
+                // Adiciona listeners para preenchimento de início/fim de consulta ao clicar
+                detailContainer.querySelectorAll('.selectable-time-slot').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        const target = e.currentTarget;
+                        document.getElementById('book-appointment-start').value = target.dataset.start;
+                        document.getElementById('book-appointment-end').value = target.dataset.end;
+                        
+                        // Efeito visual de seleção
+                        detailContainer.querySelectorAll('.selectable-time-slot').forEach(item => {
+                            item.style.boxShadow = 'none';
+                            item.style.background = 'rgba(34,197,94,0.05)';
+                        });
+                        target.style.boxShadow = '0 0 0 2px var(--color-primary)';
+                        target.style.background = 'rgba(34,197,94,0.15)';
+                    });
+                });
             } catch (err) {
                 detailContainer.innerHTML = `<p style="font-size:11px; opacity:0.5; color:#ef4444; margin-top:10px;">${err.message}</p>`;
             }
@@ -4034,6 +4060,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const proId = document.getElementById('select-my-pros-list').value;
                 const type = document.getElementById('select-my-pros-role').value;
                 if (!proId) return alert('Selecione um profissional.');
+
+                // Verifica se já possui profissional vinculado desse tipo
+                const existingPro = (state.linkedProfessionals || []).find(p => p.role === type);
+                if (existingPro) {
+                    const roleLabel = type === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+                    if (!confirm(`Você já possui o profissional ${existingPro.name} vinculado como seu ${roleLabel}. Deseja substituí-lo pelo novo profissional selecionado?`)) {
+                        return;
+                    }
+                }
+
                 await linkProfessional(proId, type);
                 renderMyProfessionalsScreen();
             });
