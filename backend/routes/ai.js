@@ -147,45 +147,65 @@ Responda APENAS com JSON puro (sem markdown, sem explicações):
 function promptDailyRecipe(mealType, cal, protein, carbs, fat, profile) {
   const mealLabel = MEAL_LABELS[mealType] || mealType;
   const ctx = profileContext(profile);
-  return `Você é um chef e nutricionista brasileiro especializado em receitas práticas e saborosas para o dia a dia.
+  const goalTips = {
+    lose:     'Priorize vegetais, proteínas magras (frango sem pele, claras, atum, cottage). Evite frituras, molhos gordurosos e açúcar. A receita deve ser saciante com baixa densidade calórica.',
+    gain:     'Inclua carboidratos complexos (arroz, batata-doce, aveia) e proteína completa. Calorias devem ser densas mas nutritivas.',
+    maintain: 'Receita equilibrada com todos os grupos nutricionais em proporção saudável.'
+  };
+  const tip = goalTips[profile?.goal] || goalTips.maintain;
+
+  return `Você é um nutricionista e chef brasileiro. Crie UMA receita saudável e realista para ${mealLabel}.
 ${ctx}
-RECEITA SOLICITADA:
-- Tipo de refeição: ${mealLabel}
-- Calorias desta refeição: ~${cal} kcal
-- Macros alvo: ~${protein}g proteína | ~${carbs}g carbos | ~${fat}g gordura
+PARÂMETROS DESTA REFEIÇÃO (siga com precisão):
+- Calorias: ${cal} kcal (tolerância: ±30 kcal)
+- Proteína: ${protein}g | Carboidratos: ${carbs}g | Gordura: ${fat}g
 
-REGRAS OBRIGATÓRIAS:
-1. Use APENAS ingredientes facilmente encontrados em qualquer supermercado brasileiro (frango, ovos, arroz, feijão, legumes comuns, etc.)
-2. Tempo máximo de preparo: 30 minutos
-3. Receita REAL com nome criativo — não genérica como "Frango com Legumes"
-4. Modo de preparo em passos numerados claros
-5. As quantidades dos ingredientes devem resultar nos macros especificados
-6. Adequada ao objetivo do cliente: ${GOAL_LABELS[profile?.goal] || 'saudável'}
+ORIENTAÇÃO NUTRICIONAL: ${tip}
 
-Responda APENAS com JSON puro (sem markdown):
-{"name":"Nome criativo da receita","time_min":20,"calories":${cal},"protein":${protein},"carbs":${carbs},"fat":${fat},"ingredients":[{"name":"Ingrediente","amount":100,"unit":"g"}],"directions":"1. Passo um.\\n2. Passo dois.\\n3. Passo três."}`;
+REGRAS — SIGA TODAS:
+1. Use ingredientes de supermercado brasileiro comum (frango, ovos, arroz, feijão, legumes, frutas comuns)
+2. Porção para 1 pessoa adulta — quantidades realistas (ex: máximo 200g de carne, 2-3 ovos, não 12)
+3. Tempo de preparo: máximo 30 minutos
+4. Nome criativo e apetitoso em português (não genérico)
+5. As QUANTIDADES dos ingredientes DEVEM resultar exatamente em ${cal} kcal — calcule os pesos com precisão
+6. Modo de preparo em passos numerados (mínimo 3 passos)
+7. PROIBIDO: receitas de maromba/culturismo para objetivos de perda de peso
+
+Responda APENAS com JSON puro sem markdown. Exemplo de formato:
+{"name":"Nome da receita","time_min":20,"calories":${cal},"protein":${protein},"carbs":${carbs},"fat":${fat},"ingredients":[{"name":"Peito de frango","amount":150,"unit":"g"},{"name":"Brócolis","amount":100,"unit":"g"}],"directions":"1. Tempere o frango com sal e alho.\\n2. Grelhe por 8 minutos de cada lado.\\n3. Cozinhe o brócolis no vapor por 5 minutos."}`;
 }
 
 function promptWeeklyPlan(mealType, calPerMeal, protPerMeal, carbPerMeal, fatPerMeal, profile) {
-  const mealLabel = mealType === 'all' ? 'refeições variadas (café da manhã, almoço, jantar, lanche — alternando)' : `${MEAL_LABELS[mealType] || mealType}`;
+  const mealLabel = mealType === 'all' ? 'refeições variadas (café da manhã, almoço, jantar, lanche — alternando ao longo da semana)' : `${MEAL_LABELS[mealType] || mealType}`;
   const ctx = profileContext(profile);
-  return `Você é um chef e nutricionista brasileiro especializado em planejamento alimentar prático.
+  const goalTips = {
+    lose:     'Receitas para perda de peso: vegetais abundantes, proteínas magras moderadas (máx 180g carne/porção), carboidratos complexos em pequena quantidade, sem frituras ou molhos calóricos.',
+    gain:     'Receitas para ganho de massa: inclua carboidratos complexos (batata-doce, arroz, aveia), proteína suficiente (frango, ovos, atum), gorduras boas (azeite, abacate).',
+    maintain: 'Receitas equilibradas: todos os macros em proporção saudável, variedade de alimentos.'
+  };
+  const tip = goalTips[profile?.goal] || goalTips.maintain;
+
+  return `Você é um nutricionista e chef brasileiro. Crie 7 receitas saudáveis para a semana.
 ${ctx}
-PLANO SEMANAL SOLICITADO:
+PARÂMETROS DE CADA REFEIÇÃO (siga com precisão):
 - Tipo: ${mealLabel}
-- Cada receita: ~${calPerMeal} kcal | ~${protPerMeal}g proteína | ~${carbPerMeal}g carbos | ~${fatPerMeal}g gordura
+- Calorias por receita: ${calPerMeal} kcal (tolerância: ±40 kcal)
+- Macros: ${protPerMeal}g proteína | ${carbPerMeal}g carbos | ${fatPerMeal}g gordura
 
-REGRAS OBRIGATÓRIAS:
-1. 7 receitas DIFERENTES — sem repetição de pratos
-2. Use APENAS ingredientes facilmente encontrados em supermercados brasileiros
-3. Tempo máximo por receita: 35 minutos
-4. Receitas REAIS e variadas (não genéricas) — inclua pratos da culinária brasileira saudável
-5. Progressão lógica para a semana: varie proteínas (frango, peixe, ovos, leguminosas)
-6. Adequadas ao objetivo: ${GOAL_LABELS[profile?.goal] || 'saudável'}
-7. Modo de preparo em passos numerados
+ORIENTAÇÃO NUTRICIONAL: ${tip}
 
-Responda APENAS com JSON puro (sem markdown) — array com exatamente 7 objetos:
-[{"day":1,"name":"Nome criativo","time_min":20,"calories":${calPerMeal},"protein":${protPerMeal},"carbs":${carbPerMeal},"fat":${fatPerMeal},"ingredients":[{"name":"Ingrediente","amount":100,"unit":"g"}],"directions":"1. Passo um.\\n2. Passo dois."}]`;
+REGRAS — SIGA TODAS:
+1. 7 receitas COMPLETAMENTE DIFERENTES — sem repetir o prato principal
+2. Ingredientes de supermercado brasileiro comum (frango, ovos, arroz, legumes, frutas comuns)
+3. Porção para 1 pessoa adulta — quantidades realistas (máx 200g de carne, 2-3 ovos por receita)
+4. Tempo máximo por receita: 35 minutos
+5. Varie as proteínas ao longo da semana: frango, peixe/atum, ovos, leguminosas (feijão, lentilha), carne magra
+6. As quantidades dos ingredientes DEVEM resultar em ${calPerMeal} kcal — calcule com precisão
+7. Modo de preparo em passos numerados (mínimo 3 passos)
+8. Nomes criativos e apetitosos em português
+
+Responda APENAS com JSON puro sem markdown — array com exatamente 7 objetos:
+[{"day":1,"name":"Nome criativo","time_min":20,"calories":${calPerMeal},"protein":${protPerMeal},"carbs":${carbPerMeal},"fat":${fatPerMeal},"ingredients":[{"name":"Ingrediente","amount":150,"unit":"g"}],"directions":"1. Passo um.\\n2. Passo dois.\\n3. Passo três."}]`;
 }
 
 // ── Routes ────────────────────────────────────────────────────

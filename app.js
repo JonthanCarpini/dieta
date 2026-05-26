@@ -2012,10 +2012,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const carbsRemaining = Math.max(10, profile.targetCarbs - carbsConsumed);
             const fatRemaining = Math.max(5, profile.targetFat - fatConsumed);
 
+            // Fração razoável por tipo de refeição — não usar saldo total do dia
+            const mealFraction = { breakfast: 0.25, lunch: 0.35, dinner: 0.30, snack: 0.12, all: 0.30 };
+            const frac = mealFraction[mealType] || 0.30;
+            const calForMeal  = Math.min(calRemaining,  Math.round(profile.targetCalories  * frac));
+            const protForMeal = Math.min(protRemaining, Math.round(profile.targetProtein   * frac));
+            const carbForMeal = Math.min(carbsRemaining,Math.round(profile.targetCarbs     * frac));
+            const fatForMeal  = Math.min(fatRemaining,  Math.round(profile.targetFat       * frac));
+
             try {
                 if (period === 'daily') {
-                    loaderStatus.innerText = `IA gerando uma receita de ${mealType === 'all' ? 'qualquer tipo' : mealType} de ${calRemaining} kcal...`;
-                    const generatedRecipe = await callGeminiForDailyRecipe(mealType, calRemaining, protRemaining, carbsRemaining, fatRemaining);
+                    loaderStatus.innerText = `IA gerando uma receita de ${mealType === 'all' ? 'qualquer tipo' : mealType} de ${calForMeal} kcal...`;
+                    const generatedRecipe = await callGeminiForDailyRecipe(mealType, calForMeal, protForMeal, carbForMeal, fatForMeal);
                     state.savedAiRecipes.push(generatedRecipe);
                     saveAiRecipesToLocalStorage();
                     renderSavedAiRecipes();
@@ -2034,7 +2042,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Erro na geração por IA: ", err);
                 const errMsg = err.message.includes('configurada') ? err.message : "IA indisponível. Exibindo receitas de demonstração.";
                 alert(errMsg);
-                runMockGeneration(mealType, period, profile, calRemaining, protRemaining, carbsRemaining, fatRemaining);
+                runMockGeneration(mealType, period, profile, calForMeal, protForMeal, carbForMeal, fatForMeal);
                 loader.classList.add('hidden');
             }
         });
