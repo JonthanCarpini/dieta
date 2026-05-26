@@ -90,6 +90,7 @@ Os dados do usuário são sincronizados com o PostgreSQL por meio de requisiçõ
 10. **`plans`**: Planos comerciais configuráveis (identificador, preço, duração, benefícios).
 11. **`payments`**: Histórico de transações com cálculo de comissões por profissional vinculado.
 12. **`professional_availability`**: Horários de disponibilidade semanal dos profissionais.
+13. **`appointments`**: Agendamentos de consultas por vídeo com patient_id, professional_id, data, hora_inicio, hora_fim, link do Jitsi e status.
 
 ---
 
@@ -139,7 +140,9 @@ O frontend calcula a fração calórica adequada por tipo de refeição a partir
 
 ### D. Acompanhamento e Vinculação Profissional
 - Usuários premium vinculam Nutricionista e/ou Personal Trainer.
-- Tela `screen-professional` exibe orientações enviadas pelos profissionais.
+- **Meu Acompanhamento (`screen-my-professionals`)**: Tela dedicada exclusiva para usuários Premium que permite a vinculação de profissionais, exibição estruturada das orientações/recomendações recebidas e agendamento de consultas por vídeo.
+- **Videoconferências Gratuitas (Jitsi Meet)**: Agendamentos geram automaticamente um link único e gratuito hospedado no Jitsi Meet no formato `https://meet.jit.si/nutrir-consultation-<patient_id>-<professional_id>-<timestamp>`, permitindo chamadas diretas pela plataforma por meio de um botão "Iniciar Chamada".
+- **Cancelamento**: Tanto o paciente quanto o profissional podem cancelar consultas diretamente na interface, mudando o status para `cancelled`.
 
 ### E. Painel de Administração (`/admin/`)
 Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais:
@@ -150,11 +153,13 @@ Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais:
 - Criação e gestão de planos comerciais.
 - **Aba Credenciais**: Seleção visual do provedor de IA ativo (cards clicáveis para Gemini/OpenAI/Mistral), cadastro individual de chaves por provedor, botão "Testar provedor ativo" que chama `/api/ai/test` e exibe provedor, modelo, latência e nome da receita de exemplo.
 - **Aba Faturamento**: Montante bruto, total de comissões e lucro líquido.
+- **Aba Consultas (Global)**: Visualização de todas as consultas agendadas na plataforma e permissão para cancelá-las.
 
 **Profissionais**:
 - **Meus Pacientes**: Lista, diário recente e envio de feedbacks.
 - **Faturamento**: Comissões acumuladas e pacientes ativos.
 - **Agenda**: Configuração de disponibilidade semanal via `professional_availability`.
+- **Aba Consultas**: Acompanhamento de todas as videochamadas agendadas por seus pacientes vinculados e opção de cancelamento.
 
 ### F. Tela de Análise Nutricional (Scanner)
 A tela `screen-results` exibe após análise de imagem:
