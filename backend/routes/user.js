@@ -545,7 +545,7 @@ router.post('/appointments', async (req, res) => {
     // 5. Gerar link único do Jitsi Meet
     const timestamp = Date.now();
     const videoRoom = `nutrir-consultation-${req.user.id}-${professional_id}-${timestamp}`;
-    const videoLink = `https://meet.jit.si/${videoRoom}`;
+    const videoLink = `https://meet.jit.si/${videoRoom}#config.disableDeepLinking=true`;
 
     // 6. Inserir no banco
     const newAppointment = await db.query(

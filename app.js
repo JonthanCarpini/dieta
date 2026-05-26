@@ -1271,7 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusBadge = '<span class="ai-pill" style="background:rgba(34,197,94,0.15); color:#22c55e;">Agendado</span>';
                         actionButtonsHtml = `
                             <div style="display:flex; gap:8px; margin-top:4px;">
-                                <a href="${a.video_link}" target="_blank" class="btn-primary flex-1" style="font-size:11px; padding:6px; height:auto; border-radius:6px; text-decoration:none; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;">
+                                <a href="${a.video_link.includes('#') ? a.video_link : a.video_link + '#config.disableDeepLinking=true'}" class="btn-primary flex-1" style="font-size:11px; padding:6px; height:auto; border-radius:6px; text-decoration:none; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;">
                                     <i data-lucide="video" style="width:12px; height:12px;"></i>
                                     Iniciar Chamada
                                 </a>
