@@ -97,6 +97,7 @@ router.get('/availability', async (req, res) => {
 });
 
 // POST /admin/availability - Salva/substitui os horários do profissional logado
+// Cada slot recebido é expandido em janelas individuais de 30 minutos no banco.
 router.post('/availability', async (req, res) => {
   const professionalId = req.user.id;
   const { slots } = req.body;
@@ -105,21 +106,38 @@ router.post('/availability', async (req, res) => {
     return res.status(400).json({ error: 'Formato inválido. Esperado array de horários.' });
   }
 
+  function timeToMins(t) {
+    const [h, m] = (t || '').substring(0, 5).split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  }
+  function minsToTime(mins) {
+    return `${String(Math.floor(mins / 60)).padStart(2,'0')}:${String(mins % 60).padStart(2,'0')}`;
+  }
+
+  // Expande intervalos em slots individuais de 30 min
+  const expanded = [];
+  for (const slot of slots) {
+    const { day_of_week, start_time, end_time } = slot;
+    if (day_of_week === undefined || !start_time || !end_time) continue;
+    const startMins = timeToMins(start_time);
+    const endMins   = timeToMins(end_time);
+    if (endMins <= startMins) continue;
+    for (let t = startMins; t + 30 <= endMins; t += 30) {
+      expanded.push({ dow: parseInt(day_of_week), start: minsToTime(t), end: minsToTime(t + 30) });
+    }
+  }
+
   try {
     await db.query('DELETE FROM professional_availability WHERE professional_id = $1', [professionalId]);
 
-    for (const slot of slots) {
-      const { day_of_week, start_time, end_time } = slot;
-      if (day_of_week === undefined || !start_time || !end_time) continue;
-      if (end_time <= start_time) continue;
-
+    for (const s of expanded) {
       await db.query(
         'INSERT INTO professional_availability (professional_id, day_of_week, start_time, end_time) VALUES ($1, $2, $3, $4)',
-        [professionalId, parseInt(day_of_week), start_time, end_time]
+        [professionalId, s.dow, s.start, s.end]
       );
     }
 
-    res.json({ message: 'Disponibilidade salva com sucesso.' });
+    res.json({ message: `Disponibilidade salva: ${expanded.length} slot(s) de 30 minutos configurado(s).` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao salvar disponibilidade.' });
