@@ -302,20 +302,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
             }
 
-            // Carrega api key (prioridade para a global do banco de dados)
+            // Carrega api key global do banco de dados
             if (data.geminiApiKey && data.geminiApiKey.trim() !== '') {
                 state.geminiApiKey = data.geminiApiKey;
-                const inputApiKey = document.getElementById('input-api-key');
-                if (inputApiKey) inputApiKey.value = data.geminiApiKey;
             } else {
                 const apiKey = localStorage.getItem('nutrir_gemini_key');
-                if (apiKey) {
-                    state.geminiApiKey = apiKey;
-                    const inputApiKey = document.getElementById('input-api-key');
-                    if (inputApiKey) inputApiKey.value = apiKey;
-                }
+                if (apiKey) state.geminiApiKey = apiKey;
             }
-            updateApiStatusIndicator();
 
             return true;
         } catch (err) {
