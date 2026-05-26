@@ -39,6 +39,10 @@ O projeto é dividido entre a raiz (frontend e configurações) e o diretório `
 
 ```
 dieta/
+├── admin/                   # Painel Administrativo Independente
+│   ├── index.html           # Estrutura HTML do Painel Admin
+│   ├── admin.css            # Estilo do Painel Admin (Dark Glassmorphism)
+│   └── admin.js             # Lógica e controle de APIs do Painel Admin
 ├── Dockerfile.frontend      # Dockerfile do Nginx que serve a SPA estática
 ├── docker-compose.yml       # Orquestração (db, backend, frontend, nginx)
 ├── nginx.conf               # Configurações do Proxy Reverso com HTTPS SSL
@@ -57,7 +61,7 @@ dieta/
 │       ├── auth.js          # Cadastro, login tradicional e login Google
 │       ├── user.js          # Sincronização do diário do paciente e orientações
 │       ├── professional.js  # Gestão de diários e feedbacks por nutricionistas/personals
-│       └── admin.js         # Controle de planos, roles e registro de profissionais
+│       └── admin.js         # Controle de planos, roles, chaves e planos do sistema
 ```
 
 ---
@@ -75,6 +79,8 @@ Os dados do usuário agora são sincronizados diretamente com o PostgreSQL por m
 6. **`ai_recipes`**: Receitas individuais ou planos de 7 dias estruturados gerados pela IA do Gemini.
 7. **`professional_links`**: Mapeamento exclusivo entre pacientes Premium e seus nutricionistas ou personal trainers.
 8. **`professional_messages`**: Mensagens de feedback, orientações e prescrições enviadas pelos profissionais.
+9. **`system_settings`**: Armazena pares chave/valor globais dinâmicos para tokens de API externa (Gemini, Google OAuth Client ID, Mercado Pago, Asaas).
+10. **`plans`**: Armazena planos comerciais configuráveis (identificador, preço, duração, descrição, benefícios).
 
 ---
 
@@ -93,10 +99,7 @@ Os dados do usuário agora são sincronizados diretamente com o PostgreSQL por m
 * **Painel Profissional**: Nutricionistas e Personal Trainers logados são direcionados a uma interface exclusiva (`screen-professional`) onde visualizam a lista de seus pacientes vinculados, leem o diário de refeições atual e histórico, e enviam orientações que aparecem instantaneamente no perfil do paciente.
 
 ### D. Painel de Administração
-* **Painel Admin**: Usuários com o cargo de `admin` têm acesso ao painel de controle (`screen-admin`).
-* **Promoção de Cargos**: Permite promover qualquer usuário para profissional (Nutricionista/Personal) ou Admin.
-* **Alteração de Planos**: Permite conceder/retirar planos Premium manualmente.
-* **Cadastro de Profissional**: Formulário para registrar contas profissionais de forma manual e direta com planos válidos por 10 anos.
+* **Painel Admin Independente (`/admin/`)**: Área restrita para administradores acessível em `https://nutrir.online/admin/`. Ele centraliza o controle total da plataforma: gerenciamento de usuários (busca, promoção de cargo, alteração de assinaturas), listagem e cadastro de profissionais com plano premium vitalício, criação/edição/deleção de planos dinâmicos e inserção/atualização de credenciais de APIs (Gemini, Google Login, Asaas, Mercado Pago).
 
 ---
 
@@ -141,3 +144,10 @@ A plataforma é orquestrada por completo usando Docker Compose na VPS (`178.238.
 1. **Gateways Reais de Produção**: Substituir as rotas simuladas dos webhooks de pagamento por credenciais reais do Mercado Pago / Asaas integradas em produção.
 2. **Upload Direto de Fotos para a VPS**: Atualmente, as fotos do escaner são convertidas em base64 e enviadas direto para o Gemini. Criar um serviço de storage/upload (como AWS S3 ou pasta local estática no Express) para arquivar fotos dos pratos.
 3. **Edição do Diário**: Permitir que usuários cliquem nas refeições registradas no Dashboard para reabrir o modal de edição e salvar as alterações no banco.
+
+---
+
+## 10. Diretrizes de Desenvolvimento (Padrões do Projeto)
+
+* **Idioma Obrigatório**: Todas as documentações (`.md`), comentários no código, mensagens de erro, logs do terminal e, principalmente, **mensagens de commits do Git DEVEM obrigatoriamente ser escritos em português (Brasil)**. commits em outros idiomas não serão aceitos.
+
