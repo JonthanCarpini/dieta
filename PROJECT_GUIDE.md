@@ -178,5 +178,7 @@ A plataforma é orquestrada por completo usando Docker Compose na VPS (`178.238.
      ```
      O script conecta automaticamente via chave SSH (`C:/Users/admin/.ssh/disparo_vps`), executa `git pull`, recria os containers Docker e recarrega o Nginx. Requer a dependência `ssh2` instalada (`npm install ssh2`).
 
-  > **Nunca** entregue uma tarefa como concluída sem executar este fluxo completo. Alterações locais sem deploy equivalem a alterações incompletas.
+  4. **Atualizar o PROJECT_GUIDE.md** — Após o deploy, revise este documento e adicione/atualize as seções necessárias para refletir as novas implementações, rotas, tabelas ou funcionalidades introduzidas. O guia deve sempre representar o estado atual e real da plataforma em produção.
+
+  > **Nunca** entregue uma tarefa como concluída sem executar este fluxo completo. Alterações locais sem deploy equivalem a alterações incompletas. Um PROJECT_GUIDE.md desatualizado é tão problemático quanto código sem deploy.
 

@@ -166,7 +166,28 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Migração automática de tabelas criadas após o volume inicial do banco
+async function runMigrations() {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS professional_availability (
+      id SERIAL PRIMARY KEY,
+      professional_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+      start_time TIME NOT NULL,
+      end_time TIME NOT NULL,
+      active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_availability_times CHECK (end_time > start_time)
+    )
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_availability_professional ON professional_availability(professional_id)
+  `);
+  console.log('Migrações executadas com sucesso.');
+}
+
 // Inicialização do servidor
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Servidor rodando com sucesso em http://0.0.0.0:${PORT}`);
+  await runMigrations();
 });
