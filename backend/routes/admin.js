@@ -245,16 +245,23 @@ router.post('/users/:id/role', async (req, res) => {
 // ==========================================
 router.post('/users/:id/plan', async (req, res) => {
   const userId = parseInt(req.params.id);
-  const { plan, durationDays } = req.body; // plan: 'trial' ou 'premium'
+  const { plan, durationDays } = req.body;
 
-  if (!plan || !['trial', 'premium'].includes(plan)) {
-    return res.status(400).json({ error: 'Plano inválido.' });
+  if (!plan) {
+    return res.status(400).json({ error: 'Plano não fornecido.' });
   }
 
   try {
+    const planCheck = await db.query('SELECT name, duration_days FROM plans WHERE name = $1', [plan.toLowerCase().trim()]);
+    if (planCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Plano não encontrado no sistema.' });
+    }
+
+    const dbPlan = planCheck.rows[0];
     let expiresAt = null;
-    if (plan === 'premium') {
-      const days = parseInt(durationDays) || 30; // Padrão 30 dias
+
+    if (dbPlan.name !== 'trial') {
+      const days = parseInt(durationDays) || dbPlan.duration_days || 30;
       expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + days);
     } else {
@@ -265,11 +272,11 @@ router.post('/users/:id/plan', async (req, res) => {
 
     const updated = await db.query(
       `UPDATE users 
-       SET plan = $1, 
-           premium_expires_at = $2, 
-           trial_expires_at = CASE WHEN $1 = 'trial' THEN $3 ELSE trial_expires_at END
+       SET plan = $1::varchar, 
+           premium_expires_at = CASE WHEN $1::varchar = 'trial' THEN NULL ELSE $2 END, 
+           trial_expires_at = CASE WHEN $1::varchar = 'trial' THEN $3 ELSE trial_expires_at END
        WHERE id = $4 RETURNING id, email, name, plan, premium_expires_at`,
-      [plan, plan === 'premium' ? expiresAt : null, plan === 'trial' ? expiresAt : null, userId]
+      [dbPlan.name, expiresAt, dbPlan.name === 'trial' ? expiresAt : null, userId]
     );
 
     if (updated.rows.length === 0) {
