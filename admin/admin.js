@@ -1664,6 +1664,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             await cancelAdminAppointment(a.id);
                         }
                     });
+                }
                 const startCallBtn = tr.querySelector('.btn-start-call');
                 if (startCallBtn) {
                     startCallBtn.addEventListener('click', (e) => {
