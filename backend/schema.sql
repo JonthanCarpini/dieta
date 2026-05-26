@@ -98,6 +98,16 @@ CREATE TABLE IF NOT EXISTS professional_messages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 9. TABELA DE CONFIGURAÇÕES GLOBAIS DO SISTEMA
+CREATE TABLE IF NOT EXISTS system_settings (
+    key VARCHAR(255) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insere chave padrão vazia do Gemini
+INSERT INTO system_settings (key, value) VALUES ('gemini_api_key', '') ON CONFLICT DO NOTHING;
+
 -- Índices recomendados para otimização de consultas
 CREATE INDEX IF NOT EXISTS idx_meals_user_date ON meals(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_water_user_date ON water_log(user_id, date);

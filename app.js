@@ -302,11 +302,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
             }
 
-            // Carrega api key local se houver
-            const apiKey = localStorage.getItem('slimo_gemini_key');
-            if (apiKey) {
-                state.geminiApiKey = apiKey;
-                document.getElementById('input-api-key').value = apiKey;
+            // Carrega api key (prioridade para a global do banco de dados)
+            if (data.geminiApiKey && data.geminiApiKey.trim() !== '') {
+                state.geminiApiKey = data.geminiApiKey;
+                const inputApiKey = document.getElementById('input-api-key');
+                if (inputApiKey) inputApiKey.value = data.geminiApiKey;
+            } else {
+                const apiKey = localStorage.getItem('slimo_gemini_key');
+                if (apiKey) {
+                    state.geminiApiKey = apiKey;
+                    const inputApiKey = document.getElementById('input-api-key');
+                    if (inputApiKey) inputApiKey.value = apiKey;
+                }
             }
             updateApiStatusIndicator();
 
@@ -609,6 +616,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!token) return;
 
         try {
+            // Carrega as configura√ß√µes globais do Gemini
+            const settingsRes = await fetch(`${API_URL}/admin/settings`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (settingsRes.ok) {
+                const settings = await settingsRes.json();
+                const geminiInput = document.getElementById('admin-gemini-key');
+                if (geminiInput) {
+                    geminiInput.value = settings.gemini_api_key || '';
+                }
+            }
+
             const res = await fetch(`${API_URL}/admin/users`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -706,40 +725,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupAdminListeners() {
         const form = document.getElementById('admin-register-pro-form');
-        if (!form) return;
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('admin-pro-name').value;
+                const email = document.getElementById('admin-pro-email').value;
+                const password = document.getElementById('admin-pro-password').value;
+                const role = document.getElementById('admin-pro-role').value;
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const name = document.getElementById('admin-pro-name').value;
-            const email = document.getElementById('admin-pro-email').value;
-            const password = document.getElementById('admin-pro-password').value;
-            const role = document.getElementById('admin-pro-role').value;
+                const token = localStorage.getItem('slimo_token');
+                try {
+                    const res = await fetch(`${API_URL}/admin/register-professional`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ name, email, password, role })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Erro ao cadastrar profissional.');
 
-            const token = localStorage.getItem('slimo_token');
-            try {
-                const res = await fetch(`${API_URL}/admin/register-professional`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ name, email, password, role })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Erro ao cadastrar profissional.');
+                    alert('Profissional cadastrado com sucesso!');
+                    form.reset();
+                    renderAdminPanel();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        }
 
-                alert('Profissional cadastrado com sucesso!');
-                form.reset();
-                renderAdminPanel();
-            } catch (err) {
-                alert(err.message);
-            }
-        });
+        const geminiForm = document.getElementById('admin-gemini-key-form');
+        if (geminiForm) {
+            geminiForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const gemini_api_key = document.getElementById('admin-gemini-key').value.trim();
+                const token = localStorage.getItem('slimo_token');
+                try {
+                    const res = await fetch(`${API_URL}/admin/settings`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ gemini_api_key })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Erro ao salvar chave.');
 
-        document.getElementById('btn-admin-logout').addEventListener('click', () => {
-            localStorage.removeItem('slimo_token');
-            showScreen('screen-login');
-        });
+                    alert('Chave global do Gemini salva com sucesso!');
+                    
+                    state.geminiApiKey = gemini_api_key;
+                    const inputApiKey = document.getElementById('input-api-key');
+                    if (inputApiKey) inputApiKey.value = gemini_api_key;
+                    updateApiStatusIndicator();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        }
+
+        const btnAdminLogout = document.getElementById('btn-admin-logout');
+        if (btnAdminLogout) {
+            btnAdminLogout.addEventListener('click', () => {
+                localStorage.removeItem('slimo_token');
+                showScreen('screen-login');
+            });
+        }
+
+        const btnAdminToDashboard = document.getElementById('btn-admin-to-dashboard');
+        if (btnAdminToDashboard) {
+            btnAdminToDashboard.addEventListener('click', () => {
+                showScreen('screen-dashboard');
+            });
+        }
     }
 
     // ==========================================================
@@ -3308,6 +3367,15 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n√
                 <span class="p-lbl">Meta Recomendada</span><span class="p-val" style="color:var(--color-primary);">${profile.targetCalories} kcal/dia</span>
             </div>
         `;
+
+        const adminCard = document.getElementById('admin-settings-card');
+        if (adminCard) {
+            if (state.user && state.user.role === 'admin') {
+                adminCard.style.display = 'block';
+            } else {
+                adminCard.style.display = 'none';
+            }
+        }
     }
 
     function updateApiStatusIndicator() {
@@ -3403,6 +3471,13 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n√
                 setupOnboardingSliders();
             }
         });
+
+        const btnSettingsGoToAdmin = document.getElementById('btn-settings-go-to-admin');
+        if (btnSettingsGoToAdmin) {
+            btnSettingsGoToAdmin.addEventListener('click', () => {
+                showScreen('screen-admin');
+            });
+        }
 
         document.getElementById('btn-reset-app').addEventListener('click', () => {
             if (confirm("Limpar permanentemente TODOS os dados locais?")) {

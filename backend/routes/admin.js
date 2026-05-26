@@ -140,4 +140,46 @@ router.post('/register-professional', async (req, res) => {
   }
 });
 
+// ==========================================
+// 5. OBTER CONFIGURAÇÕES DO SISTEMA (ADMIN)
+// ==========================================
+router.get('/settings', async (req, res) => {
+  try {
+    const settingsRes = await db.query('SELECT * FROM system_settings');
+    const settings = {};
+    settingsRes.rows.forEach(row => {
+      settings[row.key] = row.value;
+    });
+    res.json(settings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao obter configurações.' });
+  }
+});
+
+// ==========================================
+// 6. SALVAR CONFIGURAÇÕES DO SISTEMA (ADMIN)
+// ==========================================
+router.post('/settings', async (req, res) => {
+  const { gemini_api_key } = req.body;
+  if (gemini_api_key === undefined) {
+    return res.status(400).json({ error: 'Parâmetro gemini_api_key ausente.' });
+  }
+
+  try {
+    await db.query(`
+      INSERT INTO system_settings (key, value, updated_at)
+      VALUES ('gemini_api_key', $1, NOW())
+      ON CONFLICT (key) DO UPDATE SET
+        value = EXCLUDED.value,
+        updated_at = NOW()
+    `, [gemini_api_key]);
+
+    res.json({ message: 'Configurações salvas com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar configurações.' });
+  }
+});
+
 module.exports = router;

@@ -757,6 +757,20 @@
                     </div>
                 </div>
 
+                <!-- Cartão administrativo para Administradores -->
+                <div class="settings-card" id="admin-settings-card" style="display: none; border: 1px solid rgba(255,228,64,0.2);">
+                    <div class="card-header-icon border-gemini">
+                        <i data-lucide="shield" class="text-gemini"></i>
+                        <h3>Acesso Administrativo</h3>
+                    </div>
+                    <p class="settings-description">
+                        Você possui permissões de Administrador. Acesse o painel de controle para gerenciar profissionais, usuários e chaves globais.
+                    </p>
+                    <button class="btn-primary w-full" id="btn-settings-go-to-admin">
+                        <i data-lucide="shield"></i> Ir para Painel Admin
+                    </button>
+                </div>
+
                 <!-- Limpeza de dados -->
                 <div class="settings-card danger-zone">
                     <h3>Zona de Risco</h3>
@@ -807,7 +821,10 @@
                     <span class="date-today">Painel de Controle</span>
                     <h2>Administração Geral</h2>
                 </div>
-                <button class="icon-btn" id="btn-admin-logout" title="Sair"><i data-lucide="log-out"></i></button>
+                <div style="display:flex; gap:8px;">
+                    <button class="icon-btn" id="btn-admin-to-dashboard" title="Ir para o Dashboard"><i data-lucide="home"></i></button>
+                    <button class="icon-btn" id="btn-admin-logout" title="Sair"><i data-lucide="log-out"></i></button>
+                </div>
             </header>
 
             <div class="scrollable-content admin-content">
@@ -838,6 +855,21 @@
                             </select>
                         </div>
                         <button type="submit" class="btn-primary w-full margin-top-md">Cadastrar Profissional</button>
+                    </form>
+                </div>
+
+                <!-- Configuração da Chave de API do Gemini -->
+                <div class="settings-card margin-top-lg">
+                    <div class="card-header-icon border-gemini">
+                        <i data-lucide="key" class="text-gemini"></i>
+                        <h3>Configurar Chave do Gemini (Global)</h3>
+                    </div>
+                    <form id="admin-gemini-key-form" class="margin-top-md" style="display:flex; flex-direction:column; gap:12px;">
+                        <div class="form-group">
+                            <label for="admin-gemini-key">Chave de API do Gemini (AI Studio)</label>
+                            <input type="password" id="admin-gemini-key" placeholder="AIzaSy..." required>
+                        </div>
+                        <button type="submit" class="btn-primary w-full">Salvar Chave Global</button>
                     </form>
                 </div>
 

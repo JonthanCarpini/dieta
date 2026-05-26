@@ -12,6 +12,11 @@ router.use(authenticateToken);
 router.get('/profile', async (req, res) => {
   try {
     const profileRes = await db.query('SELECT * FROM profiles WHERE user_id = $1', [req.user.id]);
+    
+    // Carrega a chave de API global do Gemini
+    const geminiKeyRes = await db.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const geminiApiKey = geminiKeyRes.rows[0] ? geminiKeyRes.rows[0].value : '';
+
     res.json({
       user: {
         id: req.user.id,
@@ -23,7 +28,8 @@ router.get('/profile', async (req, res) => {
         premium_expires_at: req.user.premium_expires_at,
         isPremiumActive: req.user.isPremiumActive
       },
-      profile: profileRes.rows[0] || null
+      profile: profileRes.rows[0] || null,
+      geminiApiKey
     });
   } catch (err) {
     console.error(err);
