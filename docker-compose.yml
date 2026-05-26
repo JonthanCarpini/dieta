@@ -31,17 +31,12 @@ services:
       - ASAAS_API_KEY=your_asaas_api_key_here
     depends_on:
       - db
-    ports:
-      - "5000:5000"
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: slimo_frontend
     restart: always
-    ports:
-      - "8080:80"
 
   nginx:
     image: nginx:alpine
