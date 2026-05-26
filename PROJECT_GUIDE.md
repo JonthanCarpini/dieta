@@ -161,6 +161,15 @@ A tela `screen-results` exibe após análise de imagem:
 - **Card de calorias**: Total em âmbar + barra de progresso vs meta diária (fica vermelha acima de 90%).
 - **Card de macros**: Barras horizontais para Proteína (verde), Carboidratos (azul) e Gordura (laranja) mostrando valor atual vs meta diária com percentual.
 - **Cards de alimentos**: Nome + kcal em âmbar no topo; badge de peso + tags coloridas (P/C/G/Fibra) embaixo. Clicável para edição.
+- **Compressão de imagem**: Frontend redimensiona para max 900px e comprime em JPEG 0.80 antes de enviar — câmera e upload de arquivo. Botão "Analisar" fica bloqueado com "Processando..." durante o resize (evita race condition).
+
+### G. Tela Diário (Dashboard)
+- **Painel de macros**: substituiu o grid de 3 colunas por um card único com 3 linhas horizontais — nome + barra de progresso + `consumido/meta g`. Todos os valores arredondados (`Math.round`).
+- **Refeições expandíveis**: clicar no cabeçalho ou no botão chevron revela a lista de alimentos individuais com peso e calorias. Tags coloridas P/C/G em cada refeição.
+
+### H. Tela Histórico
+- **Card de meta**: badge com o objetivo do usuário (`Emagrecer` / `Ganhar Massa` / `Manutenção`); macros com cores por tipo.
+- **Cards de dia**: nome do dia + data, calorias com cor semântica (verde = 85–105% da meta, azul = abaixo, vermelho = acima), barra de progresso, tags P/C/G e botão expandir para ver refeições individuais do dia com horário e macros.
 
 ---
 
@@ -210,7 +219,19 @@ Todo o layout segue o design system Obsidian definido em `style.css` e `admin/ad
 
 ---
 
-## 9. Próximos Passos e Sugestões de Melhorias
+## 9. Limites e Configurações Críticas
+
+| Camada | Parâmetro | Valor atual | Observação |
+|--------|-----------|-------------|------------|
+| Nginx | `client_max_body_size` | `20m` | Bloco `http` em `nginx.conf` |
+| Express | `express.json({ limit })` | `15mb` | `backend/server.js` |
+| Express | `express.urlencoded({ limit })` | `15mb` | `backend/server.js` |
+| Frontend | Resize de imagem scanner | max 900px, JPEG 0.80 | `resizeImageToBase64()` em `app.js` |
+| Gemini | Modelos disponíveis para a chave atual | `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-2.0-flash-001`, `gemini-2.0-flash-lite`, `gemini-2.0-flash-lite-001`, `gemini-flash-latest`, `gemini-2.5-flash-lite`, `gemini-pro-latest` | Verificado via ListModels — **não** inclui `gemini-1.5-*` |
+
+---
+
+## 10. Próximos Passos e Sugestões de Melhorias
 
 1. **Gateways Reais de Produção**: Substituir webhooks simulados de pagamento por integrações reais com Mercado Pago / Asaas.
 2. **Google OAuth Configurado**: Cadastrar um Client ID real (formato `xxxx.apps.googleusercontent.com`) no painel admin para habilitar o login social.
@@ -220,7 +241,7 @@ Todo o layout segue o design system Obsidian definido em `style.css` e `admin/ad
 
 ---
 
-## 10. Diretrizes de Desenvolvimento (Padrões do Projeto)
+## 11. Diretrizes de Desenvolvimento (Padrões do Projeto)
 
 - **Idioma Obrigatório**: Todas as documentações (`.md`), comentários no código, mensagens de erro, logs do terminal e **mensagens de commits do Git DEVEM obrigatoriamente ser escritas em português (Brasil)**. Commits em outros idiomas não serão aceitos.
 
