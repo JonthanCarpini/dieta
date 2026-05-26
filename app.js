@@ -4194,62 +4194,277 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    let activeJitsiMeetApi = null;
+    let localStream = null;
+    let peerConnection = null;
+    let wsSignal = null;
+    let isMicMuted = false;
+    let isCamOff = false;
 
-    function startVideoCall(link) {
+    async function startVideoCall(link) {
         let roomName = 'nutrir-room';
         try {
             const urlObj = new URL(link);
-            // Pega a parte após a barra (removendo qualquer hash ou barra inicial)
             roomName = urlObj.pathname.substring(1).split('#')[0].split('?')[0];
         } catch(e) {
             roomName = link.replace('https://meet.jit.si/', '').split('#')[0].split('?')[0];
         }
 
-        const container = document.getElementById('video-call-container');
-        container.innerHTML = ''; // Limpa container
+        const statusEl = document.getElementById('video-call-status');
+        if (statusEl) statusEl.textContent = 'Acessando câmera e microfone...';
 
-        const domain = 'meet.jit.si';
-        const options = {
-            roomName: roomName,
-            width: '100%',
-            height: '100%',
-            parentNode: container,
-            lang: 'pt-BR',
-            configOverwrite: {
-                prejoinPageEnabled: false,
-                disableDeepLinking: true,
-                startWithAudioMuted: false,
-                startWithVideoMuted: false
-            },
-            interfaceConfigOverwrite: {
-                MOBILE_APP_PROMO: false
-            }
-        };
+        showScreen('screen-video-call');
 
         try {
-            showScreen('screen-video-call');
-            activeJitsiMeetApi = new JitsiMeetExternalAPI(domain, options);
-            activeJitsiMeetApi.addEventListener('readyToClose', () => {
-                closeVideoCall();
+            // Obter fluxo local de mídia
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            const localVideo = document.getElementById('local-video');
+            if (localVideo) localVideo.srcObject = localStream;
+
+            isMicMuted = false;
+            isCamOff = false;
+            updateCallControlsUI();
+
+            // Configurar botões de controle
+            setupCallControlsListeners();
+
+            // Configurar a conexão WebRTC
+            peerConnection = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
             });
-        } catch(err) {
-            console.error('Erro ao iniciar Jitsi Meet External API:', err);
-            alert('Não foi possível carregar a chamada de vídeo. Certifique-se de que possui conexão com a internet.');
+
+            // Adicionar faixas locais ao PeerConnection
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            // Manipular faixa remota
+            peerConnection.ontrack = (event) => {
+                const remoteVideo = document.getElementById('remote-video');
+                if (remoteVideo) {
+                    remoteVideo.srcObject = event.streams[0];
+                }
+                if (statusEl) statusEl.textContent = 'Em chamada';
+            };
+
+            // Determinar URL do WebSocket de sinalização
+            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            let host = window.location.host;
+            if (typeof API_URL !== 'undefined' && API_URL.includes('http')) {
+                try {
+                    const apiHost = new URL(API_URL).host;
+                    host = apiHost;
+                } catch(e) {}
+            }
+            const wsUrl = `${protocol}${host}/api/signal`;
+
+            if (statusEl) statusEl.textContent = 'Conectando ao servidor...';
+
+            wsSignal = new WebSocket(wsUrl);
+
+            wsSignal.onopen = () => {
+                console.log('Conectado ao servidor de sinalização');
+                if (statusEl) statusEl.textContent = 'Aguardando outro participante...';
+                
+                // Enviar join
+                wsSignal.send(JSON.stringify({
+                    type: 'join',
+                    room: roomName,
+                    userId: state.user ? state.user.id : 'paciente-' + Date.now()
+                }));
+            };
+
+            wsSignal.onmessage = async (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    switch (data.type) {
+                        case 'new-peer':
+                            if (statusEl) statusEl.textContent = 'Iniciando chamada...';
+                            // Criar oferta SDP
+                            const offer = await peerConnection.createOffer();
+                            await peerConnection.setLocalDescription(offer);
+                            wsSignal.send(JSON.stringify({
+                                type: 'offer',
+                                offer: offer,
+                                room: roomName
+                            }));
+                            break;
+
+                        case 'offer':
+                            if (statusEl) statusEl.textContent = 'Conectando...';
+                            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                            const answer = await peerConnection.createAnswer();
+                            await peerConnection.setLocalDescription(answer);
+                            wsSignal.send(JSON.stringify({
+                                type: 'answer',
+                                answer: answer,
+                                room: roomName
+                            }));
+                            break;
+
+                        case 'answer':
+                            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                            break;
+
+                        case 'candidate':
+                            if (data.candidate) {
+                                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                            }
+                            break;
+
+                        case 'peer-left':
+                            if (statusEl) statusEl.textContent = 'O profissional saiu da sala.';
+                            setTimeout(() => {
+                                closeVideoCall();
+                            }, 2000);
+                            break;
+
+                        case 'error':
+                            alert(data.message);
+                            closeVideoCall();
+                            break;
+                    }
+                } catch(err) {
+                    console.error('Erro ao processar sinalização:', err);
+                }
+            };
+
+            // Enviar candidatos ICE
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && wsSignal && wsSignal.readyState === WebSocket.OPEN) {
+                    wsSignal.send(JSON.stringify({
+                        type: 'candidate',
+                        candidate: event.candidate,
+                        room: roomName
+                    }));
+                }
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                if (peerConnection) {
+                    console.log('WebRTC Connection State:', peerConnection.connectionState);
+                    if (peerConnection.connectionState === 'connected') {
+                        if (statusEl) statusEl.textContent = 'Em chamada';
+                    } else if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+                        if (statusEl) statusEl.textContent = 'Conexão perdida. Reabrindo...';
+                    }
+                }
+            };
+
+        } catch (err) {
+            console.error('Erro ao iniciar vídeo chamada nativa:', err);
+            alert('Não foi possível acessar câmera/microfone. Verifique suas permissões nas configurações do navegador.');
             closeVideoCall();
         }
     }
 
-    function closeVideoCall() {
-        if (activeJitsiMeetApi) {
-            try {
-                activeJitsiMeetApi.dispose();
-            } catch(e) {
-                console.error(e);
-            }
-            activeJitsiMeetApi = null;
+    function setupCallControlsListeners() {
+        const btnMic = document.getElementById('btn-toggle-mic');
+        const btnCam = document.getElementById('btn-toggle-cam');
+        const btnHangup = document.getElementById('btn-hangup');
+
+        if (btnMic) {
+            const newBtnMic = btnMic.cloneNode(true);
+            btnMic.parentNode.replaceChild(newBtnMic, btnMic);
+            newBtnMic.addEventListener('click', toggleMic);
         }
-        document.getElementById('video-call-container').innerHTML = '';
+        if (btnCam) {
+            const newBtnCam = btnCam.cloneNode(true);
+            btnCam.parentNode.replaceChild(newBtnCam, btnCam);
+            newBtnCam.addEventListener('click', toggleCam);
+        }
+        if (btnHangup) {
+            const newBtnHangup = btnHangup.cloneNode(true);
+            btnHangup.parentNode.replaceChild(newBtnHangup, btnHangup);
+            newBtnHangup.addEventListener('click', () => {
+                if (confirm('Deseja realmente encerrar a videochamada?')) {
+                    closeVideoCall();
+                }
+            });
+        }
+    }
+
+    function toggleMic() {
+        if (!localStream) return;
+        const audioTracks = localStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+            isMicMuted = !isMicMuted;
+            audioTracks.forEach(track => track.enabled = !isMicMuted);
+            updateCallControlsUI();
+        }
+    }
+
+    function toggleCam() {
+        if (!localStream) return;
+        const videoTracks = localStream.getVideoTracks();
+        if (videoTracks.length > 0) {
+            isCamOff = !isCamOff;
+            videoTracks.forEach(track => track.enabled = !isCamOff);
+            updateCallControlsUI();
+            
+            const localVideo = document.getElementById('local-video');
+            if (localVideo) {
+                localVideo.style.opacity = isCamOff ? '0' : '1';
+            }
+        }
+    }
+
+    function updateCallControlsUI() {
+        const btnMic = document.getElementById('btn-toggle-mic');
+        const btnCam = document.getElementById('btn-toggle-cam');
+
+        if (btnMic) {
+            if (isMicMuted) {
+                btnMic.style.background = '#ef4444';
+                btnMic.innerHTML = '<i data-lucide="mic-off" style="width:18px; height:18px;"></i>';
+            } else {
+                btnMic.style.background = '#22c55e';
+                btnMic.innerHTML = '<i data-lucide="mic" style="width:18px; height:18px;"></i>';
+            }
+        }
+
+        if (btnCam) {
+            if (isCamOff) {
+                btnCam.style.background = '#ef4444';
+                btnCam.innerHTML = '<i data-lucide="video-off" style="width:18px; height:18px;"></i>';
+            } else {
+                btnCam.style.background = '#22c55e';
+                btnCam.innerHTML = '<i data-lucide="video" style="width:18px; height:18px;"></i>';
+            }
+        }
+        
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    }
+
+    function closeVideoCall() {
+        if (wsSignal && wsSignal.readyState === WebSocket.OPEN) {
+            try {
+                wsSignal.send(JSON.stringify({ type: 'leave' }));
+            } catch(e) {}
+            wsSignal.close();
+        }
+        wsSignal = null;
+
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        if (localVideo) localVideo.srcObject = null;
+        if (remoteVideo) remoteVideo.srcObject = null;
+
         showScreen('screen-my-professionals');
         renderMyProfessionalsScreen();
     }

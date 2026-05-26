@@ -190,7 +190,123 @@ async function runMigrations() {
 }
 
 // Inicialização do servidor
-app.listen(PORT, '0.0.0.0', async () => {
+const http = require('http');
+const WebSocket = require('ws');
+
+const server = http.createServer(app);
+
+// Inicialização do WebSocket Server de sinalização
+const wss = new WebSocket.Server({ noServer: true });
+
+// Armazenar conexões por sala
+const rooms = new Map(); // roomName -> Set of ws clients
+
+wss.on('connection', (ws) => {
+  let currentRoom = null;
+  let clientUserId = null;
+
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+      
+      switch (data.type) {
+        case 'join':
+          currentRoom = data.room;
+          clientUserId = data.userId;
+          
+          if (!rooms.has(currentRoom)) {
+            rooms.set(currentRoom, new Set());
+          }
+          
+          const roomClients = rooms.get(currentRoom);
+          if (roomClients.size >= 2) {
+            ws.send(JSON.stringify({ type: 'error', message: 'A sala está cheia.' }));
+            return;
+          }
+          
+          roomClients.add(ws);
+          ws.room = currentRoom;
+          ws.userId = clientUserId;
+
+          console.log(`Usuário ${clientUserId} entrou na sala ${currentRoom}`);
+
+          // Se já tem outro participante, notifica ambos
+          if (roomClients.size === 2) {
+            for (const client of roomClients) {
+              if (client !== ws) {
+                client.send(JSON.stringify({ type: 'new-peer', userId: clientUserId }));
+                ws.send(JSON.stringify({ type: 'new-peer', userId: client.userId }));
+              }
+            }
+          }
+          break;
+
+        case 'offer':
+        case 'answer':
+        case 'candidate':
+          // Encaminhar para o outro cliente na mesma sala
+          if (currentRoom && rooms.has(currentRoom)) {
+            const clients = rooms.get(currentRoom);
+            clients.forEach((client) => {
+              if (client !== ws && client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(data));
+              }
+            });
+          }
+          break;
+
+        case 'leave':
+          leaveRoom();
+          break;
+      }
+    } catch (e) {
+      console.error('Erro ao processar mensagem WS:', e);
+    }
+  });
+
+  function leaveRoom() {
+    if (currentRoom && rooms.has(currentRoom)) {
+      const clients = rooms.get(currentRoom);
+      clients.delete(ws);
+      console.log(`Usuário ${clientUserId} saiu da sala ${currentRoom}`);
+      
+      // Notifica o outro que o peer saiu
+      clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ type: 'peer-left' }));
+        }
+      });
+
+      if (clients.size === 0) {
+        rooms.delete(currentRoom);
+      }
+    }
+    currentRoom = null;
+  }
+
+  ws.on('close', () => {
+    leaveRoom();
+  });
+
+  ws.on('error', (err) => {
+    console.error('Erro na conexão WS:', err);
+    leaveRoom();
+  });
+});
+
+// Interceptar o upgrade de protocolo HTTP para WebSocket na rota /api/signal
+server.on('upgrade', (request, socket, head) => {
+  const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+  if (pathname === '/api/signal') {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  } else {
+    socket.destroy();
+  }
+});
+
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Servidor rodando com sucesso em http://0.0.0.0:${PORT}`);
   await runMigrations();
 });

@@ -15,7 +15,8 @@
     "express": "^4.19.2",
     "google-auth-library": "^9.10.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.11.5"
+    "pg": "^8.11.5",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
