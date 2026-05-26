@@ -508,11 +508,16 @@ router.post('/appointments', async (req, res) => {
       return res.status(400).json({ error: 'O profissional não atende neste dia da semana.' });
     }
 
-    // Validar se o horário solicitado está contido em alguma faixa de atendimento disponível
+    // Validar se o horário solicitado está contido em alguma faixa de atendimento disponível.
+    // Normaliza para HH:MM pois o PostgreSQL retorna time como "HH:MM:SS".
+    const normalizeTime = t => (t || '').substring(0, 5);
+    const reqStart = normalizeTime(start_time);
+    const reqEnd   = normalizeTime(end_time);
+
     const isWithinSlot = availabilityRes.rows.some(slot => {
-      const slotStart = slot.start_time;
-      const slotEnd = slot.end_time;
-      return (start_time >= slotStart && end_time <= slotEnd && start_time < end_time);
+      const slotStart = normalizeTime(slot.start_time);
+      const slotEnd   = normalizeTime(slot.end_time);
+      return reqStart >= slotStart && reqEnd <= slotEnd && reqStart < reqEnd;
     });
 
     if (!isWithinSlot) {
