@@ -2051,7 +2051,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || 'Falha ao gerar receita');
         }
-        const { recipe: r, mealType: mt } = await res.json();
+        const data = await res.json();
+        const { recipe: r, mealType: mt, _meta } = data;
+
+        if (_meta) {
+            console.group(`%c[Nutrir IA] Receita Diária`, 'color:#f5c14d;font-weight:bold');
+            console.log(`Provedor : ${_meta.provider}`);
+            console.log(`Modelo   : ${_meta.model}`);
+            console.log(`Latência : ${_meta.latency_ms}ms`);
+            console.log(`Receita  : ${r.name} | ${r.calories} kcal | ${r.time_min}min`);
+            console.groupEnd();
+        }
 
         const imagesByCategory = {
             breakfast: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400",
@@ -2093,7 +2103,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || 'Falha ao gerar plano semanal');
         }
-        const { plans: plansArray, mealType: mt } = await res.json();
+        const weeklyData = await res.json();
+        const { plans: plansArray, mealType: mt, _meta } = weeklyData;
+
+        if (_meta) {
+            console.group(`%c[Nutrir IA] Plano Semanal`, 'color:#f5c14d;font-weight:bold');
+            console.log(`Provedor : ${_meta.provider}`);
+            console.log(`Modelo   : ${_meta.model}`);
+            console.log(`Latência : ${_meta.latency_ms}ms`);
+            console.log(`Receitas : ${plansArray.length} dias gerados`);
+            plansArray.forEach(r => console.log(`  Dia ${r.day}: ${r.name} | ${r.calories} kcal`));
+            console.groupEnd();
+        }
 
         const imagesByCategory = {
             breakfast: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400",
@@ -2791,7 +2812,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const err = await response.json().catch(() => ({}));
             throw new Error(err.error || 'Falha ao analisar imagem');
         }
-        return response.json();
+        const scanData = await response.json();
+        if (scanData._meta) {
+            console.group(`%c[Nutrir IA] Scanner de Alimentos`, 'color:#f5c14d;font-weight:bold');
+            console.log(`Provedor : ${scanData._meta.provider}`);
+            console.log(`Modelo   : ${scanData._meta.model}`);
+            console.log(`Latência : ${scanData._meta.latency_ms}ms`);
+            if (scanData.items) {
+                console.log(`Itens    : ${scanData.items.map(i => `${i.name} (${i.weight_g}g)`).join(', ')}`);
+                console.log(`Total    : ${scanData.total?.calories} kcal | P:${scanData.total?.protein}g C:${scanData.total?.carbs}g G:${scanData.total?.fat}g`);
+            }
+            console.groupEnd();
+        }
+        return scanData;
     }
 
     function simulateImageScan() {
