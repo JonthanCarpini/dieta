@@ -1,0 +1,1791 @@
+/* ==========================================================================
+   SLIMO AI DIET TRACKER - ESTILO PREMIUM E DESIGN SYSTEM (FASE 2)
+   ========================================================================== */
+
+/* 1. VARIÁVEIS E TOKENS DE DESIGN */
+:root {
+    --bg-app: #0c0d10;
+    --bg-surface: rgba(22, 24, 33, 0.7);
+    --bg-surface-elevated: rgba(30, 33, 46, 0.95);
+    --border-color: rgba(255, 255, 255, 0.05);
+    --border-hover: rgba(255, 255, 255, 0.1);
+    
+    /* Paleta Premium */
+    --color-primary: #ff9f0a; /* Laranja característico do Slimo */
+    --color-primary-rgb: 255, 159, 10;
+    --color-secondary: #0a84ff; /* Azul da hidratação */
+    --color-secondary-rgb: 10, 132, 255;
+    --color-text-main: #f3f4f6;
+    --color-text-muted: #8e8e93;
+    
+    /* Macronutrientes */
+    --color-protein: #ff375f;
+    --color-protein-rgb: 255, 55, 95;
+    --color-carbs: #30d158;
+    --color-carbs-rgb: 48, 209, 88;
+    --color-fat: #ffd60a;
+    --color-fat-rgb: 255, 214, 10;
+    --color-fiber: #bf5af2;
+    
+    /* Gradientes */
+    --gradient-primary: linear-gradient(135deg, #ff9f0a, #ff375f);
+    --gradient-accent: linear-gradient(135deg, #bf5af2, #ff375f);
+    --gradient-orange-yellow: linear-gradient(90deg, #ffd60a 0%, #ff9f0a 100%);
+    --gradient-fasting: linear-gradient(135deg, #ffd60a, #ff375f);
+    --gradient-water: linear-gradient(180deg, #0a84ff, #30d158);
+
+    --shadow-premium: 0 12px 40px rgba(0, 0, 0, 0.5);
+    --blur-glass: 20px;
+    --transition-smooth: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* 2. RESET E UTILS */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: #030304;
+    color: var(--color-text-main);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+/* App Wrapper */
+.app-container {
+    width: 100%;
+    max-width: 460px;
+    height: 100vh;
+    background-color: var(--bg-app);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (min-width: 461px) {
+    .app-container {
+        height: 92vh;
+        max-height: 860px;
+        border-radius: 36px;
+        border: 4px solid #2c2c2e;
+        box-shadow: var(--shadow-premium);
+    }
+}
+
+/* Roteador de telas */
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: var(--transition-smooth);
+    background-color: var(--bg-app);
+    padding-bottom: 75px; /* Altura do Bottom Nav */
+    z-index: 1;
+}
+
+.screen.active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+    z-index: 2;
+}
+
+/* Telas sem Bottom Nav */
+#screen-onboarding,
+#screen-scanner,
+#screen-results,
+#screen-food-search {
+    padding-bottom: 0;
+    z-index: 5;
+}
+
+.scrollable-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    padding-bottom: 40px;
+    scrollbar-width: none;
+}
+
+.scrollable-content::-webkit-scrollbar {
+    display: none;
+}
+
+.flex-1 { flex: 1; }
+.hidden { display: none !important; }
+.w-full { width: 100%; }
+.margin-top-md { margin-top: 16px; }
+.margin-top-lg { margin-top: 24px; }
+
+/* 3. ELEMENTOS BÁSICOS & ENTRADAS */
+.btn-primary {
+    background: var(--gradient-primary);
+    color: #fff;
+    border: none;
+    border-radius: 16px;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    box-shadow: 0 4px 15px rgba(255, 159, 10, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 159, 10, 0.45);
+    filter: brightness(1.05);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-primary:disabled {
+    background: #2c2c2e;
+    color: var(--color-text-muted);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--color-text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 14px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-hover);
+}
+
+.btn-danger {
+    background: rgba(255, 55, 95, 0.1);
+    color: var(--color-protein);
+    border: 1px solid rgba(255, 55, 95, 0.2);
+    border-radius: 16px;
+    padding: 14px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.btn-danger:hover {
+    background: rgba(255, 55, 95, 0.15);
+}
+
+.btn-text-icon {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.icon-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    color: var(--color-text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Custom styled inputs */
+.form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group-row {
+    display: flex;
+    gap: 12px;
+}
+
+label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+input[type="number"],
+input[type="text"],
+input[type="password"],
+select {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    color: var(--color-text-main);
+    font-size: 15px;
+    font-family: inherit;
+    transition: var(--transition-smooth);
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.gender-selector {
+    display: flex;
+    gap: 10px;
+}
+
+.gender-btn {
+    flex: 1;
+    cursor: pointer;
+}
+
+.gender-btn input { display: none; }
+.gender-btn .btn-content {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    padding: 12px;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-smooth);
+}
+
+.gender-btn input:checked + .btn-content {
+    border-color: var(--color-primary);
+    background: rgba(255, 159, 10, 0.08);
+}
+
+.gender-btn input:checked + .btn-content i {
+    color: var(--color-primary);
+}
+
+.gender-btn span {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* SLIDERS PERSONALIZADOS ESTILO SLIMO */
+.label-row-val {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.slider-display-val {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--color-primary);
+}
+
+.slider-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Range input style */
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 10px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    outline: none;
+    overflow: visible;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    margin-top: -7px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(0,0,0,0.1);
+    transition: var(--transition-smooth);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+    transform: scale(1.15);
+    background: var(--color-primary);
+}
+
+.slider-bounds {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+}
+
+/* BALÃO DE DIÁLOGO DO MASCOTE */
+.mascot-speech-bubble {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    padding: 16px;
+    border-radius: 20px;
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.mascot-img-placeholder {
+    font-size: 32px;
+    animation: bounce 2s infinite ease-in-out;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+.speech-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--color-text-main);
+    font-weight: 500;
+}
+
+/* QUADROS DE ESTIMATIVA NO ONBOARDING */
+.estimation-results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 24px;
+    margin-bottom: 24px;
+}
+
+.result-box {
+    background: rgba(255, 159, 10, 0.03);
+    border: 1px dashed rgba(255, 159, 10, 0.2);
+    padding: 16px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.result-box .r-title {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.result-box .r-value {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--color-text-main);
+}
+
+.result-box .r-value strong {
+    color: var(--color-primary);
+}
+
+.onboarding-submit-btn {
+    margin-top: 10px;
+}
+
+/* ==========================================================================
+   4. DASHBOARD E ELEMENTOS DO DIÁRIO
+   ========================================================================== */
+.dashboard-header {
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.user-greeting h2 {
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.badge-btn-review {
+    background: rgba(255, 159, 10, 0.15);
+    border: 1px solid rgba(255, 159, 10, 0.3);
+    color: var(--color-primary);
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    animation: alertPulse 2s infinite ease-in-out;
+}
+
+@keyframes alertPulse {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 1; transform: scale(1.02); }
+}
+
+.dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Barra de pesquisa (Slimo Trigger Bar) */
+.search-trigger-bar {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    flex-shrink: 0;
+}
+
+.search-trigger-bar:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-hover);
+}
+
+/* Calorie Card */
+.calorie-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 24px;
+    backdrop-filter: blur(var(--blur-glass));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.ring-wrapper {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.progress-ring {
+    transform: rotate(-90deg);
+    width: 160px;
+    height: 160px;
+    flex-shrink: 0;
+}
+
+.progress-ring__circle {
+    transition: stroke-dashoffset 0.8s ease-in-out;
+    stroke-dasharray: 427.25;
+    stroke-dashoffset: 427.25;
+}
+
+.ring-text {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.ring-number {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--color-text-main);
+}
+
+.ring-label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    font-weight: 700;
+}
+
+.calorie-summary-row {
+    display: flex;
+    width: 100%;
+    justify-content: space-around;
+    align-items: center;
+    border-top: 1px solid rgba(255,255,255,0.03);
+    padding-top: 16px;
+}
+
+.cal-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.cal-stat .stat-val {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.cal-stat .stat-lbl {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    font-weight: 700;
+}
+
+.cal-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* CARD DE HIDRATAÇÃO (ÁGUA) */
+.water-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.water-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.water-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-secondary);
+}
+
+.water-icon-pulse {
+    animation: waterPulse 2s infinite ease-in-out;
+}
+
+@keyframes waterPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.water-title {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.water-amount {
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.water-bar-bg {
+    height: 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.water-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-secondary), #8b5cf6);
+    border-radius: 10px;
+    transition: width 0.5s ease-in-out;
+}
+
+.water-controls-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn-water-quick {
+    flex: 1;
+    background: rgba(10, 132, 255, 0.08);
+    border: 1px solid rgba(10, 132, 255, 0.15);
+    color: var(--color-secondary);
+    border-radius: 12px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    transition: var(--transition-smooth);
+}
+
+.btn-water-quick:hover {
+    background: rgba(10, 132, 255, 0.15);
+}
+
+.btn-water-quick .sub {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+/* Macros Grid */
+.macro-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.macro-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.border-protein { border-left: 4px solid var(--color-protein); }
+.border-carbs { border-left: 4px solid var(--color-carbs); }
+.border-fat { border-left: 4px solid var(--color-fat); }
+
+.macro-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.macro-name {
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.macro-val {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.macro-val strong {
+    color: var(--color-text-main);
+}
+
+.bar-bg {
+    height: 8px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    border-radius: 10px;
+    width: 0%;
+    transition: width 0.6s cubic-bezier(0.1, 0.8, 0.3, 1);
+}
+
+.bg-protein { background: var(--color-protein); }
+.bg-carbs { background: var(--color-carbs); }
+.bg-fat { background: var(--color-fat); }
+
+/* Floating Action Button (FAB) */
+.btn-fab {
+    position: absolute;
+    bottom: 90px;
+    right: 20px;
+    background: var(--gradient-primary);
+    color: #fff;
+    border: none;
+    border-radius: 30px;
+    height: 52px;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 800;
+    box-shadow: 0 8px 24px rgba(255, 159, 10, 0.4);
+    cursor: pointer;
+    z-index: 10;
+    transition: var(--transition-smooth);
+}
+
+.btn-fab:hover {
+    transform: translateY(-2px);
+}
+
+/* Meals List */
+.meals-log-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 32px;
+    flex-shrink: 0;
+}
+
+.section-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-title-row h3 {
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.meal-count {
+    font-size: 10px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 3px 8px;
+    border-radius: 20px;
+    color: var(--color-text-muted);
+}
+
+.meals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.meal-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: var(--transition-smooth);
+}
+
+.meal-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.meal-title {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.meal-time {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.meal-macros-summary {
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+    color: var(--color-text-muted);
+}
+
+.meal-item-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.meal-cal-badge {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.meal-cal-badge span {
+    font-size: 10px;
+    color: var(--color-text-muted);
+}
+
+.meal-delete-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 55, 95, 0.5);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+}
+
+.meal-delete-btn:hover {
+    color: var(--color-protein);
+    background: rgba(255, 55, 95, 0.08);
+}
+
+/* ==========================================================================
+   5. TELA DE BUSCA DE ALIMENTOS NACIONAIS (BRASIL DATABASE)
+   ========================================================================== */
+.search-input-wrapper {
+    position: relative;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.search-icon-inside {
+    position: absolute;
+    left: 40px;
+    color: var(--color-text-muted);
+}
+
+.search-input-wrapper input {
+    padding-left: 44px;
+    padding-right: 44px;
+}
+
+.clear-search-btn {
+    position: absolute;
+    right: 40px;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.search-results-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Card do resultado de busca */
+.search-food-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.search-food-item:hover {
+    border-color: var(--border-hover);
+    background: rgba(255,255,255,0.02);
+}
+
+.food-meta-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.food-meta-info .title {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.food-meta-info .kcal {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.food-meta-info .portion-badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--color-primary);
+    background: rgba(255, 159, 10, 0.08);
+    padding: 2px 6px;
+    border-radius: 20px;
+    align-self: flex-start;
+    margin-top: 4px;
+}
+
+.add-food-search-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 159, 10, 0.2);
+    background: rgba(255, 159, 10, 0.05);
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-smooth);
+}
+
+.search-food-item:hover .add-food-search-btn {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+/* ==========================================================================
+   6. TELA DE RECEITAS E DETALHAMENTO
+   ========================================================================== */
+.recipes-content-view {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Filtros horizontais */
+.recipe-filters {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+    flex-shrink: 0;
+}
+
+.recipe-filters::-webkit-scrollbar { display: none; }
+
+.recipe-filter-btn {
+    white-space: nowrap;
+    border: 1px solid var(--border-color);
+    background: rgba(255,255,255,0.02);
+    color: var(--color-text-muted);
+    border-radius: 12px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.recipe-filter-btn.active {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+}
+
+/* AI Banner */
+.ai-recipe-banner {
+    background: radial-gradient(circle at top right, rgba(255, 159, 10, 0.15), transparent 70%);
+    border: 1px dashed rgba(255, 159, 10, 0.25);
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.banner-badge {
+    align-self: flex-start;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    background: var(--color-primary);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+.ai-recipe-banner h4 {
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.ai-recipe-banner p {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+/* Grid de Receitas */
+.recipes-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.recipe-grid-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    display: flex;
+    height: 110px;
+}
+
+.recipe-grid-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+}
+
+.recipe-card-img {
+    width: 110px;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+}
+
+.recipe-card-info {
+    flex: 1;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.recipe-card-info h4 {
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.3;
+}
+
+.recipe-card-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.recipe-card-meta .cal {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+/* VISUALIZAÇÃO DE RECEITA NO MODAL COM SLIDER ESCALADOR */
+.scrollable-modal-content {
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.recipe-tags-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.recipe-badge-item {
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.recipe-badge-item.text-protein {
+    background: rgba(255, 55, 95, 0.1);
+    color: var(--color-protein);
+}
+
+.recipe-nutritional-box {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    padding: 16px;
+}
+
+.recipe-nutritional-box h4 {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    font-weight: 700;
+}
+
+.recipe-macros-table {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+
+.recipe-m-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.recipe-m-stat .val {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.recipe-m-stat .lbl {
+    font-size: 10px;
+    color: var(--color-text-muted);
+}
+
+.recipe-calories-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.recipe-calories-row strong {
+    color: var(--color-primary);
+    font-size: 16px;
+}
+
+/* Seletor de porções */
+.portions-selector-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    margin-bottom: 12px;
+}
+
+.portions-controls {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 3px;
+}
+
+.portions-controls button {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255,255,255,0.04);
+    color: var(--color-text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.portions-controls button:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.portion-val-display {
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.ingredients-scaled-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ingredient-scaled-card {
+    background: rgba(255,255,255,0.01);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+
+.ingredient-scaled-card .i-name {
+    font-weight: 600;
+}
+
+.ingredient-scaled-card .i-amount {
+    color: var(--color-primary);
+    font-weight: 800;
+}
+
+.preparo-section p {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+}
+
+/* ==========================================================================
+   7. TELA DE JEJUM INTERMITENTE (TIMER CIRCULAR)
+   ========================================================================== */
+.fasting-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.fasting-protocol-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px;
+    width: 100%;
+}
+
+.fasting-timer-container {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.fasting-ring-wrapper {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.progress-ring-fasting {
+    transform: rotate(-90deg);
+    width: 220px;
+    height: 220px;
+}
+
+.progress-ring-fasting circle {
+    transition: stroke-dashoffset 0.3s linear;
+}
+
+.fasting-text-center {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 170px;
+}
+
+.fasting-status-label {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    letter-spacing: 0.5px;
+}
+
+.fasting-timer-digits {
+    font-size: 30px;
+    font-weight: 800;
+    font-family: 'Outfit', monospace;
+    letter-spacing: -0.5px;
+    color: var(--color-text-main);
+    margin: 4px 0;
+}
+
+.fasting-info-sub {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.fasting-phase-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 20px;
+    width: 100%;
+}
+
+.fasting-phase-card .phase-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.fasting-phase-card h4 {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.fasting-phase-card p {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+/* ==========================================================================
+   8. MODAL DE PLATÔ E CONFIGURAÇÃO MANUAL
+   ========================================================================== */
+.plateau-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.plateau-option-btn {
+    cursor: pointer;
+}
+
+.plateau-option-btn input { display: none; }
+
+.plateau-option-btn .option-content {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border-color);
+    padding: 16px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: var(--transition-smooth);
+}
+
+.plateau-option-btn input:checked + .option-content {
+    border-color: var(--color-primary);
+    background: rgba(255, 159, 10, 0.08);
+}
+
+.plateau-option-btn .option-content span {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.plateau-option-btn .option-content .subtext {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+/* Flex meta override styling */
+.flex-meta-adjusters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.summary-total-cal-box {
+    background: rgba(255, 159, 10, 0.04);
+    border: 1px solid rgba(255, 159, 10, 0.15);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    margin-top: 16px;
+}
+
+.summary-total-cal-box strong {
+    color: var(--color-primary);
+    font-size: 16px;
+}
+
+/* Mini preview de macros ao adicionar alimento por busca */
+.food-confirm-summary-pill {
+    background: rgba(255,255,255,0.03);
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.food-confirm-macros-preview {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.macro-mini {
+    background: rgba(0,0,0,0.15);
+    border-radius: 10px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.macro-mini .lbl {
+    font-size: 9px;
+    color: var(--color-text-muted);
+    font-weight: 700;
+}
+
+.macro-mini .val {
+    font-size: 12px;
+    font-weight: 800;
+    margin-top: 2px;
+}
+
+/* ==========================================================================
+   9. NAVEGAÇÃO INFERIOR E GERAIS
+   ========================================================================== */
+.bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 75px;
+    background: var(--bg-surface-elevated);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding-bottom: 12px;
+    backdrop-filter: blur(var(--blur-glass));
+    z-index: 10;
+}
+
+.nav-item {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 700;
+    flex: 1;
+    transition: var(--transition-smooth);
+}
+
+.nav-item i {
+    width: 18px;
+    height: 18px;
+}
+
+.nav-item.active {
+    color: var(--color-primary);
+}
+
+.nav-item.active i {
+    transform: translateY(-1px);
+}
+
+/* Modais */
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 30;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--transition-smooth);
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-card {
+    width: 100%;
+    background: var(--bg-surface-elevated);
+    border-top: 1px solid var(--border-color);
+    border-radius: 28px 28px 0 0;
+    padding: 24px;
+    transform: translateY(100%);
+    transition: var(--transition-smooth);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modal-overlay.active .modal-card {
+    transform: translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 12px;
+}
+
+.modal-footer.flex-column {
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Scrollbar styling for modais */
+.scrollable-modal-content::-webkit-scrollbar {
+    width: 4px;
+}
+.scrollable-modal-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+}
+
+/* Custom Recipes & IA Planner Styling */
+.recipe-top-nav-tabs {
+    display: flex;
+    padding: 8px 24px;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.recipe-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: var(--transition-smooth);
+}
+
+.recipe-tab-btn.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.recipe-section-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ai-recipe-generator-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-recipe-generator-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle, rgba(var(--color-secondary-rgb), 0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.ai-recipe-generator-card h4 {
+    font-size: 16px;
+    font-weight: 800;
+    margin-top: 8px;
+}
+
+.ai-recipe-generator-card .description {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+.count-badge {
+    background: rgba(255, 159, 10, 0.1);
+    color: var(--color-primary);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+/* Weekly Plan Cards */
+.weekly-plans-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.weekly-plan-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: var(--transition-smooth);
+}
+
+.weekly-plan-card:hover {
+    border-color: var(--border-hover);
+}
+
+.weekly-plan-header {
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    background: rgba(255,255,255,0.01);
+}
+
+.weekly-plan-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.weekly-plan-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text-main);
+}
+
+.weekly-plan-subtitle {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.weekly-plan-icon {
+    transition: var(--transition-smooth);
+    color: var(--color-text-muted);
+}
+
+.weekly-plan-card.expanded .weekly-plan-icon {
+    transform: rotate(180deg);
+    color: var(--color-primary);
+}
+
+.weekly-plan-days-list {
+    display: none;
+    border-top: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px 0;
+}
+
+.weekly-plan-card.expanded .weekly-plan-days-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.weekly-day-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.weekly-day-row:last-child {
+    border-bottom: none;
+}
+
+.weekly-day-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.weekly-day-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    width: 60px;
+}
+
+.weekly-day-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.weekly-day-cal {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+}
+
+.weekly-day-arrow {
+    color: var(--color-text-muted);
+    margin-left: 8px;
+}

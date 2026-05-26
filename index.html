@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slimo AI - Dieta & Scanner de Alimentos</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons (CDN) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js (CDN) para histórico de peso/macros -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+    
+    <!-- Container Principal do App (Simula Celular se no Desktop, Tela Cheia se no Mobile) -->
+    <div class="app-container">
+        
+        <!-- ========================================== -->
+        <!-- 1. TELA DE ONBOARDING (METAS SOB MEDIDA)  -->
+        <!-- ========================================== -->
+        <section id="screen-onboarding" class="screen active">
+            <div class="welcome-header">
+                <div class="logo-badge">Slimo <span class="ai-pill">AI</span></div>
+                <h1>Crie seu plano de metas sob medida.</h1>
+                <p>Insira seus dados para estimar sua meta calórica diária com base em ciência.</p>
+            </div>
+            
+            <form id="onboarding-form" class="scrollable-content">
+                <!-- Passo 1: Gênero e Idade -->
+                <div class="form-group-row">
+                    <div class="form-group flex-1">
+                        <label>Sexo Biológico</label>
+                        <div class="gender-selector">
+                            <label class="gender-btn">
+                                <input type="radio" name="gender" value="male" checked>
+                                <div class="btn-content">
+                                    <i data-lucide="mars"></i>
+                                    <span>Masc</span>
+                                </div>
+                            </label>
+                            <label class="gender-btn">
+                                <input type="radio" name="gender" value="female">
+                                <div class="btn-content">
+                                    <i data-lucide="venus"></i>
+                                    <span>Fem</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group flex-1">
+                        <label for="input-age">Idade (anos)</label>
+                        <input type="number" id="input-age" min="15" max="100" value="26" required>
+                    </div>
+                </div>
+
+                <!-- Passo 2: Altura e Peso Atual -->
+                <div class="form-group-row">
+                    <div class="form-group flex-1">
+                        <label for="input-weight">Peso Atual (kg)</label>
+                        <input type="number" id="input-weight" step="0.1" min="30" max="250" value="70.0" required>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="input-height">Altura (cm)</label>
+                        <input type="number" id="input-height" min="100" max="250" value="172" required>
+                    </div>
+                </div>
+
+                <!-- Passo 3: Nível de Atividade -->
+                <div class="form-group">
+                    <label for="select-activity">Nível de Atividade Física</label>
+                    <select id="select-activity" required>
+                        <option value="1.2">Sedentário (pouco ou nenhum exercício)</option>
+                        <option value="1.375" selected>Leve (exercício 1-3 dias/semana)</option>
+                        <option value="1.55">Moderado (exercício 3-5 dias/semana)</option>
+                        <option value="1.725">Ativo (exercício 6-7 dias/semana)</option>
+                        <option value="1.9">Altamente Ativo (trabalho físico + treinos intensos)</option>
+                    </select>
+                </div>
+
+                <!-- Passo 4: Sliders Dinâmicos (Slimo Goal Settings) -->
+                <div class="divider-line"></div>
+                <div class="onboarding-interactive-section">
+                    <div class="mascot-speech-bubble">
+                        <div class="mascot-img-placeholder">🔥</div>
+                        <div class="speech-text">Escolha o seu ritmo de perder ou ganhar peso.</div>
+                    </div>
+
+                    <!-- Objetivo de Peso -->
+                    <div class="form-group">
+                        <div class="label-row-val">
+                            <label>Qual é seu objetivo de peso?</label>
+                            <span class="slider-display-val"><strong id="lbl-goal-weight">60.0</strong> kg</span>
+                        </div>
+                        <div class="slider-wrapper">
+                            <input type="range" id="slider-goal-weight" min="40" max="120" step="0.5" value="60">
+                            <div class="slider-bounds">
+                                <span id="lbl-bound-min">48.3 kg</span>
+                                <span id="lbl-bound-max">65.0 kg</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Velocidade de Perda/Ganho -->
+                    <div class="form-group">
+                        <div class="label-row-val">
+                            <label id="lbl-speed-title">Velocidade de perder peso</label>
+                            <span class="slider-display-val"><strong id="lbl-diet-speed">-0.50</strong> kg/semana</span>
+                        </div>
+                        <div class="slider-wrapper">
+                            <input type="range" id="slider-diet-speed" min="0.2" max="1.5" step="0.05" value="0.5">
+                            <div class="slider-bounds">
+                                <span>Lento (0.2)</span>
+                                <span>Rápido (1.5)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resultados Estimados em tempo real -->
+                    <div class="estimation-results-grid">
+                        <div class="result-box">
+                            <span class="r-title">Calorias diárias</span>
+                            <span class="r-value"><strong id="onboard-cal-result">1500</strong> kcal/dia</span>
+                        </div>
+                        <div class="result-box">
+                            <span class="r-title">Fim estimado da dieta</span>
+                            <span class="r-value" id="onboard-date-result">12/10/2026</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botão de Ação -->
+                <button type="submit" class="btn-primary onboarding-submit-btn">
+                    Continuar e Criar Plano
+                    <i data-lucide="arrow-right"></i>
+                </button>
+            </form>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 2. TELA DO DASHBOARD PRINCIPAL (INÍCIO)    -->
+        <!-- ========================================== -->
+        <section id="screen-dashboard" class="screen">
+            <header class="dashboard-header">
+                <div class="user-greeting">
+                    <span class="date-today" id="dashboard-date">Terça, 26 de Maio</span>
+                    <h2>Olá! Pronto para focar?</h2>
+                </div>
+                <!-- Botão de avaliação semanal -->
+                <button class="badge-btn-review hidden" id="btn-trigger-weekly-review" title="Avaliação Semanal Pendente">
+                    <i data-lucide="award"></i> Avaliar Semana
+                </button>
+            </header>
+
+            <div class="scrollable-content dashboard-content">
+                <!-- Barra de Pesquisa de Alimentos (Slimo Style) -->
+                <div class="search-trigger-bar" id="search-trigger-box">
+                    <i data-lucide="search"></i>
+                    <span>Buscar alimento nacional (iogurte, tapioca...)</span>
+                </div>
+
+                <!-- Progresso de Calorias com Anel SVG -->
+                <div class="calorie-card">
+                    <div class="ring-wrapper">
+                        <svg class="progress-ring" width="160" height="160">
+                            <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.05)" stroke-width="12" fill="transparent" r="68" cx="80" cy="80"/>
+                            <circle id="calorie-progress-circle" class="progress-ring__circle" stroke="url(#gradient-calories)" stroke-width="12" fill="transparent" r="68" cx="80" cy="80" stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="gradient-calories" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#7209b7" />
+                                    <stop offset="100%" stop-color="#3a86c8" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="ring-text">
+                            <span class="ring-number" id="dashboard-cal-remaining">2.100</span>
+                            <span class="ring-label">kcal restantes</span>
+                        </div>
+                    </div>
+                    <div class="calorie-summary-row">
+                        <div class="cal-stat">
+                            <span class="stat-val" id="dashboard-cal-consumed">0</span>
+                            <span class="stat-lbl">Consumido</span>
+                        </div>
+                        <div class="cal-divider"></div>
+                        <div class="cal-stat">
+                            <span class="stat-val" id="dashboard-cal-target">2.100</span>
+                            <span class="stat-lbl">Meta Diária</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Copo de Hidratação de Água (Slimo style) -->
+                <div class="water-card">
+                    <div class="water-header">
+                        <div class="water-title-wrap">
+                            <i data-lucide="droplet" class="water-icon-pulse"></i>
+                            <span class="water-title">Hidratação do Dia</span>
+                        </div>
+                        <span class="water-amount" id="water-progress-text">0 / 2500 ml</span>
+                    </div>
+                    
+                    <div class="water-bar-bg">
+                        <div class="water-bar-fill" id="water-bar" style="width: 0%"></div>
+                    </div>
+
+                    <div class="water-controls-row">
+                        <button class="btn-water-quick" data-amount="250">+250ml <span class="sub">Copo</span></button>
+                        <button class="btn-water-quick" data-amount="500">+500ml <span class="sub">Garrafa</span></button>
+                        <button class="icon-btn" id="btn-water-reset" title="Resetar Água">
+                            <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cards dos Macronutrientes -->
+                <div class="macro-grid">
+                    <!-- Proteínas -->
+                    <div class="macro-card border-protein">
+                        <div class="macro-header-row">
+                            <span class="macro-name">Proteína</span>
+                            <span class="macro-val"><strong id="consumed-protein">0</strong>/<span id="target-protein">150</span>g</span>
+                        </div>
+                        <div class="bar-bg"><div class="bar-fill bg-protein" id="bar-protein" style="width: 0%"></div></div>
+                    </div>
+                    <!-- Carboidratos -->
+                    <div class="macro-card border-carbs">
+                        <div class="macro-header-row">
+                            <span class="macro-name">Carboidratos</span>
+                            <span class="macro-val"><strong id="consumed-carbs">0</strong>/<span id="target-carbs">220</span>g</span>
+                        </div>
+                        <div class="bar-bg"><div class="bar-fill bg-carbs" id="bar-carbs" style="width: 0%"></div></div>
+                    </div>
+                    <!-- Gorduras -->
+                    <div class="macro-card border-fat">
+                        <div class="macro-header-row">
+                            <span class="macro-name">Gordura</span>
+                            <span class="macro-val"><strong id="consumed-fat">0</strong>/<span id="target-fat">70</span>g</span>
+                        </div>
+                        <div class="bar-bg"><div class="bar-fill bg-fat" id="bar-fat" style="width: 0%"></div></div>
+                    </div>
+                </div>
+
+                <!-- Histórico de Refeições de Hoje -->
+                <div class="meals-log-section">
+                    <div class="section-title-row">
+                        <h3>Refeições de Hoje</h3>
+                        <span class="meal-count" id="meal-count-badge">0 refeições</span>
+                    </div>
+                    <div class="meals-list" id="dashboard-meals-list">
+                        <div class="empty-state">
+                            <i data-lucide="salad" class="empty-icon"></i>
+                            <p>Nenhuma refeição registrada hoje. Use o scanner para adicionar!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Botão Flutuante (Scanner de Prato) -->
+            <button class="btn-fab" id="btn-fab-camera" title="Escanear Prato">
+                <i data-lucide="camera"></i>
+                <span>Escanear Prato</span>
+            </button>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 2.A SUB-TELA DE BUSCA DE ALIMENTOS         -->
+        <!-- ========================================== -->
+        <section id="screen-food-search" class="screen">
+            <header class="scanner-header">
+                <button class="icon-btn btn-back" id="btn-close-food-search">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+                <h3>Alimentos Nacionais</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="food-search-body">
+                <div class="search-input-wrapper">
+                    <i data-lucide="search" class="search-icon-inside"></i>
+                    <input type="text" id="input-food-search" placeholder="Ex: iogurte, tapioca, feijão..." autofocus>
+                    <button class="clear-search-btn" id="btn-clear-search-input" style="display: none;"><i data-lucide="x"></i></button>
+                </div>
+
+                <div class="search-results-scroll" id="food-search-results">
+                    <!-- Será preenchido por JS baseado nos itens brasileiros -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 3. TELA DE SCANNER (CÂMERA E UPLOAD)       -->
+        <!-- ========================================== -->
+        <section id="screen-scanner" class="screen">
+            <header class="scanner-header">
+                <button class="icon-btn btn-back" id="btn-back-scanner">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+                <h3>Escanear Alimento</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="scanner-body">
+                <div class="camera-preview-container">
+                    <video id="camera-stream" autoplay playsinline class="camera-feed"></video>
+                    <canvas id="photo-canvas" style="display: none;"></canvas>
+                    <div class="scanner-laser"></div>
+                    <div class="camera-frame">
+                        <div class="corner top-left"></div>
+                        <div class="corner top-right"></div>
+                        <div class="corner bottom-left"></div>
+                        <div class="corner bottom-right"></div>
+                    </div>
+                    <div class="camera-placeholder" id="camera-placeholder">
+                        <i data-lucide="image" class="placeholder-icon"></i>
+                        <p>Posicione seu prato ou faça o upload de uma foto</p>
+                    </div>
+                </div>
+
+                <div class="scanner-controls">
+                    <div class="input-tabs">
+                        <button class="tab-btn active" id="tab-camera"><i data-lucide="camera"></i> Câmera</button>
+                        <button class="tab-btn" id="tab-upload"><i data-lucide="upload"></i> Upload</button>
+                    </div>
+
+                    <div class="control-group" id="controls-camera">
+                        <button class="btn-capture" id="btn-capture-photo" title="Tirar Foto">
+                            <div class="btn-capture-inner"></div>
+                        </button>
+                        <p class="control-hint">Toque para capturar e analisar seu prato</p>
+                    </div>
+
+                    <div class="control-group hidden" id="controls-upload">
+                        <div class="upload-dropzone">
+                            <input type="file" id="file-uploader" accept="image/*" style="display: none;">
+                            <button class="btn-secondary" id="btn-select-file">
+                                <i data-lucide="folder-open"></i>
+                                Selecionar Imagem
+                            </button>
+                            <p class="upload-filename" id="upload-filename-text">Nenhum arquivo selecionado</p>
+                        </div>
+                        <button class="btn-primary" id="btn-analyze-upload" disabled>
+                            Analisar Foto Selecionada
+                            <i data-lucide="sparkles"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ai-loader-overlay hidden" id="ai-loader">
+                <div class="loader-content">
+                    <div class="sparkle-ring">
+                        <i data-lucide="sparkles" class="pulsing-sparkle"></i>
+                    </div>
+                    <h4>Analisando seu prato...</h4>
+                    <p id="loader-status">Processando imagem e estimando macros</p>
+                    <div class="bar-bg mini-loader"><div class="bar-fill animated-progress"></div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 4. TELA DE RESULTADOS DE NUTRIÇÃO         -->
+        <!-- ========================================== -->
+        <section id="screen-results" class="screen">
+            <header class="results-header">
+                <button class="icon-btn btn-back" id="btn-back-results">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+                <h3>Análise Nutricional</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="scrollable-content results-content">
+                <div class="result-image-preview">
+                    <img id="result-photo-preview" src="" alt="Prato analisado">
+                    <div class="source-badge"><i data-lucide="check-circle"></i> Analisado com IA</div>
+                </div>
+
+                <div class="results-summary-card">
+                    <div class="results-calories">
+                        <span class="kcal-number" id="result-total-calories">342</span>
+                        <span class="kcal-label">kcal no total</span>
+                    </div>
+                    <div class="results-macros-row">
+                        <div class="result-macro-pill text-protein">
+                            <span class="label">Proteína</span>
+                            <span class="value" id="result-total-protein">24g</span>
+                        </div>
+                        <div class="result-macro-pill text-carbs">
+                            <span class="label">Carbos</span>
+                            <span class="value" id="result-total-carbs">32g</span>
+                        </div>
+                        <div class="result-macro-pill text-fat">
+                            <span class="label">Gordura</span>
+                            <span class="value" id="result-total-fat">10g</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detected-foods-section">
+                    <div class="section-title-row">
+                        <h3>Alimentos Identificados</h3>
+                        <button class="btn-text-icon" id="btn-add-manual-item">
+                            <i data-lucide="plus"></i>
+                            Adicionar Item
+                        </button>
+                    </div>
+                    <div class="food-items-list" id="detected-foods-list"></div>
+                </div>
+
+                <div class="actions-section">
+                    <button class="btn-primary" id="btn-save-meal">
+                        <i data-lucide="plus-circle"></i>
+                        Adicionar Refeição ao Diário
+                    </button>
+                    <button class="btn-secondary" id="btn-discard-meal">
+                        Descartar
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 5. TELA DE RECEITAS SAUDÁVEIS (EXPANDIDO)  -->
+        <!-- ========================================== -->
+        <section id="screen-recipes" class="screen">
+            <header class="scanner-header">
+                <h3>Receitas & Planejador IA</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <!-- Abas de Navegação Internas para Receitas -->
+            <div class="recipe-top-nav-tabs">
+                <button class="recipe-tab-btn active" id="btn-tab-recipes-default">
+                    <i data-lucide="book-open"></i> Receitas Fit
+                </button>
+                <button class="recipe-tab-btn" id="btn-tab-recipes-ai">
+                    <i data-lucide="sparkles" class="text-gemini"></i> Planejador IA
+                </button>
+            </div>
+
+            <div class="scrollable-content recipes-content-view">
+                
+                <!-- SEÇÃO 1: RECEITAS PADRÃO DO APP -->
+                <div id="section-recipes-default" class="recipe-section-panel">
+                    <!-- Filtros de categoria -->
+                    <div class="recipe-filters">
+                        <button class="recipe-filter-btn active" data-category="all">Todas</button>
+                        <button class="recipe-filter-btn" data-category="breakfast">Café</button>
+                        <button class="recipe-filter-btn" data-category="lunch">Almoço</button>
+                        <button class="recipe-filter-btn" data-category="snack">Lanches</button>
+                    </div>
+
+                    <!-- Grid de Receitas -->
+                    <div class="recipes-grid" id="recipes-list-container">
+                        <!-- Injetado dinamicamente -->
+                    </div>
+                </div>
+
+                <!-- SEÇÃO 2: GERADOR E PLANOS IA -->
+                <div id="section-recipes-ai" class="recipe-section-panel hidden">
+                    <!-- Painel do Gerador IA -->
+                    <div class="ai-recipe-generator-card">
+                        <div class="banner-badge"><i data-lucide="sparkles"></i> IA Slimo</div>
+                        <h4>Criar Plano de Receitas Sob Medida</h4>
+                        <p class="description">Nossa inteligência gerará receitas deliciosas e detalhadas calibradas especificamente para bater suas calorias e macros diários.</p>
+                        
+                        <div class="form-group margin-top-md">
+                            <label for="select-ai-meal-type">Tipo de Refeição</label>
+                            <select id="select-ai-meal-type">
+                                <option value="all">Qualquer Refeição</option>
+                                <option value="breakfast">Café da Manhã</option>
+                                <option value="lunch">Almoço</option>
+                                <option value="dinner">Jantar</option>
+                                <option value="snack">Lanches / Snacks</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="select-ai-period">Período de Planejamento</label>
+                            <select id="select-ai-period">
+                                <option value="daily">Diário (1 receita adaptada ao saldo de hoje)</option>
+                                <option value="weekly">Semanal (7 receitas completas, uma para cada dia)</option>
+                            </select>
+                        </div>
+
+                        <button class="btn-primary w-full margin-top-md" id="btn-generate-ai-recipe-v2">
+                            Gerar com Inteligência Artificial
+                            <i data-lucide="sparkles"></i>
+                        </button>
+                    </div>
+
+                    <!-- Receitas Diárias IA Salvas -->
+                    <div class="saved-ai-section margin-top-lg">
+                        <div class="section-title-row">
+                            <h3>Receitas Diárias Salvas</h3>
+                            <span class="count-badge" id="ai-daily-count">0</span>
+                        </div>
+                        <div class="recipes-grid" id="ai-saved-recipes-container">
+                            <!-- Injetado por JS -->
+                        </div>
+                    </div>
+
+                    <!-- Planos Semanais Salvos -->
+                    <div class="saved-ai-section margin-top-lg">
+                        <div class="section-title-row">
+                            <h3>Planos Semanais Salvos</h3>
+                            <span class="count-badge" id="ai-weekly-count">0</span>
+                        </div>
+                        <div class="weekly-plans-list" id="ai-weekly-plans-container">
+                            <!-- Injetado por JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 6. TELA DE JEJUM INTERMITENTE (NOVO)      -->
+        <!-- ========================================== -->
+        <section id="screen-fasting" class="screen">
+            <header class="scanner-header">
+                <h3>Jejum Intermitente</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="scrollable-content fasting-content">
+                <!-- Seletor de Protocolo -->
+                <div class="fasting-protocol-card">
+                    <label for="select-fasting-protocol">Selecione seu Protocolo</label>
+                    <select id="select-fasting-protocol">
+                        <option value="12">Jejum Simples (12h de jejum / 12h alimentação)</option>
+                        <option value="14" selected>Jejum Moderado (14h de jejum / 10h alimentação)</option>
+                        <option value="16">Jejum Slimo Lean (16h de jejum / 8h alimentação)</option>
+                        <option value="18">Jejum Avançado (18h de jejum / 6h alimentação)</option>
+                    </select>
+                </div>
+
+                <!-- Timer Circular do Jejum -->
+                <div class="fasting-timer-container">
+                    <div class="fasting-ring-wrapper">
+                        <svg class="progress-ring-fasting" width="220" height="220">
+                            <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.03)" stroke-width="14" fill="transparent" r="95" cx="110" cy="110"/>
+                            <circle id="fasting-progress-circle" class="progress-ring__circle" stroke="url(#gradient-fasting)" stroke-width="14" fill="transparent" r="95" cx="110" cy="110" stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="gradient-fasting" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#fee440" />
+                                    <stop offset="100%" stop-color="#ff477e" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="fasting-text-center">
+                            <span class="fasting-status-label" id="fasting-state-label">Alimentação livre</span>
+                            <span class="fasting-timer-digits" id="fasting-timer-display">00:00:00</span>
+                            <span class="fasting-info-sub" id="fasting-period-info">Alvo: 14 horas</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botão de Ação do Jejum -->
+                <button class="btn-primary w-full" id="btn-toggle-fasting">
+                    <i data-lucide="play-circle"></i>
+                    Iniciar Meu Jejum
+                </button>
+
+                <!-- Cards com Dicas / Fases do Jejum -->
+                <div class="fasting-phase-card" id="fasting-phase-info-box">
+                    <div class="phase-header">
+                        <i data-lucide="info" class="text-gemini"></i>
+                        <h4>Estado Metabólico Atual</h4>
+                    </div>
+                    <p id="fasting-phase-description">Você está no período de alimentação livre. Seu corpo está digerindo os nutrientes recentes e acumulando glicogênio.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 7. TELA DE HISTÓRICO E GRÁFICOS          -->
+        <!-- ========================================== -->
+        <section id="screen-history" class="screen">
+            <header class="history-header">
+                <h3>Evolução & Histórico</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="scrollable-content history-content">
+                <div class="stats-overview-card">
+                    <h4>Meta Diária Estabelecida</h4>
+                    <div class="target-stats-grid">
+                        <div class="t-stat">
+                            <span class="t-val" id="hist-target-cal">2.100 kcal</span>
+                            <span class="t-lbl">Calorias</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val" id="hist-target-p">150g</span>
+                            <span class="t-lbl">Proteína</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val" id="hist-target-c">220g</span>
+                            <span class="t-lbl">Carbo</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val" id="hist-target-f">70g</span>
+                            <span class="t-lbl">Gordura</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container-card">
+                    <div class="chart-header">
+                        <h3>Acompanhamento Semanal</h3>
+                        <span class="chart-sub">Calorias diárias consumidas</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="weekly-calories-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="diary-archive-section">
+                    <h3>Registros Anteriores</h3>
+                    <div class="history-days-list" id="history-days-container"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 8. TELA DE PERFIL E OPÇÕES                -->
+        <!-- ========================================== -->
+        <section id="screen-settings" class="screen">
+            <header class="settings-header">
+                <h3>Perfil de Dieta</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="scrollable-content settings-content">
+                <!-- Configurações do Perfil do Usuário / Slimo Customize -->
+                <div class="settings-card">
+                    <div class="card-header-icon border-profile">
+                        <i data-lucide="user" class="text-profile"></i>
+                        <h3>Plano Alimentar Atual</h3>
+                    </div>
+                    
+                    <div class="settings-profile-info" id="settings-profile-summary"></div>
+
+                    <!-- Ajustes flexíveis (Slimo Custom Metas) -->
+                    <div class="flex-meta-adjusters">
+                        <button class="btn-secondary" id="btn-adjust-calories-manual">
+                            <i data-lucide="edit"></i> Ajustar meta calórica
+                        </button>
+                        <button class="btn-secondary" id="btn-adjust-macros-manual">
+                            <i data-lucide="sliders"></i> Ajustar macronutrientes
+                        </button>
+                    </div>
+
+                    <button class="btn-primary w-full" id="btn-recalculate-profile">
+                        <i data-lucide="refresh-cw"></i>
+                        Redefinir seu plano (Onboarding)
+                    </button>
+                </div>
+
+                <!-- Cartão da API Key do Gemini -->
+                <div class="settings-card">
+                    <div class="card-header-icon border-gemini">
+                        <i data-lucide="sparkles" class="text-gemini"></i>
+                        <h3>Conexão IA Gemini</h3>
+                    </div>
+                    <p class="settings-description">
+                        Insira sua chave do Google AI Studio para ativar o escaneamento de fotos realistas e o gerador inteligente de receitas.
+                    </p>
+                    <div class="form-group">
+                        <label for="input-api-key">Chave de API do Gemini</label>
+                        <div class="input-password-wrapper">
+                            <input type="password" id="input-api-key" placeholder="AIzaSy...">
+                            <button class="icon-btn" id="btn-toggle-api-key" type="button" title="Mostrar/Ocultar">
+                                <i data-lucide="eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="api-status-badge inactive" id="api-status-indicator">
+                        <div class="status-dot"></div>
+                        <span id="api-status-text">Demonstração Mock Ativo</span>
+                    </div>
+                    
+                    <button class="btn-primary w-full" id="btn-save-settings-key">
+                        Salvar Chave de API
+                    </button>
+                </div>
+
+                <!-- Limpeza de dados -->
+                <div class="settings-card danger-zone">
+                    <h3>Zona de Risco</h3>
+                    <p class="settings-description">Apaga permanentemente todo o histórico de refeições, metas calculadas e chave de API.</p>
+                    <button class="btn-danger w-full" id="btn-reset-app">
+                        <i data-lucide="trash-2"></i>
+                        Resetar Todos os Dados
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- NAVEGAÇÃO INFERIOR DE 5 ABAS (SLIMO STYLE) -->
+        <!-- ========================================== -->
+        <nav class="bottom-nav" id="main-navigation">
+            <button class="nav-item active" data-target="screen-dashboard">
+                <i data-lucide="layout-grid"></i>
+                <span>Diário</span>
+            </button>
+            <button class="nav-item" data-target="screen-recipes">
+                <i data-lucide="salad"></i>
+                <span>Receitas</span>
+            </button>
+            <button class="nav-item" data-target="screen-fasting">
+                <i data-lucide="timer"></i>
+                <span>Jejum</span>
+            </button>
+            <button class="nav-item" data-target="screen-history">
+                <i data-lucide="calendar"></i>
+                <span>Histórico</span>
+            </button>
+            <button class="nav-item" data-target="screen-settings">
+                <i data-lucide="user"></i>
+                <span>Perfil</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAIS E COMPONENTES SUSPENSOS             -->
+    <!-- ========================================== -->
+
+    <!-- Modal de Detalhamento e Escala de Receita -->
+    <div class="modal-overlay" id="recipe-detail-modal">
+        <div class="modal-card recipe-modal-card">
+            <div class="modal-header">
+                <h3 id="recipe-modal-title">Purê de Batata com Frango Desfiado</h3>
+                <button class="icon-btn" id="btn-close-recipe-modal"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body scrollable-modal-content">
+                <div class="recipe-tags-row">
+                    <span class="recipe-badge-item text-protein" id="recipe-modal-category">Almoço</span>
+                    <span class="recipe-badge-item" id="recipe-modal-time"><i data-lucide="clock"></i> 25 min</span>
+                </div>
+
+                <!-- Tabela de informação nutricional (por porção) -->
+                <div class="recipe-nutritional-box">
+                    <h4>Informação nutricional (por porção)</h4>
+                    <div class="recipe-macros-table">
+                        <div class="recipe-m-stat">
+                            <span class="val" id="recipe-m-carbs">52.3g</span>
+                            <span class="lbl">Carboidratos</span>
+                        </div>
+                        <div class="recipe-m-stat">
+                            <span class="val" id="recipe-m-protein">50.5g</span>
+                            <span class="lbl">Proteínas</span>
+                        </div>
+                        <div class="recipe-m-stat">
+                            <span class="val" id="recipe-m-fat">7.3g</span>
+                            <span class="lbl">Gorduras</span>
+                        </div>
+                    </div>
+                    <div class="recipe-calories-row">
+                        <span>Calorias</span>
+                        <strong id="recipe-m-calories">483 kcal</strong>
+                    </div>
+                </div>
+
+                <!-- Slider de Ajuste Nutricional (Slimo Scale Feature) -->
+                <div class="form-group margin-top-lg">
+                    <label>Ajuste nutricional</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="slider-recipe-scale" min="50" max="150" value="100" step="5">
+                        <div class="slider-bounds">
+                            <span>Menos calorias (-50%)</span>
+                            <span>Padrão (100%)</span>
+                            <span>Mais calorias (+50%)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Seletor de Porções -->
+                <div class="portions-selector-row">
+                    <label>Ingredientes</label>
+                    <div class="portions-controls">
+                        <button class="portion-btn-minus" id="btn-recipe-portion-minus"><i data-lucide="minus"></i></button>
+                        <span class="portion-val-display"><strong id="lbl-recipe-portions">1</strong> porção</span>
+                        <button class="portion-btn-plus" id="btn-recipe-portion-plus"><i data-lucide="plus"></i></button>
+                    </div>
+                </div>
+
+                <!-- Ingredientes List -->
+                <div class="ingredients-scaled-list" id="recipe-ingredients-list">
+                    <!-- Preenchido dinamicamente por JS -->
+                </div>
+
+                <!-- Modo de preparo simples -->
+                <div class="preparo-section margin-top-md">
+                    <label>Modo de Preparo</label>
+                    <p id="recipe-directions-text">Cozinhe a batata inglesa. Amasse e misture com o requeijão light e sal. Sirva com o frango cozido e desfiado grelhado por cima.</p>
+                </div>
+            </div>
+            <div class="modal-footer recipe-modal-footer">
+                <button class="btn-secondary" id="btn-log-recipe-7days">POR 7 DIAS</button>
+                <button class="btn-primary" id="btn-log-recipe-today">PARA HOJE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Avaliação Semanal (Plateau Checker) -->
+    <div class="modal-overlay" id="weekly-review-modal">
+        <div class="modal-card weekly-review-card">
+            <div class="modal-header">
+                <h3>Avaliação Semanal</h3>
+                <button class="icon-btn" id="btn-close-weekly-modal"><i data-lucide="x"></i></button>
+            </div>
+            
+            <!-- Passo 1: Solicitar peso -->
+            <div class="modal-body" id="weekly-step-weight">
+                <div class="mascot-speech-bubble">
+                    <div class="mascot-img-placeholder">📊</div>
+                    <div class="speech-text">Chegou o momento do seu ajuste semanal! Vamos avaliar seu peso atual?</div>
+                </div>
+                <div class="form-group margin-top-lg">
+                    <label for="input-weekly-current-weight">Insira seu peso atual (kg)</label>
+                    <input type="number" id="input-weekly-current-weight" step="0.1" placeholder="Ex: 69.5">
+                </div>
+                <button class="btn-primary w-full margin-top-md" id="btn-weekly-submit-weight">
+                    Analisar Meu Peso
+                </button>
+            </div>
+
+            <!-- Passo 2: Platô e Ajuste -->
+            <div class="modal-body hidden" id="weekly-step-plateau">
+                <div class="mascot-speech-bubble">
+                    <div class="mascot-img-placeholder">🔥</div>
+                    <div class="speech-text">Muitas vezes, um platô se resolve sozinho com mais consistência. Se quiser tentar acelerar o processo, uma opção é fazer um pequeno ajuste. A escolha é sua.</div>
+                </div>
+
+                <div class="plateau-options-list margin-top-lg">
+                    <label class="plateau-option-btn">
+                        <input type="radio" name="plateau-adjustment" value="keep" checked>
+                        <div class="option-content">
+                            <span>Manter a meta atual</span>
+                        </div>
+                    </label>
+                    <label class="plateau-option-btn">
+                        <input type="radio" name="plateau-adjustment" value="reduce">
+                        <div class="option-content">
+                            <span>Reduzir um pouco as calorias...</span>
+                            <span class="subtext">Ajuste de Calorias: -5% da meta calórica diária</span>
+                        </div>
+                    </label>
+                </div>
+
+                <button class="btn-primary w-full margin-top-md" id="btn-weekly-confirm-adjustment">
+                    CONTINUAR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Ajustar Meta Calórica Manual (Settings) -->
+    <div class="modal-overlay" id="modal-adjust-cal-manual">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Ajustar sua meta calórica diária</h3>
+                <button class="icon-btn" id="btn-close-cal-manual"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="input-cal-manual-value">Meta Calórica Diária (kcal)</label>
+                    <input type="number" id="input-cal-manual-value" min="800" max="6000" placeholder="Ex: 1500">
+                    <span class="input-hint">Defina sua meta personalizada de consumo diário de calorias.</span>
+                </div>
+            </div>
+            <div class="modal-footer flex-column">
+                <button class="btn-primary w-full" id="btn-save-cal-manual">AJUSTAR CALORIAS</button>
+                <button class="btn-secondary w-full" id="btn-restore-cal-defaults">RESTAURAR PADRÕES</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Ajustar Macronutrientes Manual (Settings) -->
+    <div class="modal-overlay" id="modal-adjust-macros-manual">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Ajustar macronutrientes</h3>
+                <button class="icon-btn" id="btn-close-macros-manual"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="input-manual-carbs">Carboidratos (g)</label>
+                    <input type="number" id="input-manual-carbs" min="0" placeholder="Carboidratos em gramas">
+                </div>
+                <div class="form-group">
+                    <label for="input-manual-protein">Proteínas (g)</label>
+                    <input type="number" id="input-manual-protein" min="0" placeholder="Proteínas em gramas">
+                </div>
+                <div class="form-group">
+                    <label for="input-manual-fat">Gorduras (g)</label>
+                    <input type="number" id="input-manual-fat" min="0" placeholder="Gorduras em gramas">
+                </div>
+                
+                <div class="summary-total-cal-box">
+                    <span>Total de calorias:</span>
+                    <strong id="lbl-manual-total-calories">1500 kcal</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-restore-macros-defaults">REDEFINIR</button>
+                <button class="btn-primary" id="btn-save-macros-manual">CONFIRMAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação de quantidade ao adicionar Alimento pela Busca -->
+    <div class="modal-overlay" id="food-add-confirm-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="food-confirm-title">Adicionar Alimento</h3>
+                <button class="icon-btn" id="btn-close-food-confirm-modal"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="food-confirm-summary-pill">
+                    <span id="food-confirm-subtitle">100g = 51 kcal</span>
+                </div>
+                <div class="form-group margin-top-md">
+                    <label for="input-food-confirm-weight">Quantidade consumida (g)</label>
+                    <input type="number" id="input-food-confirm-weight" min="1" value="100">
+                </div>
+                
+                <div class="food-confirm-macros-preview">
+                    <div class="macro-mini">
+                        <span class="lbl">Carbo</span>
+                        <span class="val" id="lbl-confirm-c">0g</span>
+                    </div>
+                    <div class="macro-mini">
+                        <span class="lbl">Proteína</span>
+                        <span class="val" id="lbl-confirm-p">0g</span>
+                    </div>
+                    <div class="macro-mini">
+                        <span class="lbl">Gordura</span>
+                        <span class="val" id="lbl-confirm-f">0g</span>
+                    </div>
+                    <div class="macro-mini">
+                        <span class="lbl">Calorias</span>
+                        <span class="val text-gemini" id="lbl-confirm-cal">0 kcal</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-cancel-food-confirm">Cancelar</button>
+                <button class="btn-primary" id="btn-save-food-confirm">Adicionar ao Diário</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Alimento do Escaner -->
+    <div class="modal-overlay" id="food-edit-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-title">Editar Alimento</h3>
+                <button class="icon-btn" id="btn-close-modal"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body scrollable-modal-content">
+                <div class="form-group">
+                    <label for="edit-item-name">Nome do Alimento</label>
+                    <input type="text" id="edit-item-name" placeholder="Ex: Frango Grelhado">
+                </div>
+                <div class="form-group">
+                    <label for="edit-item-weight">Quantidade (g)</label>
+                    <input type="number" id="edit-item-weight" placeholder="100">
+                </div>
+                <div class="form-group">
+                    <label for="edit-item-cal">Calorias (kcal)</label>
+                    <input type="number" id="edit-item-cal" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label for="edit-item-protein">Proteína (g)</label>
+                    <input type="number" id="edit-item-protein" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label for="edit-item-carbs">Carboidratos (g)</label>
+                    <input type="number" id="edit-item-carbs" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label for="edit-item-fat">Gordura (g)</label>
+                    <input type="number" id="edit-item-fat" placeholder="0">
+                </div>
+            </div>
+            <div class="modal-footer flex-column">
+                <button class="btn-primary w-full" id="btn-save-modal-item">SALVAR ALTERAÇÕES</button>
+                <button class="btn-danger w-full margin-top-md" id="btn-delete-modal-item">EXCLUIR ITEM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts do App -->
+    <script src="app.js"></script>
+</body>
+</html>
