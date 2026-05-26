@@ -1437,9 +1437,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const busySlots = busyRes.ok ? await busyRes.json() : [];
 
+                const todayStr = getTodayDateString();
+                const isToday = selectedDate === todayStr;
+                const nowSP = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+                const currentHour = String(nowSP.getHours()).padStart(2, '0');
+                const currentMinute = String(nowSP.getMinutes()).padStart(2, '0');
+                const currentTimeSP = `${currentHour}:${currentMinute}`;
+
                 let slotsHtml = daySlots.map(slot => {
                     const start = slot.start_time.slice(0, 5);
                     const end = slot.end_time.slice(0, 5);
+                    
+                    if (isToday && start < currentTimeSP) {
+                        return `
+                            <div class="expired-time-slot" 
+                                 style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; opacity:0.4; cursor:not-allowed;">
+                                <span style="font-weight:600; color:var(--color-text-muted); text-decoration:line-through;">${start} às ${end}</span>
+                                <span style="font-size:10px; font-weight:700; text-transform:uppercase; color:#ef4444; letter-spacing:0.05em;">Expirado</span>
+                            </div>
+                        `;
+                    }
+                    
                     return `
                         <div class="selectable-time-slot" data-start="${start}" data-end="${end}" 
                              style="background:rgba(34,197,94,0.05); border:1px solid rgba(34,197,94,0.15); padding:8px 12px; border-radius:8px; margin-bottom:6px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:all 0.2s;"
@@ -1521,8 +1539,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getTodayDateString() {
-        const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const nowSP = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+        const y = nowSP.getFullYear();
+        const m = String(nowSP.getMonth() + 1).padStart(2, '0');
+        const d = String(nowSP.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     }
 
     // 7. ROTEADOR DE TELAS
@@ -4102,6 +4123,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!professional_id || !appointment_date || !start_time || !end_time) {
                     alert('Por favor, preencha todos os campos.');
                     return;
+                }
+
+                // Validar data e hora com base no fuso de Brasília
+                const todayStr = getTodayDateString();
+                if (appointment_date < todayStr) {
+                    alert('Não é possível agendar consultas em datas passadas de acordo com o Horário de Brasília.');
+                    return;
+                }
+
+                if (appointment_date === todayStr) {
+                    const nowSP = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+                    const currentHour = String(nowSP.getHours()).padStart(2, '0');
+                    const currentMinute = String(nowSP.getMinutes()).padStart(2, '0');
+                    const currentTimeSP = `${currentHour}:${currentMinute}`;
+                    if (start_time <= currentTimeSP) {
+                        alert('Não é possível agendar consultas para um horário passado hoje de acordo com o Horário de Brasília.');
+                        return;
+                    }
                 }
 
                 const token = localStorage.getItem('nutrir_token');

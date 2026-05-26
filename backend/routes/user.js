@@ -425,6 +425,25 @@ router.post('/appointments', async (req, res) => {
     return res.status(400).json({ error: 'Dados do agendamento incompletos.' });
   }
 
+  // Validação de data/hora futuras de acordo com o Horário de Brasília (America/Sao_Paulo)
+  const nowSaoPaulo = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const year = nowSaoPaulo.getFullYear();
+  const month = String(nowSaoPaulo.getMonth() + 1).padStart(2, '0');
+  const day = String(nowSaoPaulo.getDate()).padStart(2, '0');
+  const currentDateSP = `${year}-${month}-${day}`;
+  
+  const hours = String(nowSaoPaulo.getHours()).padStart(2, '0');
+  const minutes = String(nowSaoPaulo.getMinutes()).padStart(2, '0');
+  const currentTimeSP = `${hours}:${minutes}`;
+
+  if (appointment_date < currentDateSP) {
+    return res.status(400).json({ error: 'Não é possível agendar consultas em datas passadas de acordo com o Horário de Brasília.' });
+  }
+
+  if (appointment_date === currentDateSP && start_time <= currentTimeSP) {
+    return res.status(400).json({ error: 'Não é possível agendar consultas em horários passados de acordo com o Horário de Brasília.' });
+  }
+
   try {
     // 1. Validar se o profissional existe e tem cargo aceitável
     const profRes = await db.query('SELECT id, name, role FROM users WHERE id = $1', [professional_id]);
