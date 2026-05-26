@@ -3,12 +3,12 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
-    container_name: slimo_db
+    container_name: nutrir_db
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: c11560011
-      POSTGRES_DB: slimo
+      POSTGRES_DB: nutrir
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql
@@ -17,13 +17,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: slimo_backend
+    container_name: nutrir_backend
     restart: always
     environment:
       - PORT=5000
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:c11560011@db:5432/slimo
-      - JWT_SECRET=super_secret_jwt_key_slimo_2026_change_me
+      - DATABASE_URL=postgresql://postgres:c11560011@db:5432/nutrir
+      - JWT_SECRET=super_secret_jwt_key_nutrir_2026_change_me
       - GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
       - MERCADO_PAGO_ACCESS_TOKEN=APP_USR-your_mercado_pago_token_here
       - ASAAS_API_KEY=your_asaas_api_key_here
@@ -38,7 +38,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: slimo_nginx
+    container_name: nutrir_nginx
     restart: always
     ports:
       - "80:80"

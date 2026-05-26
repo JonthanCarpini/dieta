@@ -1,6 +1,6 @@
 /**
  * ==========================================================
- * SLIMO ADMIN - ENGINE PRINCIPAL DE GERENCIAMENTO (FASE 2)
+ * NUTRIR ADMIN - ENGINE PRINCIPAL DE GERENCIAMENTO (FASE 2)
  * ==========================================================
  */
 
@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. ESTADO GLOBAL DO PAINEL ADMIN
     const adminState = {
-        token: localStorage.getItem('slimo_token') || '',
+        token: localStorage.getItem('nutrir_token') || '',
         user: null,
         users: [],
         plans: [],
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${adminState.token}` }
             });
             if (!res.ok) {
-                localStorage.removeItem('slimo_token');
+                localStorage.removeItem('nutrir_token');
                 adminState.token = '';
                 return false;
             }
@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const allowedRoles = ['admin', 'nutritionist', 'trainer'];
             if (!allowedRoles.includes(data.user.role)) {
                 alert('Acesso negado. Esta área é restrita a administradores e profissionais.');
-                localStorage.removeItem('slimo_token');
+                localStorage.removeItem('nutrir_token');
                 adminState.token = '';
                 return false;
             }
@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             adminState.token = data.token;
             adminState.user = data.user;
-            localStorage.setItem('slimo_token', data.token);
+            localStorage.setItem('nutrir_token', data.token);
 
             showDashboardScreen();
             setupEventListeners();
@@ -134,16 +134,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const navPlans = document.getElementById('nav-plans');
         const navBilling = document.getElementById('nav-billing');
         const navPatients = document.getElementById('nav-patients');
+        const navSchedule = document.getElementById('nav-schedule');
         const navSettings = document.getElementById('nav-settings');
         
         const sidebarTitle = document.querySelector('.sidebar-header span');
         if (sidebarTitle) {
             if (role === 'admin') {
-                sidebarTitle.innerText = 'Slimo Admin';
+                sidebarTitle.innerText = 'Nutrir Admin';
             } else if (role === 'nutritionist') {
-                sidebarTitle.innerText = 'Slimo Nutri';
+                sidebarTitle.innerText = 'Nutrir Nutri';
             } else if (role === 'trainer') {
-                sidebarTitle.innerText = 'Slimo Trainer';
+                sidebarTitle.innerText = 'Nutrir Trainer';
             }
         }
 
@@ -154,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (navPlans) navPlans.classList.remove('hidden');
             if (navBilling) navBilling.classList.remove('hidden');
             if (navPatients) navPatients.classList.add('hidden');
+            if (navSchedule) navSchedule.classList.add('hidden');
             if (navSettings) navSettings.classList.remove('hidden');
         } else {
             // profissional (nutritionist ou trainer)
@@ -163,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (navPlans) navPlans.classList.add('hidden');
             if (navBilling) navBilling.classList.remove('hidden');
             if (navPatients) navPatients.classList.remove('hidden');
+            if (navSchedule) navSchedule.classList.remove('hidden');
             if (navSettings) navSettings.classList.add('hidden');
         }
     }
@@ -185,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Logout
         document.getElementById('btn-logout').addEventListener('click', () => {
-            localStorage.removeItem('slimo_token');
+            localStorage.removeItem('nutrir_token');
             adminState.token = '';
             adminState.user = null;
             showLoginScreen();
@@ -310,6 +313,8 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadBillingData();
         } else if (tabId === 'patients') {
             await loadPatientsData();
+        } else if (tabId === 'schedule') {
+            await loadScheduleData();
         }
 
         // Garante que os ícones Lucide sejam atualizados
@@ -1055,6 +1060,172 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         lucide.createIcons();
     }
+
+    // 11. MÉTODOS DA ABA: AGENDA DE DISPONIBILIDADE
+    const DAYS_OF_WEEK = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+    async function loadScheduleData() {
+        try {
+            const res = await fetch(`${API_URL}/admin/availability`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            if (!res.ok) throw new Error('Não foi possível carregar a agenda.');
+            const slots = await res.json();
+            renderScheduleEditor(slots);
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    }
+
+    function createSlotHtml(startTime, endTime) {
+        return `
+            <div class="schedule-slot-row">
+                <input type="time" class="slot-start-time schedule-time-input" value="${startTime || '08:00'}">
+                <span class="slot-separator">até</span>
+                <input type="time" class="slot-end-time schedule-time-input" value="${endTime || '18:00'}">
+                <button class="btn-remove-slot" type="button" title="Remover horário">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        `;
+    }
+
+    function renderScheduleEditor(existingSlots) {
+        const container = document.getElementById('schedule-days-container');
+        if (!container) return;
+
+        // Agrupa slots por dia da semana
+        const dayMap = {};
+        existingSlots.forEach(s => {
+            const d = s.day_of_week;
+            if (!dayMap[d]) dayMap[d] = [];
+            dayMap[d].push(s);
+        });
+
+        container.innerHTML = '';
+
+        for (let day = 0; day < 7; day++) {
+            const daySlots = dayMap[day] || [];
+            const isEnabled = daySlots.length > 0;
+
+            const existingSlotsHtml = isEnabled
+                ? daySlots.map(s => createSlotHtml(
+                    s.start_time ? s.start_time.substring(0, 5) : '08:00',
+                    s.end_time ? s.end_time.substring(0, 5) : '18:00'
+                  )).join('')
+                : createSlotHtml('08:00', '18:00');
+
+            const dayRow = document.createElement('div');
+            dayRow.className = 'schedule-day-row';
+            dayRow.dataset.day = day;
+
+            dayRow.innerHTML = `
+                <div class="schedule-day-header">
+                    <label class="schedule-toggle-label">
+                        <input type="checkbox" class="day-toggle-cb" data-day="${day}" ${isEnabled ? 'checked' : ''}>
+                        <span class="schedule-toggle-track">
+                            <span class="schedule-toggle-thumb"></span>
+                        </span>
+                        <span class="schedule-day-name">${DAYS_OF_WEEK[day]}</span>
+                    </label>
+                    <span class="schedule-day-badge ${isEnabled ? 'active' : 'inactive'}">${isEnabled ? 'Disponível' : 'Fechado'}</span>
+                </div>
+                <div class="schedule-slots-container ${!isEnabled ? 'hidden' : ''}" data-day="${day}">
+                    ${existingSlotsHtml}
+                    <button class="btn-add-slot" data-day="${day}" type="button">
+                        <i data-lucide="plus"></i> Adicionar horário
+                    </button>
+                </div>
+            `;
+
+            container.appendChild(dayRow);
+        }
+
+        bindScheduleEvents(container);
+        lucide.createIcons();
+    }
+
+    function bindScheduleEvents(container) {
+        // Toggle de dia
+        container.querySelectorAll('.day-toggle-cb').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const day = e.target.dataset.day;
+                const dayRow = container.querySelector(`.schedule-day-row[data-day="${day}"]`);
+                const slotsContainer = container.querySelector(`.schedule-slots-container[data-day="${day}"]`);
+                const badge = dayRow.querySelector('.schedule-day-badge');
+
+                slotsContainer.classList.toggle('hidden', !e.target.checked);
+                if (badge) {
+                    badge.textContent = e.target.checked ? 'Disponível' : 'Fechado';
+                    badge.className = `schedule-day-badge ${e.target.checked ? 'active' : 'inactive'}`;
+                }
+            });
+        });
+
+        // Adicionar horário
+        container.querySelectorAll('.btn-add-slot').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const day = btn.dataset.day;
+                const slotsContainer = container.querySelector(`.schedule-slots-container[data-day="${day}"]`);
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = createSlotHtml('08:00', '18:00');
+                slotsContainer.insertBefore(wrapper.firstElementChild, btn);
+                bindRemoveSlotEvents(slotsContainer);
+                lucide.createIcons();
+            });
+        });
+
+        // Remover horário
+        container.querySelectorAll('.btn-remove-slot').forEach(btn => {
+            btn.addEventListener('click', () => btn.closest('.schedule-slot-row').remove());
+        });
+    }
+
+    function bindRemoveSlotEvents(container) {
+        container.querySelectorAll('.btn-remove-slot').forEach(btn => {
+            btn.addEventListener('click', () => btn.closest('.schedule-slot-row').remove());
+        });
+    }
+
+    // Botão de salvar agenda (vinculado após renderização)
+    document.addEventListener('click', async (e) => {
+        if (e.target.closest('#btn-save-schedule')) {
+            const slots = [];
+            const container = document.getElementById('schedule-days-container');
+            if (!container) return;
+
+            container.querySelectorAll('.schedule-day-row').forEach(dayRow => {
+                const day = parseInt(dayRow.dataset.day);
+                const cb = dayRow.querySelector('.day-toggle-cb');
+                if (!cb || !cb.checked) return;
+
+                dayRow.querySelectorAll('.schedule-slot-row').forEach(slotRow => {
+                    const start = slotRow.querySelector('.slot-start-time').value;
+                    const end = slotRow.querySelector('.slot-end-time').value;
+                    if (start && end && end > start) {
+                        slots.push({ day_of_week: day, start_time: start, end_time: end });
+                    }
+                });
+            });
+
+            try {
+                const res = await fetch(`${API_URL}/admin/availability`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminState.token}`
+                    },
+                    body: JSON.stringify({ slots })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro ao salvar agenda.');
+                alert('Disponibilidade salva com sucesso!');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+    });
 
     async function viewPatientDetails(patient) {
         // Mostra a tela de detalhes

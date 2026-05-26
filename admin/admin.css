@@ -1,5 +1,5 @@
 /* ==========================================================
-   SLIMO ADMIN - DESIGN SYSTEM & BRAND STYLES (VANILLA CSS)
+   NUTRIR ADMIN - DESIGN SYSTEM & BRAND STYLES (VANILLA CSS)
    ========================================================== */
 
 :root {
@@ -663,4 +663,194 @@ button, select, input, textarea {
     .settings-field-group .form-group {
         width: 100%;
     }
+}
+
+/* ==========================================================
+   AGENDA DE DISPONIBILIDADE DO PROFISSIONAL
+   ========================================================== */
+
+.schedule-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.schedule-day-row {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: var(--transition-smooth);
+}
+
+.schedule-day-row:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.schedule-day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background-color: var(--color-surface);
+    cursor: pointer;
+}
+
+.schedule-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.schedule-toggle-label input[type="checkbox"] {
+    display: none;
+}
+
+.schedule-toggle-track {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    transition: var(--transition-smooth);
+    flex-shrink: 0;
+}
+
+.schedule-toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    background-color: var(--color-text-muted);
+    border-radius: 50%;
+    transition: var(--transition-smooth);
+}
+
+.schedule-toggle-label input[type="checkbox"]:checked + .schedule-toggle-track {
+    background-color: rgba(254, 228, 64, 0.2);
+    border-color: var(--color-primary);
+}
+
+.schedule-toggle-label input[type="checkbox"]:checked + .schedule-toggle-track .schedule-toggle-thumb {
+    left: 21px;
+    background-color: var(--color-primary);
+}
+
+.schedule-day-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.schedule-day-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.03em;
+}
+
+.schedule-day-badge.active {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: var(--color-success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.schedule-day-badge.inactive {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+}
+
+.schedule-slots-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 18px;
+    background-color: rgba(255, 255, 255, 0.01);
+    border-top: 1px solid var(--color-border);
+}
+
+.schedule-slot-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.schedule-time-input {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    color: var(--color-text);
+    font-size: 14px;
+    font-weight: 500;
+    width: 130px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.schedule-time-input:hover,
+.schedule-time-input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+}
+
+.slot-separator {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.btn-remove-slot {
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-md);
+    color: var(--color-danger);
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-smooth);
+    margin-left: auto;
+}
+
+.btn-remove-slot:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: var(--color-danger);
+}
+
+.btn-remove-slot svg {
+    width: 14px;
+    height: 14px;
+}
+
+.btn-add-slot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    margin-top: 4px;
+    align-self: flex-start;
+}
+
+.btn-add-slot:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.btn-add-slot svg {
+    width: 14px;
+    height: 14px;
 }

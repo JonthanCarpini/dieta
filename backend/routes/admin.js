@@ -77,6 +77,55 @@ router.get('/billing', async (req, res) => {
   }
 });
 
+// ====================================================
+// ROTAS DE AGENDA (PROFISSIONAIS E ADMINS)
+// ====================================================
+
+// GET /admin/availability - Retorna os horários disponíveis do profissional logado
+router.get('/availability', async (req, res) => {
+  const professionalId = req.user.id;
+  try {
+    const result = await db.query(
+      'SELECT * FROM professional_availability WHERE professional_id = $1 AND active = true ORDER BY day_of_week, start_time',
+      [professionalId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar disponibilidade.' });
+  }
+});
+
+// POST /admin/availability - Salva/substitui os horários do profissional logado
+router.post('/availability', async (req, res) => {
+  const professionalId = req.user.id;
+  const { slots } = req.body;
+
+  if (!Array.isArray(slots)) {
+    return res.status(400).json({ error: 'Formato inválido. Esperado array de horários.' });
+  }
+
+  try {
+    await db.query('DELETE FROM professional_availability WHERE professional_id = $1', [professionalId]);
+
+    for (const slot of slots) {
+      const { day_of_week, start_time, end_time } = slot;
+      if (day_of_week === undefined || !start_time || !end_time) continue;
+      if (end_time <= start_time) continue;
+
+      await db.query(
+        'INSERT INTO professional_availability (professional_id, day_of_week, start_time, end_time) VALUES ($1, $2, $3, $4)',
+        [professionalId, parseInt(day_of_week), start_time, end_time]
+      );
+    }
+
+    res.json({ message: 'Disponibilidade salva com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar disponibilidade.' });
+  }
+});
+
 // Exige cargo de administrador para todas as rotas abaixo
 router.use(requireRole(['admin']));
 

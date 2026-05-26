@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SLIMO AI DIET TRACKER - ESTILO PREMIUM E DESIGN SYSTEM (FASE 2)
+   NUTRIR AI DIET TRACKER - ESTILO PREMIUM E DESIGN SYSTEM (FASE 2)
    ========================================================================== */
 
 /* 1. VARIÁVEIS E TOKENS DE DESIGN */
@@ -11,7 +11,7 @@
     --border-hover: rgba(255, 255, 255, 0.1);
     
     /* Paleta Premium */
-    --color-primary: #ff9f0a; /* Laranja característico do Slimo */
+    --color-primary: #ff9f0a; /* Laranja característico do Nutrir */
     --color-primary-rgb: 255, 159, 10;
     --color-secondary: #0a84ff; /* Azul da hidratação */
     --color-secondary-rgb: 10, 132, 255;
@@ -317,7 +317,7 @@ input:focus, select:focus {
     font-weight: 700;
 }
 
-/* SLIDERS PERSONALIZADOS ESTILO SLIMO */
+/* SLIDERS PERSONALIZADOS ESTILO NUTRIR */
 .label-row-val {
     display: flex;
     justify-content: space-between;
@@ -494,7 +494,7 @@ input[type="range"]::-webkit-slider-thumb:active {
     gap: 16px;
 }
 
-/* Barra de pesquisa (Slimo Trigger Bar) */
+/* Barra de pesquisa (Nutrir Trigger Bar) */
 .search-trigger-bar {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border-color);

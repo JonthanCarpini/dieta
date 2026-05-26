@@ -1,4 +1,4 @@
--- Schema de Banco de Dados para o Slimo AI (Nutrir.online)
+-- Schema de Banco de Dados para o Nutrir AI (Nutrir.online)
 -- Banco de Dados: PostgreSQL
 
 -- Habilita extensão para UUID caso necessário no futuro
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS plans (
 
 -- Insere planos padrões caso não existam
 INSERT INTO plans (name, display_name, price, duration_days, description, features) VALUES 
-('trial', 'Plano de Testes (7 dias)', 0.00, 7, 'Experimente todas as funcionalidades básicas do Slimo AI gratuitamente.', '["Controle de macros básico", "Acompanhamento de água", "Escanear pratos por IA"]'::jsonb),
+('trial', 'Plano de Testes (7 dias)', 0.00, 7, 'Experimente todas as funcionalidades básicas do Nutrir gratuitamente.', '["Controle de macros básico", "Acompanhamento de água", "Escanear pratos por IA"]'::jsonb),
 ('premium', 'Plano Premium Mensal', 29.90, 30, 'Desbloqueie orientação profissional com nutricionistas e personal trainers.', '["Receitas por IA ilimitadas", "Acompanhamento profissional completo", "Análise de refeições ilimitada"]'::jsonb)
 ON CONFLICT (name) DO NOTHING;
 
@@ -146,6 +146,18 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 12. TABELA DE DISPONIBILIDADE DE AGENDA DOS PROFISSIONAIS
+CREATE TABLE IF NOT EXISTS professional_availability (
+    id SERIAL PRIMARY KEY,
+    professional_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Domingo, 1=Segunda ... 6=Sábado
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_availability_times CHECK (end_time > start_time)
+);
+
 -- Índices recomendados para otimização de consultas
 CREATE INDEX IF NOT EXISTS idx_meals_user_date ON meals(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_water_user_date ON water_log(user_id, date);
@@ -153,3 +165,4 @@ CREATE INDEX IF NOT EXISTS idx_fasting_user_active ON fasting_log(user_id, activ
 CREATE INDEX IF NOT EXISTS idx_ai_recipes_user ON ai_recipes(user_id);
 CREATE INDEX IF NOT EXISTS idx_pro_links_patient ON professional_links(user_id);
 CREATE INDEX IF NOT EXISTS idx_pro_links_professional ON professional_links(professional_id);
+CREATE INDEX IF NOT EXISTS idx_availability_professional ON professional_availability(professional_id);

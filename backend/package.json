@@ -1,7 +1,7 @@
 {
-  "name": "slimo-backend",
+  "name": "nutrir-backend",
   "version": "1.0.0",
-  "description": "API backend para o Slimo AI Diet Tracker (Nutrir.online)",
+  "description": "API backend para o Nutrir AI Diet Tracker (Nutrir.online)",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -20,6 +20,6 @@
   "devDependencies": {
     "nodemon": "^3.1.0"
   },
-  "author": "Slimo Dev Team",
+  "author": "Nutrir Dev Team",
   "license": "MIT"
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Admin - Slimo AI</title>
+    <title>Painel Admin - Nutrir</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +22,7 @@
                 <div class="logo-shield">
                     <i data-lucide="shield" class="logo-icon"></i>
                 </div>
-                <h2>Slimo Admin</h2>
+                <h2>Nutrir Admin</h2>
                 <p>Entre com suas credenciais de administrador ou profissional</p>
             </div>
             
@@ -47,7 +47,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <i data-lucide="shield-check" class="shield-green"></i>
-                <span>Slimo Admin</span>
+                <span>Nutrir Admin</span>
             </div>
             <nav class="sidebar-nav">
                 <button class="nav-btn active" data-tab="overview" id="nav-overview">
@@ -67,6 +67,9 @@
                 </button>
                 <button class="nav-btn" data-tab="patients" id="nav-patients">
                     <i data-lucide="users"></i> Meus Pacientes
+                </button>
+                <button class="nav-btn" data-tab="schedule" id="nav-schedule">
+                    <i data-lucide="calendar-clock"></i> Agenda
                 </button>
                 <button class="nav-btn" data-tab="settings" id="nav-settings">
                     <i data-lucide="key-round"></i> Credenciais
@@ -89,7 +92,7 @@
             <section id="tab-overview" class="tab-content active">
                 <div class="header-section">
                     <h1>Visão Geral</h1>
-                    <p>Métricas gerais do Slimo AI em tempo real</p>
+                    <p>Métricas gerais do Nutrir em tempo real</p>
                 </div>
 
                 <!-- Cards de Estatísticas -->
@@ -565,6 +568,29 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA: AGENDA DE DISPONIBILIDADE (PROFISSIONAL) -->
+            <section id="tab-schedule" class="tab-content">
+                <div class="header-section">
+                    <h1>Minha Agenda</h1>
+                    <p>Configure seus dias e horários disponíveis para consultas online</p>
+                </div>
+
+                <div class="dashboard-card max-width-lg">
+                    <h3>Horários de Disponibilidade</h3>
+                    <p class="description">Selecione os dias da semana e defina os intervalos de horário em que você está disponível para atender pacientes online.</p>
+
+                    <div class="schedule-grid margin-top-lg" id="schedule-days-container">
+                        <!-- Gerado via JS -->
+                    </div>
+
+                    <div class="margin-top-lg" style="display:flex; justify-content:flex-end;">
+                        <button class="btn-primary" id="btn-save-schedule" style="padding: 12px 24px; font-size:14px;">
+                            <i data-lucide="save"></i> Salvar Disponibilidade
+                        </button>
                     </div>
                 </div>
             </section>

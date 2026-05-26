@@ -1,11 +1,11 @@
-# Guia de Desenvolvimento - Slimo AI Diet Tracker (Arquitetura Completa)
+# Guia de Desenvolvimento - Nutrir Diet Tracker (Arquitetura Completa)
 
-Este documento serve como um guia completo do projeto **Slimo AI Diet Tracker** para orientar desenvolvedores e modelos de linguagem (LLMs) que darão continuidade ao desenvolvimento, refinamento e manutenção da plataforma SaaS.
+Este documento serve como um guia completo do projeto **Nutrir Diet Tracker** para orientar desenvolvedores e modelos de linguagem (LLMs) que darão continuidade ao desenvolvimento, refinamento e manutenção da plataforma SaaS.
 
 ---
 
 ## 1. Visão Geral do Projeto
-O Slimo AI é uma plataforma SaaS de nutrição responsiva com design moderno e futurista. Ele foi migrado de um protótipo local para uma aplicação full-stack Dockerizada profissional, implantada no domínio real **`https://nutrir.online`**.
+O Nutrir é uma plataforma SaaS de nutrição responsiva com design moderno e futurista. Ele foi migrado de um protótipo local para uma aplicação full-stack Dockerizada profissional, implantada no domínio real **`https://nutrir.online`**.
 
 O app gerencia o acompanhamento de calorias, macronutrientes, hidratação e jejum diários com suporte de IA (Gemini para escaneamento de fotos e geração de receitas) e permite a vinculação de usuários Premium com profissionais de saúde (Nutricionistas e Personal Trainers), além de possuir controle administrativo completo.
 
@@ -155,4 +155,27 @@ A plataforma é orquestrada por completo usando Docker Compose na VPS (`178.238.
 ## 10. Diretrizes de Desenvolvimento (Padrões do Projeto)
 
 * **Idioma Obrigatório**: Todas as documentações (`.md`), comentários no código, mensagens de erro, logs do terminal e, principalmente, **mensagens de commits do Git DEVEM obrigatoriamente ser escritos em português (Brasil)**. commits em outros idiomas não serão aceitos.
+
+* **Fluxo Obrigatório Pós-Alteração**: Ao finalizar qualquer conjunto de alterações no projeto, o seguinte fluxo DEVE ser executado obrigatoriamente, nesta ordem:
+
+  1. **Commit Git** — Criar um commit descritivo com todas as alterações realizadas:
+     ```bash
+     git add <arquivos-alterados>
+     git commit -m "tipo: descrição clara do que foi feito"
+     ```
+
+  2. **Push para o repositório remoto**:
+     ```bash
+     git push origin master
+     ```
+
+  3. **Deploy na VPS** — Acessar o servidor via SSH e atualizar a aplicação:
+     ```bash
+     ssh usuario@178.238.236.103
+     cd /caminho/do/projeto
+     git pull origin master
+     docker compose up -d --build
+     ```
+
+  > **Nunca** entregue uma tarefa como concluída sem executar este fluxo completo. Alterações locais sem deploy equivalem a alterações incompletas.
 

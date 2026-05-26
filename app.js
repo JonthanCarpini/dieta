@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * SLIMO AI DIET TRACKER - ENGINE PRINCIPAL COMPLETA (FASE 2)
+ * NUTRIR AI DIET TRACKER - ENGINE PRINCIPAL COMPLETA (FASE 2)
  * ==========================================================================
  */
 
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         savedWeeklyPlans: []     // Planos semanais gerados por IA salvos
     };
 
-    // 2. BANCO DE DADOS DE ALIMENTOS BRASILEIROS (SLIMO BRAZIL DATABASE)
+    // 2. BANCO DE DADOS DE ALIMENTOS BRASILEIROS (NUTRIR BRAZIL DATABASE)
     const BR_FOOD_DATABASE = [
         { name: "Iogurte natural integral", calories: 51, protein: 3.0, carbs: 4.0, fat: 3.0, portion_g: 100, brand: "Livre" },
         { name: "Iogurte natural desnatado", calories: 41, protein: 4.0, carbs: 6.0, fat: 0.0, portion_g: 100, brand: "Livre" },
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lucide.createIcons();
 
         // Verifica token e carrega estado da API
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (token) {
             const success = await loadStateFromAPI(token);
             if (success) {
@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!profileRes.ok) {
                 if (profileRes.status === 401 || profileRes.status === 403) {
-                    localStorage.removeItem('slimo_token');
+                    localStorage.removeItem('nutrir_token');
                 }
                 return false;
             }
@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const inputApiKey = document.getElementById('input-api-key');
                 if (inputApiKey) inputApiKey.value = data.geminiApiKey;
             } else {
-                const apiKey = localStorage.getItem('slimo_gemini_key');
+                const apiKey = localStorage.getItem('nutrir_gemini_key');
                 if (apiKey) {
                     state.geminiApiKey = apiKey;
                     const inputApiKey = document.getElementById('input-api-key');
@@ -326,9 +326,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveProfileToLocalStorage(profile) {
         state.userProfile = profile;
-        localStorage.setItem('slimo_profile', JSON.stringify(profile));
+        localStorage.setItem('nutrir_profile', JSON.stringify(profile));
 
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
 
         try {
@@ -359,9 +359,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveMealsToLocalStorage() {
-        localStorage.setItem('slimo_meals_log', JSON.stringify(state.mealsLog));
+        localStorage.setItem('nutrir_meals_log', JSON.stringify(state.mealsLog));
 
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
 
         // Envia as refeições para sincronizar no backend
@@ -389,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function deleteMealFromAPI(mealId) {
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
         try {
             await fetch(`${API_URL}/user/meals/${mealId}`, {
@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveWaterToAPI() {
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
         try {
             await fetch(`${API_URL}/user/water`, {
@@ -423,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveFastingToAPI(active) {
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
         try {
             await fetch(`${API_URL}/user/fasting`, {
@@ -444,8 +444,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveAiRecipesToLocalStorage() {
-        localStorage.setItem('slimo_saved_ai_recipes', JSON.stringify(state.savedAiRecipes));
-        const token = localStorage.getItem('slimo_token');
+        localStorage.setItem('nutrir_saved_ai_recipes', JSON.stringify(state.savedAiRecipes));
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
 
         for (const recipe of state.savedAiRecipes) {
@@ -470,8 +470,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveWeeklyPlansToLocalStorage() {
-        localStorage.setItem('slimo_saved_weekly_plans', JSON.stringify(state.savedWeeklyPlans));
-        const token = localStorage.getItem('slimo_token');
+        localStorage.setItem('nutrir_saved_weekly_plans', JSON.stringify(state.savedWeeklyPlans));
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
 
         for (const plan of state.savedWeeklyPlans) {
@@ -551,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(data.error || 'Erro na requisição.');
                 }
 
-                localStorage.setItem('slimo_token', data.token);
+                localStorage.setItem('nutrir_token', data.token);
                 await initApp();
             } catch (err) {
                 alert(`Erro de autenticação: ${err.message}`);
@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || 'Erro na autenticação do Google.');
             }
 
-            localStorage.setItem('slimo_token', data.token);
+            localStorage.setItem('nutrir_token', data.token);
             await initApp();
         } catch (err) {
             alert(`Falha no Login Google: ${err.message}`);
@@ -612,7 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // PAINEL DO ADMINISTRADOR - EVENTOS E MÉTODOS
     // ==========================================================
     async function renderAdminPanel() {
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
 
         try {
@@ -733,7 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const password = document.getElementById('admin-pro-password').value;
                 const role = document.getElementById('admin-pro-role').value;
 
-                const token = localStorage.getItem('slimo_token');
+                const token = localStorage.getItem('nutrir_token');
                 try {
                     const res = await fetch(`${API_URL}/admin/register-professional`, {
                         method: 'POST',
@@ -760,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
             geminiForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const gemini_api_key = document.getElementById('admin-gemini-key').value.trim();
-                const token = localStorage.getItem('slimo_token');
+                const token = localStorage.getItem('nutrir_token');
                 try {
                     const res = await fetch(`${API_URL}/admin/settings`, {
                         method: 'POST',
@@ -788,7 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnAdminLogout = document.getElementById('btn-admin-logout');
         if (btnAdminLogout) {
             btnAdminLogout.addEventListener('click', () => {
-                localStorage.removeItem('slimo_token');
+                localStorage.removeItem('nutrir_token');
                 showScreen('screen-login');
             });
         }
@@ -807,7 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedPatientId = null;
 
     async function renderProfessionalPanel() {
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
 
         try {
@@ -867,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function openPatientDetailsModal(patientId, patientName) {
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
 
         selectedPatientId = patientId;
@@ -947,7 +947,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const token = localStorage.getItem('slimo_token');
+            const token = localStorage.getItem('nutrir_token');
             try {
                 const res = await fetch(`${API_URL}/professional/patients/${selectedPatientId}/feedback`, {
                     method: 'POST',
@@ -967,7 +967,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.getElementById('btn-professional-logout').addEventListener('click', () => {
-            localStorage.removeItem('slimo_token');
+            localStorage.removeItem('nutrir_token');
             showScreen('screen-login');
         });
     }
@@ -988,7 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         try {
             const prosRes = await fetch(`${API_URL}/user/available-professionals`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -1061,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function linkProfessional(proId, type) {
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         try {
             const res = await fetch(`${API_URL}/user/link-professional`, {
                 method: 'POST',
@@ -1080,7 +1080,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function simulatePremiumPayment() {
-        const token = localStorage.getItem('slimo_token');
+        const token = localStorage.getItem('nutrir_token');
         if (!token) return;
 
         if (confirm("Você será redirecionado para a simulação de pagamento via Mercado Pago/Asaas (PIX). Confirmar upgrade premium por 30 dias?")) {
@@ -1378,7 +1378,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function addWater(amount) {
         state.waterConsumed += amount;
-        localStorage.setItem('slimo_water_consumed', state.waterConsumed);
+        localStorage.setItem('nutrir_water_consumed', state.waterConsumed);
         updateWaterWidget();
     }
 
@@ -2420,7 +2420,7 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
 
     selectFastingProtocol.addEventListener('change', (e) => {
         state.fastingDurationGoal = parseInt(e.target.value);
-        localStorage.setItem('slimo_fasting_goal', state.fastingDurationGoal);
+        localStorage.setItem('nutrir_fasting_goal', state.fastingDurationGoal);
         renderFastingScreen();
         saveFastingToAPI(state.fastingActive);
     });
@@ -2430,8 +2430,8 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
             // Inicia Jejum
             state.fastingActive = true;
             state.fastingStartTime = new Date();
-            localStorage.setItem('slimo_fasting_active', true);
-            localStorage.setItem('slimo_fasting_start_time', state.fastingStartTime.toISOString());
+            localStorage.setItem('nutrir_fasting_active', true);
+            localStorage.setItem('nutrir_fasting_start_time', state.fastingStartTime.toISOString());
             
             startFastingTimer();
             saveFastingToAPI(true);
@@ -2441,8 +2441,8 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
             if (confirm("Deseja realmente finalizar o jejum atual?")) {
                 state.fastingActive = false;
                 state.fastingStartTime = null;
-                localStorage.removeItem('slimo_fasting_active');
-                localStorage.removeItem('slimo_fasting_start_time');
+                localStorage.removeItem('nutrir_fasting_active');
+                localStorage.removeItem('nutrir_fasting_start_time');
                 
                 if (state.fastingInterval) {
                     clearInterval(state.fastingInterval);
@@ -2842,7 +2842,7 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
 
         if (state.geminiApiKey && state.geminiApiKey.trim() !== '') {
             try {
-                loaderStatus.innerText = "IA Slimo analisando texturas e volumes do prato...";
+                loaderStatus.innerText = "IA Nutrir analisando texturas e volumes do prato...";
                 
                 const base64Data = state.currentCapturedImage.split(',')[1];
                 const response = await callGeminiApi(base64Data);
@@ -3406,7 +3406,7 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n�
 
         document.getElementById('btn-water-reset').addEventListener('click', () => {
             state.waterConsumed = 0;
-            localStorage.setItem('slimo_water_consumed', 0);
+            localStorage.setItem('nutrir_water_consumed', 0);
             updateWaterWidget();
             saveWaterToAPI();
         });
@@ -3459,7 +3459,7 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n�
         document.getElementById('btn-save-settings-key').addEventListener('click', () => {
             const key = document.getElementById('input-api-key').value.trim();
             state.geminiApiKey = key;
-            localStorage.setItem('slimo_gemini_key', key);
+            localStorage.setItem('nutrir_gemini_key', key);
             updateApiStatusIndicator();
             alert("Chave de API salva com sucesso!");
         });
