@@ -43,6 +43,7 @@ dieta/
 │   ├── index.html           # Estrutura HTML do Painel Admin
 │   ├── admin.css            # Estilo do Painel Admin (Dark Glassmorphism)
 │   └── admin.js             # Lógica e controle de APIs do Painel Admin
+├── deploy.js                # Script Node.js de deploy automático via SSH para a VPS
 ├── Dockerfile.frontend      # Dockerfile do Nginx que serve a SPA estática
 ├── docker-compose.yml       # Orquestração (db, backend, frontend, nginx)
 ├── nginx.conf               # Configurações do Proxy Reverso com HTTPS SSL
@@ -61,7 +62,7 @@ dieta/
 │       ├── auth.js          # Cadastro, login tradicional e login Google
 │       ├── user.js          # Sincronização do diário do paciente e orientações
 │       ├── professional.js  # Gestão de diários e feedbacks por nutricionistas/personals
-│       └── admin.js         # Controle de planos, roles, chaves e planos do sistema
+│       └── admin.js         # Controle de planos, roles, chaves, agenda e planos do sistema
 ```
 
 ---
@@ -82,6 +83,7 @@ O dados do usuário agora são sincronizados diretamente com o PostgreSQL por me
 9. **`system_settings`**: Armazena pares chave/valor globais dinâmicos para tokens de API externa (Gemini, Google OAuth Client ID, Mercado Pago, Asaas).
 10. **`plans`**: Armazena planos comerciais configuráveis (identificador, preço, duração, descrição, benefícios).
 11. **`payments`**: Histórico detalhado das transações de pagamento da plataforma, integrando o cálculo e a distribuição das comissões aos profissionais vinculados (nutricionista/personal trainer).
+12. **`professional_availability`**: Horários disponíveis de cada profissional para consultas online, com `day_of_week` (0=Dom a 6=Sáb), `start_time` e `end_time` por slot.
 
 ---
 
@@ -105,6 +107,7 @@ O dados do usuário agora são sincronizados diretamente com o PostgreSQL por me
   * **Profissionais**: Acesso restrito e personalizado às seguintes abas:
     * **Meus Pacientes**: Permite visualizar a lista completa de pacientes vinculados a ele, inspecionar o diário recente de alimentação (refeições, hidratação diária, jejum ativo) e enviar feedback/prescrições em tempo real.
     * **Faturamento**: Exibe as métricas de comissões acumuladas, total de pacientes ativos e lista detalhada das comissões geradas a partir das assinaturas dos seus clientes vinculados.
+    * **Agenda**: Permite ao profissional configurar sua disponibilidade semanal para consultas online — ativando dias da semana e definindo um ou mais intervalos de horário por dia. Os dados são persistidos na tabela `professional_availability` via `GET/POST /api/admin/availability`.
 
 ---
 
@@ -169,13 +172,11 @@ A plataforma é orquestrada por completo usando Docker Compose na VPS (`178.238.
      git push origin master
      ```
 
-  3. **Deploy na VPS** — Acessar o servidor via SSH e atualizar a aplicação:
+  3. **Deploy na VPS** — Executar o script `deploy.js` na raiz do projeto:
      ```bash
-     ssh usuario@178.238.236.103
-     cd /caminho/do/projeto
-     git pull origin master
-     docker compose up -d --build
+     node deploy.js
      ```
+     O script conecta automaticamente via chave SSH (`C:/Users/admin/.ssh/disparo_vps`), executa `git pull`, recria os containers Docker e recarrega o Nginx. Requer a dependência `ssh2` instalada (`npm install ssh2`).
 
   > **Nunca** entregue uma tarefa como concluída sem executar este fluxo completo. Alterações locais sem deploy equivalem a alterações incompletas.
 
