@@ -271,6 +271,26 @@ router.get('/available-professionals', async (req, res) => {
   }
 });
 
+// Retorna os profissionais vinculados atualmente ao usuário logado
+router.get('/linked-professionals', async (req, res) => {
+  if (!req.user.isPremiumActive) {
+    return res.status(403).json({ error: 'Acesso restrito a usuários premium.' });
+  }
+  try {
+    const linked = await db.query(
+      `SELECT l.type, u.id, u.name, u.email, u.role
+       FROM professional_links l
+       JOIN users u ON l.professional_id = u.id
+       WHERE l.user_id = $1`,
+      [req.user.id]
+    );
+    res.json(linked.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar profissionais vinculados.' });
+  }
+});
+
 // Vincula o usuário ao profissional selecionado
 router.post('/link-professional', async (req, res) => {
   if (!req.user.isPremiumActive) {
@@ -313,6 +333,171 @@ router.get('/professional-feedbacks', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar feedbacks de profissionais.' });
+  }
+// ==========================================
+// 7. CONSULTAS E AGENDAMENTOS (VIDEO CHAMADAS)
+// ==========================================
+
+// Retorna a disponibilidade de um profissional específico
+router.get('/professionals/:id/availability', async (req, res) => {
+  if (!req.user.isPremiumActive) {
+    return res.status(403).json({ error: 'Acesso restrito a usuários premium.' });
+  }
+  const professionalId = parseInt(req.params.id);
+  try {
+    const availability = await db.query(
+      'SELECT * FROM professional_availability WHERE professional_id = $1 AND active = true ORDER BY day_of_week, start_time',
+      [professionalId]
+    );
+    res.json(availability.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar disponibilidade do profissional.' });
+  }
+});
+
+// Agendar consulta (video chamada)
+router.post('/appointments', async (req, res) => {
+  if (!req.user.isPremiumActive) {
+    return res.status(403).json({ error: 'Acesso restrito a usuários premium.' });
+  }
+
+  const { professional_id, appointment_date, start_time, end_time } = req.body;
+
+  if (!professional_id || !appointment_date || !start_time || !end_time) {
+    return res.status(400).json({ error: 'Dados do agendamento incompletos.' });
+  }
+
+  try {
+    // 1. Validar se o profissional existe e tem cargo aceitável
+    const profRes = await db.query('SELECT id, name, role FROM users WHERE id = $1', [professional_id]);
+    if (profRes.rows.length === 0 || !['nutritionist', 'trainer'].includes(profRes.rows[0].role)) {
+      return res.status(400).json({ error: 'Profissional inválido ou não encontrado.' });
+    }
+
+    const professional = profRes.rows[0];
+
+    // 2. Verificar se o paciente está de fato vinculado a este profissional
+    const linkCheck = await db.query(
+      'SELECT id FROM professional_links WHERE user_id = $1 AND professional_id = $2',
+      [req.user.id, professional_id]
+    );
+    if (linkCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Você só pode agendar consultas com profissionais vinculados ao seu perfil.' });
+    }
+
+    // 3. Validar se o dia da semana está dentro da disponibilidade
+    const dateParts = appointment_date.split('-');
+    const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+    const dayOfWeek = dateObj.getDay();
+
+    // Buscar disponibilidade para este dia da semana
+    const availabilityRes = await db.query(
+      `SELECT * FROM professional_availability 
+       WHERE professional_id = $1 AND day_of_week = $2 AND active = true`,
+      [professional_id, dayOfWeek]
+    );
+
+    if (availabilityRes.rows.length === 0) {
+      return res.status(400).json({ error: 'O profissional não atende neste dia da semana.' });
+    }
+
+    // Validar se o horário solicitado está contido em alguma faixa de atendimento disponível
+    const isWithinSlot = availabilityRes.rows.some(slot => {
+      const slotStart = slot.start_time;
+      const slotEnd = slot.end_time;
+      return (start_time >= slotStart && end_time <= slotEnd && start_time < end_time);
+    });
+
+    if (!isWithinSlot) {
+      return res.status(400).json({ error: 'O horário solicitado está fora do período de atendimento configurado pelo profissional.' });
+    }
+
+    // 4. Verificar conflito de horários (se o profissional já possui agendamento ativo nessa data e horário sobreposto)
+    const conflictRes = await db.query(
+      `SELECT id FROM appointments 
+       WHERE professional_id = $1 
+         AND appointment_date = $2 
+         AND status = 'scheduled'
+         AND (
+           (start_time <= $3 AND end_time > $3) OR
+           (start_time < $4 AND end_time >= $4) OR
+           (start_time >= $3 AND end_time <= $4)
+         )`,
+      [professional_id, appointment_date, start_time, end_time]
+    );
+
+    if (conflictRes.rows.length > 0) {
+      return res.status(400).json({ error: 'Este horário já está reservado por outro paciente.' });
+    }
+
+    // 5. Gerar link único do Jitsi Meet
+    const timestamp = Date.now();
+    const videoRoom = `nutrir-consultation-${req.user.id}-${professional_id}-${timestamp}`;
+    const videoLink = `https://meet.jit.si/${videoRoom}`;
+
+    // 6. Inserir no banco
+    const newAppointment = await db.query(
+      `INSERT INTO appointments (patient_id, professional_id, appointment_date, start_time, end_time, video_link)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [req.user.id, professional_id, appointment_date, start_time, end_time, videoLink]
+    );
+
+    res.status(201).json({
+      message: 'Consulta agendada com sucesso.',
+      appointment: newAppointment.rows[0],
+      professionalName: professional.name
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao agendar consulta.' });
+  }
+});
+
+// Listar consultas do paciente
+router.get('/appointments', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT a.*, u.name as professional_name, u.role as professional_role
+       FROM appointments a
+       JOIN users u ON a.professional_id = u.id
+       WHERE a.patient_id = $1
+       ORDER BY a.appointment_date DESC, a.start_time DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar consultas.' });
+  }
+});
+
+// Cancelar consulta pelo paciente
+router.post('/appointments/:id/cancel', async (req, res) => {
+  const appointmentId = parseInt(req.params.id);
+  try {
+    const checkRes = await db.query(
+      'SELECT patient_id FROM appointments WHERE id = $1',
+      [appointmentId]
+    );
+
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Agendamento não encontrado.' });
+    }
+
+    if (checkRes.rows[0].patient_id !== req.user.id) {
+      return res.status(403).json({ error: 'Não autorizado a cancelar esta consulta.' });
+    }
+
+    const updated = await db.query(
+      "UPDATE appointments SET status = 'cancelled' WHERE id = $1 RETURNING *",
+      [appointmentId]
+    );
+
+    res.json({ message: 'Consulta cancelada com sucesso.', appointment: updated.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao cancelar consulta.' });
   }
 });
 

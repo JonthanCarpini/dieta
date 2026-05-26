@@ -149,7 +149,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fasting: document.getElementById('screen-fasting'),
         history: document.getElementById('screen-history'),
         settings: document.getElementById('screen-settings'),
-        'food-search': document.getElementById('screen-food-search')
+        'food-search': document.getElementById('screen-food-search'),
+        'my-professionals': document.getElementById('screen-my-professionals')
     };
 
     const nav = document.getElementById('main-navigation');
@@ -1102,6 +1103,265 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function renderMyProfessionalsScreen() {
+        const trialCard = document.getElementById('my-pros-trial-card');
+        const premiumContainer = document.getElementById('my-pros-premium-container');
+        
+        if (!state.user) return;
+
+        if (!state.user.isPremiumActive) {
+            trialCard.classList.remove('hidden');
+            premiumContainer.classList.add('hidden');
+            return;
+        }
+
+        trialCard.classList.add('hidden');
+        premiumContainer.classList.remove('hidden');
+
+        const token = localStorage.getItem('nutrir_token');
+        try {
+            // 1. Carrega todos os profissionais disponíveis
+            const prosRes = await fetch(`${API_URL}/user/available-professionals`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!prosRes.ok) throw new Error('Falha ao buscar profissionais.');
+            const professionals = await prosRes.json();
+
+            const roleSelect = document.getElementById('select-my-pros-role');
+            const prosListSelect = document.getElementById('select-my-pros-list');
+
+            const updateProsDropdown = () => {
+                const selectedRole = roleSelect.value;
+                const filtered = professionals.filter(p => p.role === selectedRole);
+                prosListSelect.innerHTML = `<option value="">Selecione um profissional...</option>` +
+                    filtered.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            };
+
+            roleSelect.removeEventListener('change', updateProsDropdown);
+            roleSelect.addEventListener('change', updateProsDropdown);
+            updateProsDropdown();
+
+            // 2. Carrega orientações e profissionais vinculados
+            const linkedRes = await fetch(`${API_URL}/user/linked-professionals`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!linkedRes.ok) throw new Error('Falha ao buscar profissionais vinculados.');
+            const linkedPros = await linkedRes.json();
+
+            const feedbacksRes = await fetch(`${API_URL}/user/professional-feedbacks`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const feedbacks = feedbacksRes.ok ? await feedbacksRes.json() : [];
+
+            // 3. Carrega consultas
+            const appRes = await fetch(`${API_URL}/user/appointments`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const appointments = appRes.ok ? await appRes.json() : [];
+
+            // 4. Renderiza profissionais vinculados
+            const listContainer = document.getElementById('my-pros-linked-list');
+            listContainer.innerHTML = '';
+
+            if (linkedPros.length === 0) {
+                listContainer.innerHTML = '<p style="font-size:12px; opacity:0.5; text-align:center; padding:12px;">Nenhum profissional vinculado ainda.</p>';
+            } else {
+                linkedPros.forEach(p => {
+                    const profFeedbacks = feedbacks.filter(f => f.professional_id === p.id);
+                    const card = document.createElement('div');
+                    card.className = 'settings-card';
+                    card.style.padding = '14px';
+
+                    const roleLabel = p.role === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+                    
+                    let feedbacksHtml = '<p style="font-size:11px; opacity:0.5; margin-top:6px;">Nenhuma orientação recebida ainda.</p>';
+                    if (profFeedbacks.length > 0) {
+                        feedbacksHtml = profFeedbacks.map(f => `
+                            <div style="background:rgba(255,255,255,0.02); padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.05); margin-top:6px; font-size:12px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; opacity:0.6; font-size:10px;">
+                                    <span>${new Date(f.created_at).toLocaleDateString('pt-BR')}</span>
+                                </div>
+                                <p style="line-height:1.4; opacity:0.9;">${f.content}</p>
+                            </div>
+                        `).join('');
+                    }
+
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div>
+                                <h4 style="margin:0; font-size:15px; font-weight:600;">${p.name}</h4>
+                                <span style="font-size:11px; opacity:0.6; display:block; margin-top:2px;">${roleLabel}</span>
+                                <span style="font-size:11px; opacity:0.4;">${p.email}</span>
+                            </div>
+                            <button class="btn-primary btn-book-appointment-trigger" data-pro-id="${p.id}" data-pro-name="${p.name}" style="font-size:11px; padding:6px 12px; height:auto; border-radius:8px;">
+                                <i data-lucide="video" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i>
+                                Agendar
+                            </button>
+                        </div>
+                        
+                        <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:10px; margin-top:10px;">
+                            <h5 style="margin:0; font-size:12px; font-weight:600; opacity:0.8;">Orientações e Prescrições:</h5>
+                            <div style="max-height:150px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
+                                ${feedbacksHtml}
+                            </div>
+                        </div>
+                    `;
+
+                    card.querySelector('.btn-book-appointment-trigger').addEventListener('click', (e) => {
+                        const target = e.currentTarget;
+                        openBookAppointmentModal(target.dataset.proId, target.dataset.proName);
+                    });
+
+                    listContainer.appendChild(card);
+                });
+            }
+
+            // 5. Renderiza consultas
+            const appContainer = document.getElementById('my-pros-appointments-list');
+            appContainer.innerHTML = '';
+
+            if (appointments.length === 0) {
+                appContainer.innerHTML = '<p style="font-size:12px; opacity:0.5; text-align:center; padding:12px;">Nenhuma consulta agendada.</p>';
+            } else {
+                appointments.forEach(a => {
+                    const appointmentCard = document.createElement('div');
+                    appointmentCard.className = 'history-day-card';
+                    appointmentCard.style.padding = '12px';
+                    appointmentCard.style.display = 'flex';
+                    appointmentCard.style.flexDirection = 'column';
+                    appointmentCard.style.gap = '8px';
+
+                    const roleLabel = a.professional_role === 'nutritionist' ? 'Nutri' : 'Personal';
+                    
+                    const dateParts = a.appointment_date.split('T')[0].split('-');
+                    const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+
+                    const startTime = a.start_time.slice(0, 5);
+                    const endTime = a.end_time.slice(0, 5);
+
+                    let statusBadge = '';
+                    let actionButtonsHtml = '';
+
+                    if (a.status === 'scheduled') {
+                        statusBadge = '<span class="ai-pill" style="background:rgba(34,197,94,0.15); color:#22c55e;">Agendado</span>';
+                        actionButtonsHtml = `
+                            <div style="display:flex; gap:8px; margin-top:4px;">
+                                <a href="${a.video_link}" target="_blank" class="btn-primary flex-1" style="font-size:11px; padding:6px; height:auto; border-radius:6px; text-decoration:none; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;">
+                                    <i data-lucide="video" style="width:12px; height:12px;"></i>
+                                    Iniciar Chamada
+                                </a>
+                                <button class="btn-danger flex-1 btn-cancel-appointment-trigger" data-app-id="${a.id}" style="font-size:11px; padding:6px; height:auto; border-radius:6px;">
+                                    Cancelar
+                                </button>
+                            </div>
+                        `;
+                    } else if (a.status === 'cancelled') {
+                        statusBadge = '<span class="ai-pill" style="background:rgba(239,68,68,0.15); color:#ef4444;">Cancelado</span>';
+                        appointmentCard.style.opacity = '0.6';
+                    } else {
+                        statusBadge = '<span class="ai-pill" style="background:rgba(255,255,255,0.15); color:#fff;">Concluído</span>';
+                        appointmentCard.style.opacity = '0.7';
+                    }
+
+                    appointmentCard.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong style="font-size:13px;">${a.professional_name}</strong> <span style="font-size:10px; opacity:0.6;">(${roleLabel})</span>
+                                <div style="font-size:11px; opacity:0.6; margin-top:2px;">
+                                    <i data-lucide="calendar" style="width:10px; height:10px; display:inline-block; vertical-align:middle; margin-top:-2px; margin-right:2px;"></i>
+                                    ${formattedDate} às ${startTime} - ${endTime}
+                                </div>
+                            </div>
+                            <div>
+                                ${statusBadge}
+                            </div>
+                        </div>
+                        ${actionButtonsHtml}
+                    `;
+
+                    const cancelBtn = appointmentCard.querySelector('.btn-cancel-appointment-trigger');
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', async (e) => {
+                            if (confirm('Deseja realmente cancelar esta consulta?')) {
+                                await cancelAppointment(e.currentTarget.dataset.appId);
+                            }
+                        });
+                    }
+
+                    appContainer.appendChild(appointmentCard);
+                });
+            }
+
+            lucide.createIcons();
+        } catch (err) {
+            console.error('Erro ao renderizar tela de Meus Profissionais:', err);
+        }
+    }
+
+    async function openBookAppointmentModal(proId, proName) {
+        document.getElementById('book-appointment-pro-id').value = proId;
+        document.getElementById('book-appointment-pro-info').innerText = `Agende uma consulta por vídeo com ${proName}.`;
+        
+        const todayStr = getTodayDateString();
+        document.getElementById('book-appointment-date').value = todayStr;
+        document.getElementById('book-appointment-date').min = todayStr;
+
+        document.getElementById('book-appointment-start').value = '';
+        document.getElementById('book-appointment-end').value = '';
+
+        const slotsContainer = document.getElementById('book-appointment-pro-availability-slots');
+        slotsContainer.innerHTML = '<p style="font-size:11px; opacity:0.5;">Buscando horários...</p>';
+
+        const token = localStorage.getItem('nutrir_token');
+        try {
+            const res = await fetch(`${API_URL}/user/professionals/${proId}/availability`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Falha ao buscar agenda do profissional.');
+            const slots = await res.json();
+
+            slotsContainer.innerHTML = '';
+            if (slots.length === 0) {
+                slotsContainer.innerHTML = '<p style="font-size:11px; opacity:0.5; color:#ef4444;">Este profissional ainda não configurou horários de atendimento.</p>';
+            } else {
+                const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+                slots.forEach(slot => {
+                    const row = document.createElement('div');
+                    row.style.display = 'flex';
+                    row.style.justifyContent = 'space-between';
+                    row.style.padding = '4px 0';
+                    row.style.borderBottom = '1px solid rgba(255,255,255,0.02)';
+                    row.innerHTML = `
+                        <strong>${diasSemana[slot.day_of_week]}</strong>
+                        <span>${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}</span>
+                    `;
+                    slotsContainer.appendChild(row);
+                });
+            }
+        } catch (err) {
+            slotsContainer.innerHTML = `<p style="font-size:11px; opacity:0.5; color:#ef4444;">${err.message}</p>`;
+        }
+
+        document.getElementById('modal-book-appointment').classList.add('active');
+    }
+
+    async function cancelAppointment(appointmentId) {
+        const token = localStorage.getItem('nutrir_token');
+        try {
+            const res = await fetch(`${API_URL}/user/appointments/${appointmentId}/cancel`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao cancelar consulta.');
+
+            alert('Consulta cancelada com sucesso!');
+            renderMyProfessionalsScreen();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
     function getTodayDateString() {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1130,7 +1390,7 @@ document.addEventListener('DOMContentLoaded', () => {
         targetScreen.classList.add('active');
 
         // Exibição do Bottom Nav
-        const noNavScreens = ['screen-login', 'screen-onboarding', 'screen-scanner', 'screen-results', 'screen-food-search', 'screen-professional', 'screen-admin'];
+        const noNavScreens = ['screen-login', 'screen-onboarding', 'screen-scanner', 'screen-results', 'screen-food-search', 'screen-professional', 'screen-admin', 'screen-my-professionals'];
         if (noNavScreens.includes(screenId)) {
             nav.style.display = 'none';
         } else {
@@ -1161,7 +1421,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (screenId === 'screen-settings') {
             renderSettingsPage();
-            renderUserProfessionalSettings();
+        }
+        if (screenId === 'screen-my-professionals') {
+            renderMyProfessionalsScreen();
         }
         if (screenId === 'screen-professional') {
             renderProfessionalPanel();
@@ -3614,6 +3876,93 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 renderSavedAiRecipes();
                 renderSavedWeeklyPlans();
+            });
+        }
+
+        // Ouvintes da nova tela de Meus Profissionais (screen-my-professionals)
+        const btnGoToMyPros = document.getElementById('btn-go-to-my-professionals');
+        if (btnGoToMyPros) {
+            btnGoToMyPros.addEventListener('click', () => showScreen('screen-my-professionals'));
+        }
+
+        const btnBackMyPros = document.getElementById('btn-back-my-professionals');
+        if (btnBackMyPros) {
+            btnBackMyPros.addEventListener('click', () => showScreen('screen-settings'));
+        }
+
+        const btnMyProsUpgrade = document.getElementById('btn-my-pros-upgrade');
+        if (btnMyProsUpgrade) {
+            btnMyProsUpgrade.addEventListener('click', simulatePremiumPayment);
+        }
+
+        const myProsLinkForm = document.getElementById('my-pros-link-form');
+        if (myProsLinkForm) {
+            myProsLinkForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const proId = document.getElementById('select-my-pros-list').value;
+                const type = document.getElementById('select-my-pros-role').value;
+                if (!proId) return alert('Selecione um profissional.');
+                await linkProfessional(proId, type);
+                renderMyProfessionalsScreen();
+            });
+        }
+
+        // Modal de Agendamento
+        const btnCloseBookAppointment = document.getElementById('btn-close-book-appointment');
+        if (btnCloseBookAppointment) {
+            btnCloseBookAppointment.addEventListener('click', () => {
+                document.getElementById('modal-book-appointment').classList.remove('active');
+            });
+        }
+
+        const btnCancelBookAppointment = document.getElementById('btn-cancel-book-appointment');
+        if (btnCancelBookAppointment) {
+            btnCancelBookAppointment.addEventListener('click', () => {
+                document.getElementById('modal-book-appointment').classList.remove('active');
+            });
+        }
+
+        const bookAppointmentForm = document.getElementById('book-appointment-form');
+        if (bookAppointmentForm) {
+            bookAppointmentForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const professional_id = document.getElementById('book-appointment-pro-id').value;
+                const appointment_date = document.getElementById('book-appointment-date').value;
+                const start_time = document.getElementById('book-appointment-start').value;
+                const end_time = document.getElementById('book-appointment-end').value;
+
+                if (!professional_id || !appointment_date || !start_time || !end_time) {
+                    alert('Por favor, preencha todos os campos.');
+                    return;
+                }
+
+                const token = localStorage.getItem('nutrir_token');
+                try {
+                    const res = await fetch(`${API_URL}/user/appointments`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ professional_id, appointment_date, start_time, end_time })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Erro ao agendar consulta.');
+
+                    alert('Consulta agendada com sucesso!');
+                    document.getElementById('modal-book-appointment').classList.remove('active');
+                    renderMyProfessionalsScreen();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        }
+
+        const btnSaveBookAppointment = document.getElementById('btn-save-book-appointment');
+        if (btnSaveBookAppointment) {
+            btnSaveBookAppointment.addEventListener('click', () => {
+                const submitEvent = new Event('submit', { cancelable: true });
+                bookAppointmentForm.dispatchEvent(submitEvent);
             });
         }
     }

@@ -116,4 +116,55 @@ router.post('/patients/:id/feedback', verifyPatientAccess, async (req, res) => {
   }
 });
 
+// ==========================================
+// 4. CONSULTAS E AGENDAMENTOS DO PROFISSIONAL
+// ==========================================
+
+// Listar consultas do profissional
+router.get('/appointments', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT a.*, u.name as patient_name, u.email as patient_email
+       FROM appointments a
+       JOIN users u ON a.patient_id = u.id
+       WHERE a.professional_id = $1
+       ORDER BY a.appointment_date DESC, a.start_time DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar consultas.' });
+  }
+});
+
+// Cancelar consulta pelo profissional
+router.post('/appointments/:id/cancel', async (req, res) => {
+  const appointmentId = parseInt(req.params.id);
+  try {
+    const checkRes = await db.query(
+      'SELECT professional_id FROM appointments WHERE id = $1',
+      [appointmentId]
+    );
+
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Agendamento não encontrado.' });
+    }
+
+    if (checkRes.rows[0].professional_id !== req.user.id) {
+      return res.status(403).json({ error: 'Não autorizado a cancelar esta consulta.' });
+    }
+
+    const updated = await db.query(
+      "UPDATE appointments SET status = 'cancelled' WHERE id = $1 RETURNING *",
+      [appointmentId]
+    );
+
+    res.json({ message: 'Consulta cancelada com sucesso.', appointment: updated.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao cancelar consulta.' });
+  }
+});
+
 module.exports = router;

@@ -166,3 +166,19 @@ CREATE INDEX IF NOT EXISTS idx_ai_recipes_user ON ai_recipes(user_id);
 CREATE INDEX IF NOT EXISTS idx_pro_links_patient ON professional_links(user_id);
 CREATE INDEX IF NOT EXISTS idx_pro_links_professional ON professional_links(professional_id);
 CREATE INDEX IF NOT EXISTS idx_availability_professional ON professional_availability(professional_id);
+
+-- 13. TABELA DE AGENDAMENTOS DE CONSULTAS (VIDEO CHAMADAS)
+CREATE TABLE IF NOT EXISTS appointments (
+    id SERIAL PRIMARY KEY,
+    patient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    professional_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    appointment_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    video_link VARCHAR(255) NOT NULL,
+    status VARCHAR(50) DEFAULT 'scheduled', -- 'scheduled', 'cancelled', 'completed'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments(patient_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_professional ON appointments(professional_id);

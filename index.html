@@ -738,11 +738,8 @@
                         <i data-lucide="users" class="text-gemini"></i>
                         <h3>Acompanhamento Profissional</h3>
                     </div>
-                    <div id="professional-status-area">
-                        <!-- Será preenchido via JS baseado se é Premium ou Trial -->
-                        <p class="settings-description">Faça o upgrade para o plano Premium para vincular seu nutricionista e personal trainer.</p>
-                        <button class="btn-primary w-full" id="btn-upgrade-premium">Upgrade para Premium</button>
-                    </div>
+                    <p class="settings-description">Consulte orientações de profissionais vinculados, envie mensagens ou agende consultas por vídeo.</p>
+                    <button class="btn-primary w-full" id="btn-go-to-my-professionals">Ver Acompanhamento</button>
                 </div>
 
                 <!-- Cartão administrativo para Administradores -->
@@ -768,6 +765,87 @@
                         Resetar Todos os Dados
                     </button>
                 </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 8.B TELA DEDICADA: MEUS PROFISSIONAIS      -->
+        <!-- ========================================== -->
+        <section id="screen-my-professionals" class="screen">
+            <header class="scanner-header">
+                <button class="icon-btn btn-back" id="btn-back-my-professionals">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+                <h3>Meu Acompanhamento</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="scrollable-content my-professionals-content">
+                
+                <!-- CARD SE NÃO FOR PREMIUM (TRIAL BLOCKER) -->
+                <div class="settings-card hidden" id="my-pros-trial-card">
+                    <div class="card-header-icon border-gemini">
+                        <i data-lucide="lock" class="text-gemini"></i>
+                        <h3>Recurso Premium</h3>
+                    </div>
+                    <p class="settings-description">
+                        O acompanhamento profissional exclusivo e agendamento de consultas por vídeo são recursos exclusivos do plano Premium.
+                    </p>
+                    <button class="btn-primary w-full" id="btn-my-pros-upgrade">Fazer Upgrade Agora</button>
+                </div>
+
+                <!-- SEÇÃO PRINCIPAL (SE FOR PREMIUM) -->
+                <div id="my-pros-premium-container" class="hidden" style="display:flex; flex-direction:column; gap:16px;">
+                    
+                    <!-- 1. VINCULAÇÃO DE PROFISSIONAIS -->
+                    <div class="settings-card" id="my-pros-linking-card">
+                        <div class="card-header-icon border-profile">
+                            <i data-lucide="user-plus" class="text-profile"></i>
+                            <h3>Vincular Novo Profissional</h3>
+                        </div>
+                        <p class="settings-description">Escolha e vincule seu nutricionista ou personal trainer.</p>
+                        
+                        <form id="my-pros-link-form" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+                            <div class="form-group">
+                                <label for="select-my-pros-role">Tipo de Profissional</label>
+                                <select id="select-my-pros-role" required>
+                                    <option value="nutritionist">Nutricionista</option>
+                                    <option value="trainer">Personal Trainer</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="select-my-pros-list">Profissional Disponível</label>
+                                <select id="select-my-pros-list" required>
+                                    <option value="">Selecione um profissional...</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn-primary w-full">Vincular Profissional</button>
+                        </form>
+                    </div>
+
+                    <!-- 2. PROFISSIONAIS VINCULADOS ATUALMENTE -->
+                    <div class="my-pros-linked-section">
+                        <h3 style="margin-bottom:8px;">Profissionais Vinculados</h3>
+                        <div id="my-pros-linked-list" style="display:flex; flex-direction:column; gap:12px;">
+                            <!-- Preenchido via JS -->
+                        </div>
+                    </div>
+
+                    <!-- 3. AGENDA DE CONSULTAS VÍDEO -->
+                    <div class="settings-card">
+                        <div class="card-header-icon border-gemini">
+                            <i data-lucide="video" class="text-gemini"></i>
+                            <h3>Minhas Consultas por Vídeo</h3>
+                        </div>
+                        <p class="settings-description">Confira suas consultas agendadas e acesse a sala de videoconferência na hora marcada.</p>
+                        
+                        <div id="my-pros-appointments-list" style="display:flex; flex-direction:column; gap:10px; margin-top:12px;">
+                            <!-- Lista de consultas agendadas (JS) -->
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
         </section>
 
@@ -1217,6 +1295,54 @@
             <div class="modal-footer">
                 <button class="btn-secondary" id="btn-cancel-patient-feedback">Cancelar</button>
                 <button class="btn-primary" id="btn-save-patient-feedback">Enviar Orientação</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Agendar Consulta -->
+    <div class="modal-overlay" id="modal-book-appointment">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Agendar Consulta por Vídeo</h3>
+                <button class="icon-btn" id="btn-close-book-appointment"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body scrollable-modal-content">
+                <p class="settings-description" id="book-appointment-pro-info">Agende uma consulta com o profissional.</p>
+                
+                <form id="book-appointment-form" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+                    <input type="hidden" id="book-appointment-pro-id">
+                    
+                    <div class="form-group">
+                        <label for="book-appointment-date">Data da Consulta</label>
+                        <input type="date" id="book-appointment-date" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Horários de Atendimento Deste Profissional</label>
+                        <div id="book-appointment-pro-availability-slots" style="display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; font-size:12px; max-height:120px; overflow-y:auto; border:1px solid rgba(255,255,255,0.05);">
+                            <!-- Preenchido via JS -->
+                        </div>
+                    </div>
+
+                    <div class="form-group-row" style="display:flex; gap:12px;">
+                        <div class="form-group flex-1">
+                            <label for="book-appointment-start">Hora de Início</label>
+                            <input type="time" id="book-appointment-start" required>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label for="book-appointment-end">Hora de Fim</label>
+                            <input type="time" id="book-appointment-end" required>
+                        </div>
+                    </div>
+
+                    <p class="control-hint" style="font-size:11px; opacity:0.6; line-height:1.4;">
+                        Importante: O horário agendado deve estar dentro das janelas de atendimento listadas acima e não pode conflitar com outras consultas do profissional.
+                    </p>
+                </form>
+            </div>
+            <div class="modal-footer" style="display:flex; gap:12px;">
+                <button class="btn-secondary flex-1" id="btn-cancel-book-appointment">Cancelar</button>
+                <button class="btn-primary flex-1" id="btn-save-book-appointment">Confirmar</button>
             </div>
         </div>
     </div>

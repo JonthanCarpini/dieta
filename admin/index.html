@@ -72,6 +72,9 @@
                 <button class="nav-btn" data-tab="schedule" id="nav-schedule">
                     <i data-lucide="calendar-clock"></i> Agenda
                 </button>
+                <button class="nav-btn" data-tab="appointments" id="nav-appointments">
+                    <i data-lucide="video"></i> Consultas
+                </button>
                 <button class="nav-btn" data-tab="settings" id="nav-settings">
                     <i data-lucide="key-round"></i> Credenciais
                 </button>
@@ -667,6 +670,29 @@
                         <button class="btn-primary" id="btn-save-schedule" style="padding: 12px 24px; font-size:14px;">
                             <i data-lucide="save"></i> Salvar Disponibilidade
                         </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA: GERENCIAMENTO DE CONSULTAS (VIDEO CHAMADAS) -->
+            <section id="tab-appointments" class="tab-content">
+                <div class="header-section">
+                    <h1>Consultas por Vídeo</h1>
+                    <p id="appointments-tab-desc">Acompanhe e gerencie os agendamentos de videoconferência na plataforma</p>
+                </div>
+
+                <div class="dashboard-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr id="appointments-table-headers">
+                                    <!-- Preenchido via JS com base na role -->
+                                </tr>
+                            </thead>
+                            <tbody id="appointments-table-body">
+                                <!-- Injetado via JS -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>

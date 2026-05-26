@@ -126,6 +126,68 @@ router.post('/availability', async (req, res) => {
   }
 });
 
+// GET /admin/appointments - Retorna as consultas baseadas no cargo
+router.get('/appointments', async (req, res) => {
+  try {
+    const role = req.user.role;
+    if (role === 'admin') {
+      const result = await db.query(
+        `SELECT a.*, 
+                pat.name as patient_name, pat.email as patient_email,
+                pro.name as professional_name, pro.role as professional_role
+         FROM appointments a
+         JOIN users pat ON a.patient_id = pat.id
+         JOIN users pro ON a.professional_id = pro.id
+         ORDER BY a.appointment_date DESC, a.start_time DESC`
+      );
+      res.json(result.rows);
+    } else if (role === 'nutritionist' || role === 'trainer') {
+      const result = await db.query(
+        `SELECT a.*, pat.name as patient_name, pat.email as patient_email
+         FROM appointments a
+         JOIN users pat ON a.patient_id = pat.id
+         WHERE a.professional_id = $1
+         ORDER BY a.appointment_date DESC, a.start_time DESC`,
+        [req.user.id]
+      );
+      res.json(result.rows);
+    } else {
+      res.status(403).json({ error: 'Acesso negado.' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar consultas para o painel.' });
+  }
+});
+
+// POST /admin/appointments/:id/cancel - Cancela consulta no painel
+router.post('/appointments/:id/cancel', async (req, res) => {
+  const appointmentId = parseInt(req.params.id);
+  try {
+    const appointmentRes = await db.query('SELECT * FROM appointments WHERE id = $1', [appointmentId]);
+    if (appointmentRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada.' });
+    }
+
+    const appointment = appointmentRes.rows[0];
+    const role = req.user.role;
+
+    if (role !== 'admin' && appointment.professional_id !== req.user.id) {
+      return res.status(403).json({ error: 'Não autorizado a cancelar esta consulta.' });
+    }
+
+    const updated = await db.query(
+      "UPDATE appointments SET status = 'cancelled' WHERE id = $1 RETURNING *",
+      [appointmentId]
+    );
+
+    res.json({ message: 'Consulta cancelada com sucesso.', appointment: updated.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao cancelar consulta.' });
+  }
+});
+
 // Exige cargo de administrador para todas as rotas abaixo
 router.use(requireRole(['admin']));
 
