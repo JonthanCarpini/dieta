@@ -319,14 +319,51 @@
                     <p>Gerencie as integrações globais e tokens do sistema de forma segura</p>
                 </div>
 
-                <div class="dashboard-card max-width-lg">
-                    <form id="global-settings-form" style="display:flex; flex-direction:column; gap:20px;">
-                        
-                        <!-- Chave do Gemini -->
-                        <div class="settings-field-group">
+                <!-- IA: Provedor e Teste -->
+                <div class="dashboard-card max-width-lg margin-top-md">
+                    <h3>Provedor de IA (LLM)</h3>
+                    <p class="description">Selecione qual modelo de linguagem será usado globalmente para geração de receitas e análise de fotos. Insira a chave do provedor escolhido e teste antes de salvar.</p>
+
+                    <!-- Seletor de provedor -->
+                    <div class="llm-provider-selector margin-top-md">
+                        <label class="llm-provider-card" id="provider-card-gemini">
+                            <input type="radio" name="active_llm_provider" value="gemini" id="provider-gemini">
+                            <div class="llm-card-inner">
+                                <span class="llm-logo llm-logo-gemini">✦</span>
+                                <div>
+                                    <strong>Google Gemini</strong>
+                                    <span class="llm-card-sub">gemini-2.5-flash · visão de imagens</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="llm-provider-card" id="provider-card-openai">
+                            <input type="radio" name="active_llm_provider" value="openai" id="provider-openai">
+                            <div class="llm-card-inner">
+                                <span class="llm-logo llm-logo-openai">⬡</span>
+                                <div>
+                                    <strong>OpenAI</strong>
+                                    <span class="llm-card-sub">gpt-4o-mini · alta disponibilidade</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="llm-provider-card" id="provider-card-mistral">
+                            <input type="radio" name="active_llm_provider" value="mistral" id="provider-mistral">
+                            <div class="llm-card-inner">
+                                <span class="llm-logo llm-logo-mistral">◈</span>
+                                <div>
+                                    <strong>Mistral AI</strong>
+                                    <span class="llm-card-sub">mistral-small-latest · custo baixo</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Chaves de API dos provedores -->
+                    <div class="margin-top-lg" style="display:flex;flex-direction:column;gap:14px;">
+                        <div class="settings-field-group" style="border:none;padding:0;margin:0;">
                             <div class="field-info">
-                                <h4>Chave de API do Gemini</h4>
-                                <p class="description">Utilizada globalmente para escaneamento de fotos e geração de planos/receitas por inteligência artificial.</p>
+                                <h4>Google Gemini API Key</h4>
+                                <p class="description">Suporta análise de imagens (scanner). Fallback automático para gemini-1.5-flash em sobrecarga.</p>
                             </div>
                             <div class="form-group">
                                 <div class="input-password-wrapper">
@@ -335,12 +372,50 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="settings-field-group" style="border:none;padding:0;margin:0;">
+                            <div class="field-info">
+                                <h4>OpenAI API Key</h4>
+                                <p class="description">Usa gpt-4o-mini. Alta disponibilidade. Suporta análise de imagens.</p>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-password-wrapper">
+                                    <input type="password" id="setting-openai-key" placeholder="sk-proj-..." class="masked-input">
+                                    <button class="toggle-visibility-btn" type="button" data-target="setting-openai-key"><i data-lucide="eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="settings-field-group" style="border:none;padding:0;margin:0;">
+                            <div class="field-info">
+                                <h4>Mistral AI API Key</h4>
+                                <p class="description">Usa mistral-small-latest. Custo baixo. Não suporta análise de imagens.</p>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-password-wrapper">
+                                    <input type="password" id="setting-mistral-key" placeholder="..." class="masked-input">
+                                    <button class="toggle-visibility-btn" type="button" data-target="setting-mistral-key"><i data-lucide="eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botão de teste -->
+                    <div class="llm-test-row margin-top-lg">
+                        <button type="button" class="btn-secondary" id="btn-test-llm">
+                            <i data-lucide="zap"></i> Testar provedor ativo
+                        </button>
+                        <div id="llm-test-result" class="llm-test-result hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Demais credenciais -->
+                <div class="dashboard-card max-width-lg margin-top-lg">
+                    <form id="global-settings-form" style="display:flex; flex-direction:column; gap:20px;">
 
                         <!-- Google Client ID -->
                         <div class="settings-field-group">
                             <div class="field-info">
                                 <h4>Google OAuth Client ID</h4>
-                                <p class="description">Chave pública utilizada para autenticar o login social dos usuários na página de login.</p>
+                                <p class="description">Chave pública para autenticar o login social dos usuários.</p>
                             </div>
                             <div class="form-group">
                                 <div class="input-password-wrapper">
@@ -354,7 +429,7 @@
                         <div class="settings-field-group">
                             <div class="field-info">
                                 <h4>Mercado Pago Access Token</h4>
-                                <p class="description">Token de API do Mercado Pago para verificação e criação de cobranças Pix.</p>
+                                <p class="description">Token de API do Mercado Pago para cobranças Pix.</p>
                             </div>
                             <div class="form-group">
                                 <div class="input-password-wrapper">
@@ -368,7 +443,7 @@
                         <div class="settings-field-group">
                             <div class="field-info">
                                 <h4>Asaas API Key</h4>
-                                <p class="description">Token de API para automação e consultas financeiras na plataforma de pagamento Asaas.</p>
+                                <p class="description">Token para automação financeira na plataforma Asaas.</p>
                             </div>
                             <div class="form-group">
                                 <div class="input-password-wrapper">

@@ -806,6 +806,61 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 8. MÉTODOS DA ABA: CREDENCIAIS (KEYS / SETTINGS)
+    function setActiveLLMCard(provider) {
+        ['gemini', 'openai', 'mistral'].forEach(p => {
+            const card = document.getElementById(`provider-card-${p}`);
+            if (card) card.classList.toggle('active', p === provider);
+        });
+        const radio = document.getElementById(`provider-${provider}`);
+        if (radio) radio.checked = true;
+    }
+
+    function setupLLMProviderCards() {
+        ['gemini', 'openai', 'mistral'].forEach(p => {
+            const radio = document.getElementById(`provider-${p}`);
+            if (radio) radio.addEventListener('change', () => setActiveLLMCard(p));
+        });
+
+        const btnTest = document.getElementById('btn-test-llm');
+        if (btnTest) {
+            btnTest.addEventListener('click', async () => {
+                const resultEl = document.getElementById('llm-test-result');
+                btnTest.disabled = true;
+                btnTest.innerHTML = '<i data-lucide="loader"></i> Testando...';
+                lucide.createIcons();
+                resultEl.className = 'llm-test-result';
+                resultEl.textContent = '';
+
+                // Salvar configurações atuais antes de testar
+                await saveAllSettings();
+
+                try {
+                    const res = await fetch(`${API_URL}/ai/test`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${adminState.token}` }
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                        resultEl.className = 'llm-test-result success';
+                        resultEl.innerHTML = `✓ <strong>${data.provider}</strong> (${data.model}) respondeu em <strong>${data.latency_ms}ms</strong>.<br>
+                            Receita de teste: <em>"${data.sample.name}"</em> — ${data.sample.calories} kcal, ${data.sample.time_min} min.`;
+                    } else {
+                        resultEl.className = 'llm-test-result error';
+                        resultEl.textContent = `✗ Falha: ${data.error}`;
+                    }
+                } catch (err) {
+                    resultEl.className = 'llm-test-result error';
+                    resultEl.textContent = `✗ Erro de conexão: ${err.message}`;
+                } finally {
+                    btnTest.disabled = false;
+                    btnTest.innerHTML = '<i data-lucide="zap"></i> Testar provedor ativo';
+                    lucide.createIcons();
+                    resultEl.classList.remove('hidden');
+                }
+            });
+        }
+    }
+
     async function loadSettingsData() {
         try {
             const res = await fetch(`${API_URL}/admin/settings`, {
@@ -814,42 +869,45 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error('Não foi possível carregar as credenciais.');
             adminState.settings = await res.json();
 
-            // Preenche os campos
-            document.getElementById('setting-gemini-key').value = adminState.settings.gemini_api_key || '';
-            document.getElementById('setting-google-id').value = adminState.settings.google_client_id || '';
-            document.getElementById('setting-mp-token').value = adminState.settings.mercadopago_token || '';
-            document.getElementById('setting-asaas-key').value = adminState.settings.asaas_key || '';
+            document.getElementById('setting-gemini-key').value  = adminState.settings.gemini_api_key  || '';
+            document.getElementById('setting-openai-key').value  = adminState.settings.openai_api_key  || '';
+            document.getElementById('setting-mistral-key').value = adminState.settings.mistral_api_key || '';
+            document.getElementById('setting-google-id').value   = adminState.settings.google_client_id || '';
+            document.getElementById('setting-mp-token').value    = adminState.settings.mercadopago_token || '';
+            document.getElementById('setting-asaas-key').value   = adminState.settings.asaas_key || '';
+
+            setActiveLLMCard(adminState.settings.active_llm_provider || 'gemini');
+            setupLLMProviderCards();
         } catch (err) {
             alert(err.message);
         }
     }
 
+    async function saveAllSettings() {
+        const activeProvider = document.querySelector('input[name="active_llm_provider"]:checked')?.value || 'gemini';
+        const payload = {
+            active_llm_provider:  activeProvider,
+            gemini_api_key:       document.getElementById('setting-gemini-key').value.trim(),
+            openai_api_key:       document.getElementById('setting-openai-key').value.trim(),
+            mistral_api_key:      document.getElementById('setting-mistral-key').value.trim(),
+            google_client_id:     document.getElementById('setting-google-id').value.trim(),
+            mercadopago_token:    document.getElementById('setting-mp-token').value.trim(),
+            asaas_key:            document.getElementById('setting-asaas-key').value.trim()
+        };
+        const res = await fetch(`${API_URL}/admin/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao salvar credenciais.');
+        return data;
+    }
+
     async function handleSettingsSave(e) {
         e.preventDefault();
-        const gemini_api_key = document.getElementById('setting-gemini-key').value.trim();
-        const google_client_id = document.getElementById('setting-google-id').value.trim();
-        const mercadopago_token = document.getElementById('setting-mp-token').value.trim();
-        const asaas_key = document.getElementById('setting-asaas-key').value.trim();
-
-        const payload = {
-            gemini_api_key,
-            google_client_id,
-            mercadopago_token,
-            asaas_key
-        };
-
         try {
-            const res = await fetch(`${API_URL}/admin/settings`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${adminState.token}`
-                },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Erro ao salvar credenciais.');
-
+            await saveAllSettings();
             alert('Todas as credenciais foram gravadas com sucesso no banco de dados!');
             await loadSettingsData();
         } catch (err) {
