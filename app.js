@@ -1109,7 +1109,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (!state.user) return;
 
-        if (!state.user.isPremiumActive) {
+        const trialTitle = trialCard.querySelector('h3');
+        const trialDescription = trialCard.querySelector('.settings-description');
+
+        if (state.user.isPlanExpired) {
+            if (trialTitle) trialTitle.innerText = 'Assinatura Expirada';
+            if (trialDescription) trialDescription.innerText = 'Sua assinatura expirou. Para continuar contando com acompanhamento profissional exclusivo e agendamento de consultas por vídeo, por favor renove sua assinatura.';
+            trialCard.classList.remove('hidden');
+            premiumContainer.classList.add('hidden');
+            return;
+        }
+
+        if (!state.user.has_nutritionist && !state.user.has_trainer) {
+            if (trialTitle) trialTitle.innerText = 'Upgrade Necessário';
+            if (trialDescription) trialDescription.innerText = 'O acompanhamento profissional exclusivo e agendamento de consultas não estão inclusos no seu plano atual. Faça upgrade para um plano que inclua suporte a profissionais para liberar este recurso.';
             trialCard.classList.remove('hidden');
             premiumContainer.classList.add('hidden');
             return;
@@ -1129,6 +1142,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const roleSelect = document.getElementById('select-my-pros-role');
             const prosListSelect = document.getElementById('select-my-pros-list');
+
+            // Popula o select de papéis com base no plano do usuário
+            let roleSelectHtml = '';
+            if (state.user.has_nutritionist) {
+                roleSelectHtml += `<option value="nutritionist">Nutricionista</option>`;
+            }
+            if (state.user.has_trainer) {
+                roleSelectHtml += `<option value="trainer">Personal Trainer</option>`;
+            }
+            roleSelect.innerHTML = roleSelectHtml;
 
             const updateProsDropdown = () => {
                 const selectedRole = roleSelect.value;
@@ -1390,7 +1413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         targetScreen.classList.add('active');
 
         // Exibição do Bottom Nav
-        const noNavScreens = ['screen-login', 'screen-onboarding', 'screen-scanner', 'screen-results', 'screen-food-search', 'screen-professional', 'screen-admin', 'screen-my-professionals'];
+        const noNavScreens = ['screen-login', 'screen-onboarding', 'screen-scanner', 'screen-results', 'screen-food-search', 'screen-professional', 'screen-admin'];
         if (noNavScreens.includes(screenId)) {
             nav.style.display = 'none';
         } else {

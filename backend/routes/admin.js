@@ -417,38 +417,50 @@ router.get('/plans', async (req, res) => {
 // 8. CRIAR/ATUALIZAR PLANO
 // ==========================================
 router.post('/plans', async (req, res) => {
-  const { id, name, display_name, price, duration_days, description, features } = req.body;
+  const { 
+    id, name, display_name, price, duration_days, description, features,
+    has_nutritionist, has_trainer, max_nutritionist_appointments_per_month, max_trainer_appointments_per_month 
+  } = req.body;
 
   if (!name || !display_name || price === undefined || duration_days === undefined) {
     return res.status(400).json({ error: 'Preencha os campos obrigatórios.' });
   }
 
   const featuresJson = typeof features === 'string' ? features : JSON.stringify(features || []);
+  const hasNutri = has_nutritionist === true || has_nutritionist === 'true';
+  const hasTrainer = has_trainer === true || has_trainer === 'true';
+  const maxNutri = parseInt(max_nutritionist_appointments_per_month) || 0;
+  const maxTrainer = parseInt(max_trainer_appointments_per_month) || 0;
 
   try {
     if (id) {
       // Atualizar plano existente
       const updated = await db.query(`
         UPDATE plans 
-        SET name = $1, display_name = $2, price = $3, duration_days = $4, description = $5, features = $6
-        WHERE id = $7
+        SET name = $1, display_name = $2, price = $3, duration_days = $4, description = $5, features = $6,
+            has_nutritionist = $7, has_trainer = $8, max_nutritionist_appointments_per_month = $9, max_trainer_appointments_per_month = $10
+        WHERE id = $11
         RETURNING *
-      `, [name.toLowerCase().trim(), display_name, price, duration_days, description, featuresJson, id]);
+      `, [name.toLowerCase().trim(), display_name, price, duration_days, description, featuresJson, hasNutri, hasTrainer, maxNutri, maxTrainer, id]);
       
       res.json({ message: 'Plano atualizado com sucesso.', plan: updated.rows[0] });
     } else {
       // Criar novo plano
       const inserted = await db.query(`
-        INSERT INTO plans (name, display_name, price, duration_days, description, features)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO plans (name, display_name, price, duration_days, description, features, has_nutritionist, has_trainer, max_nutritionist_appointments_per_month, max_trainer_appointments_per_month)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (name) DO UPDATE SET
           display_name = EXCLUDED.display_name,
           price = EXCLUDED.price,
           duration_days = EXCLUDED.duration_days,
           description = EXCLUDED.description,
-          features = EXCLUDED.features
+          features = EXCLUDED.features,
+          has_nutritionist = EXCLUDED.has_nutritionist,
+          has_trainer = EXCLUDED.has_trainer,
+          max_nutritionist_appointments_per_month = EXCLUDED.max_nutritionist_appointments_per_month,
+          max_trainer_appointments_per_month = EXCLUDED.max_trainer_appointments_per_month
         RETURNING *
-      `, [name.toLowerCase().trim(), display_name, price, duration_days, description, featuresJson]);
+      `, [name.toLowerCase().trim(), display_name, price, duration_days, description, featuresJson, hasNutri, hasTrainer, maxNutri, maxTrainer]);
       
       res.json({ message: 'Plano criado com sucesso.', plan: inserted.rows[0] });
     }

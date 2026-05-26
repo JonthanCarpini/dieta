@@ -222,6 +222,22 @@ document.addEventListener('DOMContentLoaded', () => {
             planForm.addEventListener('submit', handlePlanSave);
         }
 
+        const checkHasNutri = document.getElementById('plan-has-nutritionist');
+        if (checkHasNutri) {
+            checkHasNutri.addEventListener('change', function() {
+                const group = document.getElementById('plan-max-nutritionist-group');
+                if (group) group.classList.toggle('hidden', !this.checked);
+            });
+        }
+
+        const checkHasTrainer = document.getElementById('plan-has-trainer');
+        if (checkHasTrainer) {
+            checkHasTrainer.addEventListener('change', function() {
+                const group = document.getElementById('plan-max-trainer-group');
+                if (group) group.classList.toggle('hidden', !this.checked);
+            });
+        }
+
         document.getElementById('btn-cancel-plan-edit').addEventListener('click', resetPlanForm);
 
         // Voltar da visualização de diário do paciente
@@ -727,6 +743,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         document.getElementById('plan-features').value = featuresArr.join('\n');
 
+        const hasNutri = plan.has_nutritionist === true || plan.has_nutritionist === 'true';
+        const hasTrainer = plan.has_trainer === true || plan.has_trainer === 'true';
+
+        const checkHasNutri = document.getElementById('plan-has-nutritionist');
+        if (checkHasNutri) {
+            checkHasNutri.checked = hasNutri;
+            const group = document.getElementById('plan-max-nutritionist-group');
+            if (group) group.classList.toggle('hidden', !hasNutri);
+            const limitInput = document.getElementById('plan-max-nutritionist');
+            if (limitInput) limitInput.value = plan.max_nutritionist_appointments_per_month || 0;
+        }
+
+        const checkHasTrainer = document.getElementById('plan-has-trainer');
+        if (checkHasTrainer) {
+            checkHasTrainer.checked = hasTrainer;
+            const group = document.getElementById('plan-max-trainer-group');
+            if (group) group.classList.toggle('hidden', !hasTrainer);
+            const limitInput = document.getElementById('plan-max-trainer');
+            if (limitInput) limitInput.value = plan.max_trainer_appointments_per_month || 0;
+        }
+
         document.getElementById('btn-cancel-plan-edit').classList.remove('hidden');
     }
 
@@ -744,6 +781,24 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('plan-duration').value = '';
         document.getElementById('plan-description').value = '';
         document.getElementById('plan-features').value = '';
+
+        const checkHasNutri = document.getElementById('plan-has-nutritionist');
+        if (checkHasNutri) {
+            checkHasNutri.checked = false;
+            const group = document.getElementById('plan-max-nutritionist-group');
+            if (group) group.classList.add('hidden');
+            const limitInput = document.getElementById('plan-max-nutritionist');
+            if (limitInput) limitInput.value = '0';
+        }
+
+        const checkHasTrainer = document.getElementById('plan-has-trainer');
+        if (checkHasTrainer) {
+            checkHasTrainer.checked = false;
+            const group = document.getElementById('plan-max-trainer-group');
+            if (group) group.classList.add('hidden');
+            const limitInput = document.getElementById('plan-max-trainer');
+            if (limitInput) limitInput.value = '0';
+        }
         
         document.getElementById('btn-cancel-plan-edit').classList.add('hidden');
     }
@@ -761,13 +816,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Trata os benefícios como array
         const features = featuresText.split('\n').map(f => f.trim()).filter(f => f !== '');
 
+        const has_nutritionist = document.getElementById('plan-has-nutritionist')?.checked || false;
+        const max_nutritionist_appointments_per_month = parseInt(document.getElementById('plan-max-nutritionist')?.value) || 0;
+        const has_trainer = document.getElementById('plan-has-trainer')?.checked || false;
+        const max_trainer_appointments_per_month = parseInt(document.getElementById('plan-max-trainer')?.value) || 0;
+
         const payload = {
             name,
             display_name,
             price,
             duration_days,
             description,
-            features
+            features,
+            has_nutritionist,
+            max_nutritionist_appointments_per_month,
+            has_trainer,
+            max_trainer_appointments_per_month
         };
 
         if (id) payload.id = parseInt(id);

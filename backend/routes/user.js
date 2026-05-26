@@ -26,7 +26,12 @@ router.get('/profile', async (req, res) => {
         plan: req.user.plan,
         trial_expires_at: req.user.trial_expires_at,
         premium_expires_at: req.user.premium_expires_at,
-        isPremiumActive: req.user.isPremiumActive
+        isPremiumActive: req.user.isPremiumActive,
+        isPlanExpired: req.user.isPlanExpired,
+        has_nutritionist: req.user.has_nutritionist,
+        has_trainer: req.user.has_trainer,
+        max_nutritionist_appointments_per_month: req.user.max_nutritionist_appointments_per_month,
+        max_trainer_appointments_per_month: req.user.max_trainer_appointments_per_month
       },
       profile: profileRes.rows[0] || null,
       geminiApiKey
@@ -291,15 +296,24 @@ router.get('/linked-professionals', async (req, res) => {
   }
 });
 
-// Vincula o usuário ao profissional selecionado
+// Vincular profissional (nutricionista ou personal trainer)
 router.post('/link-professional', async (req, res) => {
-  if (!req.user.isPremiumActive) {
-    return res.status(403).json({ error: 'Acesso restrito a usuários premium.' });
+  if (req.user.isPlanExpired) {
+    return res.status(403).json({ error: 'Sua assinatura expirou. Renove seu plano para continuar vinculando profissionais.' });
   }
-  const { professional_id, type } = req.body; // type: 'nutritionist' ou 'trainer'
+
+  const { professional_id, type } = req.body;
 
   if (!professional_id || !type || !['nutritionist', 'trainer'].includes(type)) {
     return res.status(400).json({ error: 'ID do profissional ou tipo inválido.' });
+  }
+
+  // Valida direitos do plano do usuário
+  if (type === 'nutritionist' && !req.user.has_nutritionist) {
+    return res.status(403).json({ error: 'Seu plano atual não dá direito a acompanhamento com Nutricionista.' });
+  }
+  if (type === 'trainer' && !req.user.has_trainer) {
+    return res.status(403).json({ error: 'Seu plano atual não dá direito a acompanhamento com Personal Trainer.' });
   }
 
   try {
@@ -342,11 +356,23 @@ router.get('/professional-feedbacks', async (req, res) => {
 
 // Retorna a disponibilidade de um profissional específico
 router.get('/professionals/:id/availability', async (req, res) => {
-  if (!req.user.isPremiumActive) {
-    return res.status(403).json({ error: 'Acesso restrito a usuários premium.' });
+  if (req.user.isPlanExpired) {
+    return res.status(403).json({ error: 'Sua assinatura expirou.' });
   }
   const professionalId = parseInt(req.params.id);
   try {
+    const profRes = await db.query('SELECT role FROM users WHERE id = $1', [professionalId]);
+    if (profRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Profissional não encontrado.' });
+    }
+    const role = profRes.rows[0].role;
+    if (role === 'nutritionist' && !req.user.has_nutritionist) {
+      return res.status(403).json({ error: 'Acesso restrito. Seu plano não dá direito a Nutricionista.' });
+    }
+    if (role === 'trainer' && !req.user.has_trainer) {
+      return res.status(403).json({ error: 'Acesso restrito. Seu plano não dá direito a Personal Trainer.' });
+    }
+
     const availability = await db.query(
       'SELECT * FROM professional_availability WHERE professional_id = $1 AND active = true ORDER BY day_of_week, start_time',
       [professionalId]
@@ -360,8 +386,8 @@ router.get('/professionals/:id/availability', async (req, res) => {
 
 // Agendar consulta (video chamada)
 router.post('/appointments', async (req, res) => {
-  if (!req.user.isPremiumActive) {
-    return res.status(403).json({ error: 'Acesso restrito a usuários premium.' });
+  if (req.user.isPlanExpired) {
+    return res.status(403).json({ error: 'Sua assinatura expirou. Renove seu plano para agendar consultas.' });
   }
 
   const { professional_id, appointment_date, start_time, end_time } = req.body;
@@ -378,6 +404,36 @@ router.post('/appointments', async (req, res) => {
     }
 
     const professional = profRes.rows[0];
+
+    // Verificar se o usuário tem direito de agendar com este tipo de profissional no seu plano
+    if (professional.role === 'nutritionist' && !req.user.has_nutritionist) {
+      return res.status(403).json({ error: 'Seu plano atual não dá direito a consultas com Nutricionista.' });
+    }
+    if (professional.role === 'trainer' && !req.user.has_trainer) {
+      return res.status(403).json({ error: 'Seu plano atual não dá direito a consultas com Personal Trainer.' });
+    }
+
+    // Verificar limite mensal de consultas
+    const limit = professional.role === 'nutritionist' 
+      ? req.user.max_nutritionist_appointments_per_month 
+      : req.user.max_trainer_appointments_per_month;
+
+    const countRes = await db.query(
+      `SELECT COUNT(*) as count FROM appointments a
+       JOIN users u ON a.professional_id = u.id
+       WHERE a.patient_id = $1 
+         AND u.role = $2
+         AND a.status != 'cancelled'
+         AND DATE_TRUNC('month', a.appointment_date) = DATE_TRUNC('month', CURRENT_DATE)`,
+      [req.user.id, professional.role]
+    );
+
+    const appointmentsCount = parseInt(countRes.rows[0].count);
+    if (appointmentsCount >= limit) {
+      return res.status(400).json({ 
+        error: `Você atingiu o limite de consultas mensais (${limit}) para este tipo de profissional no seu plano atual.` 
+      });
+    }
 
     // 2. Verificar se o paciente está de fato vinculado a este profissional
     const linkCheck = await db.query(

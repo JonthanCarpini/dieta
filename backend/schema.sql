@@ -123,13 +123,17 @@ CREATE TABLE IF NOT EXISTS plans (
     duration_days INTEGER NOT NULL DEFAULT 30,
     description TEXT,
     features JSONB DEFAULT '[]'::jsonb,
+    has_nutritionist BOOLEAN DEFAULT FALSE,
+    has_trainer BOOLEAN DEFAULT FALSE,
+    max_nutritionist_appointments_per_month INTEGER DEFAULT 0,
+    max_trainer_appointments_per_month INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Insere planos padrões caso não existam
-INSERT INTO plans (name, display_name, price, duration_days, description, features) VALUES 
-('trial', 'Plano de Testes (7 dias)', 0.00, 7, 'Experimente todas as funcionalidades básicas do Nutrir gratuitamente.', '["Controle de macros básico", "Acompanhamento de água", "Escanear pratos por IA"]'::jsonb),
-('premium', 'Plano Premium Mensal', 29.90, 30, 'Desbloqueie orientação profissional com nutricionistas e personal trainers.', '["Receitas por IA ilimitadas", "Acompanhamento profissional completo", "Análise de refeições ilimitada"]'::jsonb)
+INSERT INTO plans (name, display_name, price, duration_days, description, features, has_nutritionist, has_trainer, max_nutritionist_appointments_per_month, max_trainer_appointments_per_month) VALUES 
+('trial', 'Plano de Testes (7 dias)', 0.00, 7, 'Experimente todas as funcionalidades básicas do Nutrir gratuitamente.', '["Controle de macros básico", "Acompanhamento de água", "Escanear pratos por IA"]'::jsonb, FALSE, FALSE, 0, 0),
+('premium', 'Plano Premium Mensal', 29.90, 30, 'Desbloqueie orientação profissional com nutricionistas e personal trainers.', '["Receitas por IA ilimitadas", "Acompanhamento profissional completo", "Análise de refeições ilimitada"]'::jsonb, TRUE, TRUE, 4, 4)
 ON CONFLICT (name) DO NOTHING;
 
 -- 11. TABELA DE PAGAMENTOS E FATURAMENTO (PAYMENTS LOG)

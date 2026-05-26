@@ -285,6 +285,26 @@
                                 <label for="plan-features">Benefícios (um por linha)</label>
                                 <textarea id="plan-features" placeholder="Ex: Receitas ilimitadas&#10;Gráficos premium&#10;Acompanhamento profissional" style="height: 90px;"></textarea>
                             </div>
+                            
+                            <!-- Profissional Permissions & Limits -->
+                            <div class="form-group-row" style="display: flex; align-items: center; gap: 8px; margin-top: 10px; margin-bottom: 10px;">
+                                <input type="checkbox" id="plan-has-nutritionist" style="width: auto; margin: 0;">
+                                <label for="plan-has-nutritionist" style="margin: 0; font-size: 11px; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer;">Tem direito a Nutricionista</label>
+                            </div>
+                            <div class="form-group hidden" id="plan-max-nutritionist-group">
+                                <label for="plan-max-nutritionist">Limite de Consultas com Nutri / Mês</label>
+                                <input type="number" id="plan-max-nutritionist" min="0" placeholder="Ex: 4" value="0">
+                            </div>
+
+                            <div class="form-group-row" style="display: flex; align-items: center; gap: 8px; margin-top: 10px; margin-bottom: 10px;">
+                                <input type="checkbox" id="plan-has-trainer" style="width: auto; margin: 0;">
+                                <label for="plan-has-trainer" style="margin: 0; font-size: 11px; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer;">Tem direito a Personal Trainer</label>
+                            </div>
+                            <div class="form-group hidden" id="plan-max-trainer-group">
+                                <label for="plan-max-trainer">Limite de Consultas com Personal / Mês</label>
+                                <input type="number" id="plan-max-trainer" min="0" placeholder="Ex: 4" value="0">
+                            </div>
+
                             <div class="btn-group margin-top-md">
                                 <button type="submit" class="btn-primary w-full" id="btn-save-plan">Salvar Plano</button>
                                 <button type="button" class="btn-secondary w-full hidden" id="btn-cancel-plan-edit">Cancelar</button>
