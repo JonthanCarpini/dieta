@@ -1705,6 +1705,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let wsSignal = null;
     let isMicMuted = false;
     let isCamOff = false;
+    let remoteCandidatesQueue = [];
 
     async function startVideoCall(link) {
         let roomName = 'nutrir-room';
@@ -1715,6 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
             roomName = link.replace('https://meet.jit.si/', '').split('#')[0].split('?')[0];
         }
 
+        remoteCandidatesQueue = [];
         const statusEl = document.getElementById('video-call-status');
         if (statusEl) statusEl.textContent = 'Acessando câmera e microfone...';
 
@@ -1752,6 +1754,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const remoteVideo = document.getElementById('remote-video');
                 if (remoteVideo) {
                     remoteVideo.srcObject = event.streams[0];
+                    remoteVideo.play().catch(err => {
+                        console.warn("Autoplay bloqueado no stream remoto (Admin). Forçando muted e play...", err);
+                        remoteVideo.muted = true;
+                        remoteVideo.play().catch(e => console.error("Erro fatal ao reproduzir vídeo:", e));
+                    });
                 }
                 if (statusEl) statusEl.textContent = 'Em chamada';
             };
@@ -1783,6 +1790,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
             };
 
+            // Função para processar candidatos ICE acumulados após RemoteDescription ser definida
+            const processPendingCandidates = async () => {
+                if (remoteCandidatesQueue.length > 0) {
+                    console.log(`[WebRTC-Admin] Aplicando ${remoteCandidatesQueue.length} candidatos ICE acumulados...`);
+                    for (const candidate of remoteCandidatesQueue) {
+                        try {
+                            await peerConnection.addIceCandidate(candidate);
+                        } catch (e) {
+                            console.error("Erro ao aplicar candidato acumulado:", e);
+                        }
+                    }
+                    remoteCandidatesQueue = [];
+                }
+            };
+
             wsSignal.onmessage = async (event) => {
                 try {
                     const data = JSON.parse(event.data);
@@ -1810,15 +1832,27 @@ document.addEventListener('DOMContentLoaded', () => {
                                 answer: answer,
                                 room: roomName
                             }));
+                            await processPendingCandidates();
                             break;
 
                         case 'answer':
                             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                            await processPendingCandidates();
                             break;
 
                         case 'candidate':
                             if (data.candidate) {
-                                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                                const candidate = new RTCIceCandidate(data.candidate);
+                                if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                                    try {
+                                        await peerConnection.addIceCandidate(candidate);
+                                    } catch (e) {
+                                        console.error("Erro ao adicionar candidato ICE:", e);
+                                    }
+                                } else {
+                                    console.log("[WebRTC-Admin] Acumulando candidato ICE (RemoteDescription não definida)");
+                                    remoteCandidatesQueue.push(candidate);
+                                }
                             }
                             break;
 
@@ -1982,6 +2016,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (localVideo) localVideo.srcObject = null;
         if (remoteVideo) remoteVideo.srcObject = null;
 
+        remoteCandidatesQueue = [];
         const screenVideoCall = document.getElementById('screen-video-call');
         if (screenVideoCall) screenVideoCall.style.display = 'none';
 

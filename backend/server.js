@@ -230,13 +230,17 @@ wss.on('connection', (ws) => {
 
           console.log(`Usuário ${clientUserId} entrou na sala ${currentRoom}`);
 
-          // Se já tem outro participante, notifica ambos
+          // Se já tem outro participante, notifica apenas quem acabou de entrar para iniciar a chamada (evita colisão SDP)
           if (roomClients.size === 2) {
+            let otherUser = null;
             for (const client of roomClients) {
               if (client !== ws) {
-                client.send(JSON.stringify({ type: 'new-peer', userId: clientUserId }));
-                ws.send(JSON.stringify({ type: 'new-peer', userId: client.userId }));
+                otherUser = client;
+                break;
               }
+            }
+            if (otherUser) {
+              ws.send(JSON.stringify({ type: 'new-peer', userId: otherUser.userId }));
             }
           }
           break;
