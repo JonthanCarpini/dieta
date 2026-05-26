@@ -687,61 +687,48 @@
         <!-- ========================================== -->
         <section id="screen-settings" class="screen">
             <header class="settings-header">
-                <h3>Perfil de Dieta</h3>
+                <h3>Perfil</h3>
                 <div style="width: 40px;"></div>
             </header>
 
             <div class="scrollable-content settings-content">
-                <!-- Configurações do Perfil do Usuário / Slimo Customize -->
-                <div class="settings-card">
-                    <div class="card-header-icon border-profile">
-                        <i data-lucide="user" class="text-profile"></i>
-                        <h3>Plano Alimentar Atual</h3>
-                    </div>
-                    
-                    <div class="settings-profile-info" id="settings-profile-summary"></div>
 
-                    <!-- Ajustes flexíveis (Slimo Custom Metas) -->
-                    <div class="flex-meta-adjusters">
-                        <button class="btn-secondary" id="btn-adjust-calories-manual">
-                            <i data-lucide="edit"></i> Ajustar meta calórica
-                        </button>
-                        <button class="btn-secondary" id="btn-adjust-macros-manual">
-                            <i data-lucide="sliders"></i> Ajustar macronutrientes
-                        </button>
+                <!-- Hero do usuário -->
+                <div class="profile-hero-card">
+                    <div class="profile-avatar-ring">
+                        <span class="profile-avatar-initials" id="profile-avatar-initials">?</span>
                     </div>
-
-                    <button class="btn-primary w-full" id="btn-recalculate-profile">
-                        <i data-lucide="refresh-cw"></i>
-                        Redefinir seu plano (Onboarding)
+                    <div class="profile-hero-info">
+                        <span class="profile-hero-name" id="profile-hero-name">Usuário</span>
+                        <span class="profile-hero-plan" id="profile-hero-plan">Plano Trial</span>
+                    </div>
+                    <button class="profile-logout-btn" id="btn-profile-logout" title="Sair da conta">
+                        <i data-lucide="log-out"></i>
                     </button>
                 </div>
 
-                <!-- Cartão da API Key do Gemini -->
+                <!-- Plano Alimentar Atual -->
                 <div class="settings-card">
-                    <div class="card-header-icon border-gemini">
-                        <i data-lucide="sparkles" class="text-gemini"></i>
-                        <h3>Conexão IA Gemini</h3>
+                    <div class="card-header-icon border-profile">
+                        <i data-lucide="target" class="text-profile"></i>
+                        <h3>Plano Alimentar</h3>
                     </div>
-                    <p class="settings-description">
-                        Insira sua chave do Google AI Studio para ativar o escaneamento de fotos realistas e o gerador inteligente de receitas.
-                    </p>
-                    <div class="form-group">
-                        <label for="input-api-key">Chave de API do Gemini</label>
-                        <div class="input-password-wrapper">
-                            <input type="password" id="input-api-key" placeholder="AIzaSy...">
-                            <button class="icon-btn" id="btn-toggle-api-key" type="button" title="Mostrar/Ocultar">
-                                <i data-lucide="eye"></i>
-                            </button>
-                        </div>
+
+                    <div id="settings-profile-summary"></div>
+
+                    <!-- Ajustes flexíveis -->
+                    <div class="flex-meta-adjusters">
+                        <button class="btn-secondary" id="btn-adjust-calories-manual">
+                            <i data-lucide="edit"></i> Meta calórica
+                        </button>
+                        <button class="btn-secondary" id="btn-adjust-macros-manual">
+                            <i data-lucide="sliders"></i> Macros
+                        </button>
                     </div>
-                    <div class="api-status-badge inactive" id="api-status-indicator">
-                        <div class="status-dot"></div>
-                        <span id="api-status-text">Demonstração Mock Ativo</span>
-                    </div>
-                    
-                    <button class="btn-primary w-full" id="btn-save-settings-key">
-                        Salvar Chave de API
+
+                    <button class="btn-secondary w-full" id="btn-recalculate-profile">
+                        <i data-lucide="refresh-cw"></i>
+                        Refazer onboarding
                     </button>
                 </div>
 

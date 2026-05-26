@@ -3352,41 +3352,60 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n�
     function renderSettingsPage() {
         const profile = state.userProfile;
         const summaryEl = document.getElementById('settings-profile-summary');
-        if (!profile) return;
 
-        const goals = { lose: 'Emagrecimento / Déficit', maintain: 'Manter Peso', gain: 'Ganhar Massa / Hipertrofia' };
+        // Hero section
+        const heroName = document.getElementById('profile-hero-name');
+        const heroInitials = document.getElementById('profile-avatar-initials');
+        const heroPlan = document.getElementById('profile-hero-plan');
+        if (heroName && state.user) {
+            const name = state.user.name || state.user.email || 'Usuário';
+            heroName.textContent = name;
+            heroInitials.textContent = name.charAt(0).toUpperCase();
+        }
+        if (heroPlan && state.user) {
+            const planLabels = { trial: 'Plano Trial', premium: 'Plano Premium' };
+            heroPlan.textContent = planLabels[state.user.plan] || 'Plano Trial';
+            heroPlan.className = 'profile-hero-plan' + (state.user.plan === 'premium' ? ' premium' : '');
+        }
+
+        if (!profile || !summaryEl) return;
+
+        const goals = { lose: 'Déficit calórico', maintain: 'Manutenção', gain: 'Hipertrofia' };
+        const genderIcon = profile.gender === 'male' ? '♂' : '♀';
 
         summaryEl.innerHTML = `
-            <div class="profile-info-row"><span class="p-lbl">Sexo Biológico</span><span class="p-val">${profile.gender === 'male' ? 'Masculino' : 'Feminino'}</span></div>
-            <div class="profile-info-row"><span class="p-lbl">Idade</span><span class="p-val">${profile.age} anos</span></div>
-            <div class="profile-info-row"><span class="p-lbl">Peso Atual</span><span class="p-val">${profile.weight} kg</span></div>
-            <div class="profile-info-row"><span class="p-lbl">Altura</span><span class="p-val">${profile.height} cm</span></div>
-            <div class="profile-info-row"><span class="p-lbl">Objetivo de Peso</span><span class="p-val">${profile.goalWeight} kg</span></div>
-            <div class="profile-info-row"><span class="p-lbl">Plano de Dieta</span><span class="p-val">${goals[profile.goal]}</span></div>
-            <div class="profile-info-row" style="border-top:1px dashed rgba(255,255,255,0.05); padding-top:8px; margin-top:8px;">
-                <span class="p-lbl">Meta Recomendada</span><span class="p-val" style="color:var(--color-primary);">${profile.targetCalories} kcal/dia</span>
+            <div class="profile-cal-highlight">
+                <span class="pch-label">Meta diária</span>
+                <span class="pch-value">${profile.targetCalories}<span class="pch-unit"> kcal</span></span>
+                <span class="pch-goal">${goals[profile.goal] || ''}</span>
+            </div>
+            <div class="profile-bio-grid">
+                <div class="profile-bio-item">
+                    <span class="pbi-label">Sexo</span>
+                    <span class="pbi-value">${genderIcon} ${profile.gender === 'male' ? 'Masc.' : 'Fem.'}</span>
+                </div>
+                <div class="profile-bio-item">
+                    <span class="pbi-label">Idade</span>
+                    <span class="pbi-value">${profile.age} <span class="pbi-unit">anos</span></span>
+                </div>
+                <div class="profile-bio-item">
+                    <span class="pbi-label">Peso</span>
+                    <span class="pbi-value">${profile.weight} <span class="pbi-unit">kg</span></span>
+                </div>
+                <div class="profile-bio-item">
+                    <span class="pbi-label">Altura</span>
+                    <span class="pbi-value">${profile.height} <span class="pbi-unit">cm</span></span>
+                </div>
+                <div class="profile-bio-item pbi-wide">
+                    <span class="pbi-label">Objetivo de peso</span>
+                    <span class="pbi-value">${profile.goalWeight} <span class="pbi-unit">kg</span></span>
+                </div>
             </div>
         `;
 
         const adminCard = document.getElementById('admin-settings-card');
         if (adminCard) {
-            if (state.user && state.user.role === 'admin') {
-                adminCard.style.display = 'block';
-            } else {
-                adminCard.style.display = 'none';
-            }
-        }
-    }
-
-    function updateApiStatusIndicator() {
-        const badge = document.getElementById('api-status-indicator');
-        const text = document.getElementById('api-status-text');
-        if (state.geminiApiKey && state.geminiApiKey.trim() !== '') {
-            badge.className = 'api-status-badge active';
-            text.innerText = "Chave Ativa e Conectada";
-        } else {
-            badge.className = 'api-status-badge inactive';
-            text.innerText = "Demonstração Mock Ativo";
+            adminCard.style.display = (state.user && state.user.role === 'admin') ? 'block' : 'none';
         }
     }
 
@@ -3450,19 +3469,16 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n�
             if (state.currentCapturedImage) analyzeFoodPhoto();
         });
 
-        // API Key
-        document.getElementById('btn-toggle-api-key').addEventListener('click', () => {
-            const input = document.getElementById('input-api-key');
-            input.type = input.type === 'password' ? 'text' : 'password';
-        });
-
-        document.getElementById('btn-save-settings-key').addEventListener('click', () => {
-            const key = document.getElementById('input-api-key').value.trim();
-            state.geminiApiKey = key;
-            localStorage.setItem('nutrir_gemini_key', key);
-            updateApiStatusIndicator();
-            alert("Chave de API salva com sucesso!");
-        });
+        // Logout do perfil
+        const btnProfileLogout = document.getElementById('btn-profile-logout');
+        if (btnProfileLogout) {
+            btnProfileLogout.addEventListener('click', () => {
+                if (confirm('Deseja sair da sua conta?')) {
+                    localStorage.removeItem('nutrir_token');
+                    showScreen('screen-login');
+                }
+            });
+        }
 
         // Recalcular plano e reset
         document.getElementById('btn-recalculate-profile').addEventListener('click', () => {
@@ -3489,8 +3505,6 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n�
                 state.fastingActive = false;
                 state.savedAiRecipes = [];
                 state.savedWeeklyPlans = [];
-                
-                document.getElementById('input-api-key').value = '';
                 initApp();
             }
         });

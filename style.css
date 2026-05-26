@@ -1632,6 +1632,166 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); }
    ========================================================================== */
 .settings-content { display: flex; flex-direction: column; gap: 14px; }
 
+/* ── Profile Hero ── */
+.profile-hero-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 18px 16px;
+    backdrop-filter: blur(var(--blur-glass));
+}
+
+.profile-avatar-ring {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--color-primary-dim, rgba(245,193,77,0.12));
+    border: 2px solid rgba(245,193,77,0.35);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 16px rgba(245,193,77,0.12);
+}
+
+.profile-avatar-initials {
+    font-family: 'Geist Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-primary);
+    line-height: 1;
+}
+
+.profile-hero-info {
+    flex: 1;
+    display: flex; flex-direction: column; gap: 3px;
+    min-width: 0;
+}
+
+.profile-hero-name {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text-main);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.profile-hero-plan {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    background: rgba(255,250,240,0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 2px 9px;
+    display: inline-block;
+    align-self: flex-start;
+}
+
+.profile-hero-plan.premium {
+    color: var(--color-primary);
+    background: rgba(245,193,77,0.08);
+    border-color: rgba(245,193,77,0.2);
+}
+
+.profile-logout-btn {
+    background: rgba(255,250,240,0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--color-text-muted);
+    width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    flex-shrink: 0;
+}
+
+.profile-logout-btn i { width: 16px; height: 16px; }
+
+.profile-logout-btn:hover {
+    color: #fca5a5;
+    border-color: rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.08);
+}
+
+/* ── Calorie highlight ── */
+.profile-cal-highlight {
+    background: rgba(245,193,77,0.06);
+    border: 1px solid rgba(245,193,77,0.14);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.pch-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+}
+
+.pch-value {
+    font-family: 'Geist Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+}
+
+.pch-unit { font-size: 14px; font-weight: 400; opacity: 0.7; }
+
+.pch-goal {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 1px;
+}
+
+/* ── Bio grid ── */
+.profile-bio-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.profile-bio-item {
+    background: rgba(255,250,240,0.025);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 3px;
+}
+
+.profile-bio-item.pbi-wide {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pbi-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-text-muted);
+}
+
+.pbi-value {
+    font-family: 'Geist Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text-main);
+    letter-spacing: -0.02em;
+}
+
+.pbi-unit { font-size: 11px; font-weight: 400; opacity: 0.55; }
+
 .settings-card {
     background: var(--bg-surface);
     border: 1px solid var(--border-color);
