@@ -16,17 +16,17 @@ async function getLLMConfig() {
 
 // ── Provider: Gemini (with fallback) ─────────────────────────
 
+// Only models confirmed available via ListModels for this key class
 // v1beta supports responseMimeType (JSON mode); v1 does not
 const GEMINI_CANDIDATES = [
-  { api: 'v1beta', model: 'gemini-2.5-flash',        jsonMode: true  },
-  { api: 'v1beta', model: 'gemini-2.0-flash',        jsonMode: true  },
-  { api: 'v1beta', model: 'gemini-2.0-flash-lite',   jsonMode: true  },
-  { api: 'v1beta', model: 'gemini-1.5-flash',        jsonMode: true  },
-  { api: 'v1beta', model: 'gemini-1.5-flash-002',    jsonMode: true  },
-  { api: 'v1beta', model: 'gemini-1.5-flash-001',    jsonMode: true  },
-  { api: 'v1',     model: 'gemini-1.5-flash',        jsonMode: false },
-  { api: 'v1',     model: 'gemini-1.5-pro',          jsonMode: false },
-  { api: 'v1beta', model: 'gemini-1.0-pro',          jsonMode: false },
+  { api: 'v1beta', model: 'gemini-2.5-flash',          jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-2.0-flash',          jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-2.0-flash-001',      jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-2.0-flash-lite',     jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-2.0-flash-lite-001', jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-flash-latest',       jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-2.5-flash-lite',     jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-pro-latest',         jsonMode: false },
 ];
 
 function extractJson(text) {
@@ -116,19 +116,36 @@ async function callMistral(apiKey, prompt) {
 // ── Unified dispatcher ────────────────────────────────────────
 
 async function callLLM(cfg, prompt, imageBase64 = null) {
-  const provider = cfg.active_llm_provider || 'gemini';
-  if (provider === 'openai') {
-    if (!cfg.openai_api_key) throw new Error('Chave OpenAI não configurada no painel admin.');
-    return { provider, ...(await callOpenAI(cfg.openai_api_key, prompt)) };
+  const active = cfg.active_llm_provider || 'gemini';
+
+  // Build ordered list: active provider first, then fallbacks
+  const order = [active, ...['gemini', 'mistral', 'openai'].filter(p => p !== active)];
+  let lastErr;
+
+  for (const provider of order) {
+    try {
+      if (provider === 'openai' && cfg.openai_api_key) {
+        const result = await callOpenAI(cfg.openai_api_key, prompt);
+        if (provider !== active) console.warn(`Auto-fallback para OpenAI após falha de ${active}`);
+        return { provider, ...result };
+      }
+      if (provider === 'mistral' && cfg.mistral_api_key) {
+        if (imageBase64) { lastErr = 'Mistral não suporta imagens'; continue; }
+        const result = await callMistral(cfg.mistral_api_key, prompt);
+        if (provider !== active) console.warn(`Auto-fallback para Mistral após falha de ${active}`);
+        return { provider, ...result };
+      }
+      if (provider === 'gemini' && cfg.gemini_api_key) {
+        const result = await callGemini(cfg.gemini_api_key, prompt, imageBase64);
+        return { provider, ...result };
+      }
+    } catch (err) {
+      lastErr = err.message;
+      console.warn(`Provedor ${provider} falhou: ${err.message.slice(0, 120)}`);
+    }
   }
-  if (provider === 'mistral') {
-    if (!cfg.mistral_api_key) throw new Error('Chave Mistral não configurada no painel admin.');
-    if (imageBase64) throw new Error('Mistral não suporta análise de imagens. Use Gemini ou OpenAI para o scanner.');
-    return { provider, ...(await callMistral(cfg.mistral_api_key, prompt)) };
-  }
-  // default: gemini
-  if (!cfg.gemini_api_key) throw new Error('Chave Gemini não configurada no painel admin.');
-  return { provider, ...(await callGemini(cfg.gemini_api_key, prompt, imageBase64)) };
+
+  throw new Error(lastErr || 'Nenhum provedor de IA configurado ou disponível.');
 }
 
 // ── Prompts ───────────────────────────────────────────────────
