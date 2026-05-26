@@ -34,7 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const isAuthorized = await checkSession();
             if (isAuthorized) {
                 setupEventListeners();
-                loadTab('overview');
+                const defaultTab = adminState.user.role === 'admin' ? 'overview' : 'patients';
+                loadTab(defaultTab);
             } else {
                 showLoginScreen();
             }
@@ -60,8 +61,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await res.json();
-            if (data.user.role !== 'admin') {
-                alert('Acesso negado. Esta área é restrita a administradores.');
+            const allowedRoles = ['admin', 'nutritionist', 'trainer'];
+            if (!allowedRoles.includes(data.user.role)) {
+                alert('Acesso negado. Esta área é restrita a administradores e profissionais.');
                 localStorage.removeItem('slimo_token');
                 adminState.token = '';
                 return false;
@@ -95,8 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Falha na autenticação.');
 
-            if (data.user.role !== 'admin') {
-                throw new Error('Acesso negado. Usuário não possui perfil administrador.');
+            const allowedRoles = ['admin', 'nutritionist', 'trainer'];
+            if (!allowedRoles.includes(data.user.role)) {
+                throw new Error('Acesso negado. Usuário não possui perfil de administrador ou profissional.');
             }
 
             adminState.token = data.token;
@@ -105,7 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             showDashboardScreen();
             setupEventListeners();
-            loadTab('overview');
+            const defaultTab = data.user.role === 'admin' ? 'overview' : 'patients';
+            loadTab(defaultTab);
         } catch (err) {
             errorBanner.innerText = err.message;
             errorBanner.classList.remove('hidden');
@@ -120,6 +124,47 @@ document.addEventListener('DOMContentLoaded', () => {
     function showDashboardScreen() {
         loginContainer.classList.add('hidden');
         adminDashboard.classList.remove('hidden');
+
+        // Ajusta navegação de acordo com o cargo do usuário logado
+        const role = adminState.user.role;
+        
+        const navOverview = document.getElementById('nav-overview');
+        const navUsers = document.getElementById('nav-users');
+        const navProfessionals = document.getElementById('nav-professionals');
+        const navPlans = document.getElementById('nav-plans');
+        const navBilling = document.getElementById('nav-billing');
+        const navPatients = document.getElementById('nav-patients');
+        const navSettings = document.getElementById('nav-settings');
+        
+        const sidebarTitle = document.querySelector('.sidebar-header span');
+        if (sidebarTitle) {
+            if (role === 'admin') {
+                sidebarTitle.innerText = 'Slimo Admin';
+            } else if (role === 'nutritionist') {
+                sidebarTitle.innerText = 'Slimo Nutri';
+            } else if (role === 'trainer') {
+                sidebarTitle.innerText = 'Slimo Trainer';
+            }
+        }
+
+        if (role === 'admin') {
+            if (navOverview) navOverview.classList.remove('hidden');
+            if (navUsers) navUsers.classList.remove('hidden');
+            if (navProfessionals) navProfessionals.classList.remove('hidden');
+            if (navPlans) navPlans.classList.remove('hidden');
+            if (navBilling) navBilling.classList.remove('hidden');
+            if (navPatients) navPatients.classList.add('hidden');
+            if (navSettings) navSettings.classList.remove('hidden');
+        } else {
+            // profissional (nutritionist ou trainer)
+            if (navOverview) navOverview.classList.add('hidden');
+            if (navUsers) navUsers.classList.add('hidden');
+            if (navProfessionals) navProfessionals.classList.add('hidden');
+            if (navPlans) navPlans.classList.add('hidden');
+            if (navBilling) navBilling.classList.remove('hidden');
+            if (navPatients) navPatients.classList.remove('hidden');
+            if (navSettings) navSettings.classList.add('hidden');
+        }
     }
 
     // 3. EVENT LISTENERS E ROTEAMENTO INTERNO DE ABAS
@@ -173,6 +218,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('btn-cancel-plan-edit').addEventListener('click', resetPlanForm);
 
+        // Voltar da visualização de diário do paciente
+        const btnBack = document.getElementById('btn-back-to-patients');
+        if (btnBack) {
+            btnBack.addEventListener('click', () => {
+                document.getElementById('patient-details-view').classList.add('hidden');
+                document.getElementById('patients-list-view').classList.remove('hidden');
+            });
+        }
+
+        // Formulário de prescrição/feedback
+        const feedbackForm = document.getElementById('patient-feedback-form');
+        if (feedbackForm) {
+            feedbackForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const patientId = document.getElementById('feedback-patient-id').value;
+                const content = document.getElementById('feedback-content').value;
+
+                try {
+                    const res = await fetch(`${API_URL}/professional/patients/${patientId}/feedback`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${adminState.token}`
+                        },
+                        body: JSON.stringify({ content })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Erro ao enviar feedback.');
+
+                    alert('Orientação enviada com sucesso para o paciente!');
+                    document.getElementById('feedback-content').value = '';
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        }
+
         // Formulário de Credenciais Gerais do Sistema
         const settingsForm = document.getElementById('global-settings-form');
         if (settingsForm) {
@@ -187,6 +269,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     async function loadTab(tabId) {
+        // Atualiza a classe active nos botões da sidebar
+        const navButtons = document.querySelectorAll('.nav-btn');
+        navButtons.forEach(btn => {
+            if (btn.dataset.tab === tabId) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
         // Oculta todas as telas de abas
         const tabs = document.querySelectorAll('.tab-content');
         tabs.forEach(t => t.classList.remove('active'));
@@ -194,6 +286,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mostra aba ativa
         const activeTab = document.getElementById(`tab-${tabId}`);
         if (activeTab) activeTab.classList.add('active');
+
+        // Se for a aba de pacientes, certifique-se de voltar para a lista padrão caso estivesse em detalhes
+        if (tabId === 'patients') {
+            const listLayout = document.getElementById('patients-list-view');
+            const detailsLayout = document.getElementById('patient-details-view');
+            if (listLayout) listLayout.classList.remove('hidden');
+            if (detailsLayout) detailsLayout.classList.add('hidden');
+        }
 
         // Carrega os dados específicos da aba
         if (tabId === 'overview') {
@@ -206,6 +306,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadPlansData();
         } else if (tabId === 'settings') {
             await loadSettingsData();
+        } else if (tabId === 'billing') {
+            await loadBillingData();
+        } else if (tabId === 'patients') {
+            await loadPatientsData();
         }
 
         // Garante que os ícones Lucide sejam atualizados
@@ -424,8 +528,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!res.ok) throw new Error('Não foi possível carregar os profissionais.');
             const allUsers = await res.json();
-            
-            // Filtra profissionais
             adminState.professionals = allUsers.filter(u => u.role === 'nutritionist' || u.role === 'trainer');
             renderProfessionalsTable();
         } catch (err) {
@@ -450,13 +552,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><strong>${p.name}</strong></td>
                 <td>${p.email}</td>
                 <td><span class="badge-role ${p.role}">${roleLabels[p.role] || p.role}</span></td>
-                <td><span class="badge-plan premium">VITALÍCIO (10A)</span></td>
+                <td>
+                    <input type="number" class="table-select pro-commission-input" data-user-id="${p.id}" value="${p.commission_percentage || 0}" style="width: 80px;" min="0" max="100" step="0.01">
+                </td>
                 <td>
                     <button class="btn-danger btn-demote-pro" data-user-id="${p.id}" style="font-size:11px; padding: 4px 8px;">
                         Rebaixar a Usuário
                     </button>
                 </td>
             `;
+
+            tr.querySelector('.pro-commission-input').addEventListener('change', async (e) => {
+                const val = parseFloat(e.target.value);
+                await updateProfessionalCommission(p.id, val);
+            });
 
             tr.querySelector('.btn-demote-pro').addEventListener('click', async () => {
                 if (confirm(`Deseja remover as permissões profissionais de ${p.name}?`)) {
@@ -466,6 +575,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
             tbody.appendChild(tr);
         });
+    }
+
+    async function updateProfessionalCommission(userId, percentage) {
+        try {
+            const res = await fetch(`${API_URL}/admin/users/${userId}/commission`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminState.token}`
+                },
+                body: JSON.stringify({ commission_percentage: percentage })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao atualizar comissão.');
+
+            alert('Percentual de comissão atualizado com sucesso!');
+        } catch (err) {
+            alert(err.message);
+            await loadProfessionalsData();
+        }
     }
 
     async function demoteProfessional(userId) {
@@ -494,6 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = document.getElementById('pro-email').value;
         const password = document.getElementById('pro-password').value;
         const role = document.getElementById('pro-role').value;
+        const commission_percentage = parseFloat(document.getElementById('pro-commission').value || 0);
 
         try {
             const res = await fetch(`${API_URL}/admin/register-professional`, {
@@ -502,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${adminState.token}`
                 },
-                body: JSON.stringify({ name, email, password, role })
+                body: JSON.stringify({ name, email, password, role, commission_percentage })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Erro ao cadastrar profissional.');
@@ -737,5 +867,297 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+    }
+
+    // 9. MÉTODOS DA ABA: FATURAMENTO (BILLING)
+    async function loadBillingData() {
+        try {
+            const res = await fetch(`${API_URL}/admin/billing`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            if (!res.ok) throw new Error('Não foi possível carregar os dados de faturamento.');
+            
+            const data = await res.json();
+            const role = data.role;
+            const stats = data.stats;
+            const history = data.history;
+
+            // Exibe/oculta os cards de acordo com a role
+            const adminStatsDiv = document.getElementById('billing-stats-admin');
+            const proStatsDiv = document.getElementById('billing-stats-pro');
+            
+            if (role === 'admin') {
+                if (adminStatsDiv) adminStatsDiv.classList.remove('hidden');
+                if (proStatsDiv) proStatsDiv.classList.add('hidden');
+                
+                const grossLabel = document.getElementById('billing-stat-gross');
+                const commsLabel = document.getElementById('billing-stat-commissions');
+                const netLabel = document.getElementById('billing-stat-net');
+                
+                if (grossLabel) grossLabel.innerText = `R$ ${parseFloat(stats.gross || 0).toFixed(2)}`;
+                if (commsLabel) commsLabel.innerText = `R$ ${parseFloat(stats.commission || 0).toFixed(2)}`;
+                if (netLabel) netLabel.innerText = `R$ ${parseFloat(stats.net || 0).toFixed(2)}`;
+            } else {
+                if (adminStatsDiv) adminStatsDiv.classList.add('hidden');
+                if (proStatsDiv) proStatsDiv.classList.remove('hidden');
+                
+                const commsLabel = document.getElementById('pro-stat-commissions');
+                const patientsLabel = document.getElementById('pro-stat-patients');
+                
+                if (commsLabel) commsLabel.innerText = `R$ ${parseFloat(stats.commission || 0).toFixed(2)}`;
+                if (patientsLabel) patientsLabel.innerText = stats.activePatients || 0;
+            }
+
+            renderBillingTable(role, history);
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    }
+
+    function renderBillingTable(role, history) {
+        const header = document.getElementById('billing-table-header');
+        const tbody = document.getElementById('billing-table-body');
+        
+        if (!header || !tbody) return;
+        
+        tbody.innerHTML = '';
+        
+        if (role === 'admin') {
+            header.innerHTML = `
+                <tr>
+                    <th>ID</th>
+                    <th>Data</th>
+                    <th>Paciente</th>
+                    <th>Plano</th>
+                    <th>Gateway</th>
+                    <th>Profissional Vinculado</th>
+                    <th>Comissão</th>
+                    <th>Valor Pago</th>
+                </tr>
+            `;
+
+            if (history.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted);">Nenhuma transação financeira registrada.</td></tr>`;
+                return;
+            }
+
+            history.forEach(item => {
+                const date = new Date(item.created_at).toLocaleDateString('pt-BR');
+                const commissionStr = item.commission_amount && parseFloat(item.commission_amount) > 0
+                    ? `R$ ${parseFloat(item.commission_amount).toFixed(2)} (${item.commission_percentage || 0}%)`
+                    : 'Nenhum';
+                const proStr = item.professional_name ? `${item.professional_name}` : '-';
+                const gatewayStr = `${(item.payment_gateway || 'mp').toUpperCase()} (${item.gateway_payment_id || '-'})`;
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><code>#${item.id}</code></td>
+                    <td>${date}</td>
+                    <td><strong>${item.patient_name}</strong><br><small>${item.patient_email}</small></td>
+                    <td><span class="badge-plan premium">${(item.plan_name || 'premium').toUpperCase()}</span></td>
+                    <td><small>${gatewayStr}</small></td>
+                    <td>${proStr}</td>
+                    <td>${commissionStr}</td>
+                    <td><strong>R$ ${parseFloat(item.amount || 0).toFixed(2)}</strong></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            // nutricionista ou trainer
+            header.innerHTML = `
+                <tr>
+                    <th>ID</th>
+                    <th>Data</th>
+                    <th>Paciente</th>
+                    <th>Plano</th>
+                    <th>Comissão Recebida</th>
+                    <th>Valor Pago</th>
+                </tr>
+            `;
+
+            if (history.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-text-muted);">Nenhum repasse de comissão registrado.</td></tr>`;
+                return;
+            }
+
+            history.forEach(item => {
+                const date = new Date(item.created_at).toLocaleDateString('pt-BR');
+                const commissionVal = parseFloat(item.commission_amount || 0);
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><code>#${item.id}</code></td>
+                    <td>${date}</td>
+                    <td><strong>${item.patient_name}</strong><br><small>${item.patient_email}</small></td>
+                    <td><span class="badge-plan premium">${(item.plan_name || 'premium').toUpperCase()}</span></td>
+                    <td><strong style="color: var(--color-success);">R$ ${commissionVal.toFixed(2)}</strong></td>
+                    <td>R$ ${parseFloat(item.amount || 0).toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        lucide.createIcons();
+    }
+
+    // 10. MÉTODOS DA ABA: MEUS PACIENTES
+    async function loadPatientsData() {
+        try {
+            const res = await fetch(`${API_URL}/professional/patients`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            if (!res.ok) throw new Error('Não foi possível carregar a lista de pacientes.');
+            
+            const patients = await res.json();
+            renderPatientsTable(patients);
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    }
+
+    function renderPatientsTable(patients) {
+        const tbody = document.getElementById('patients-table-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (patients.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-text-muted);">Nenhum paciente ou cliente vinculado ao seu perfil.</td></tr>`;
+            return;
+        }
+
+        patients.forEach(p => {
+            const tr = document.createElement('tr');
+            const isPremium = p.plan && p.plan !== 'trial';
+            const planBadgeClass = isPremium ? 'premium' : 'trial';
+            const planLabel = p.plan === 'premium' ? 'Premium' : p.plan;
+            const weightHeight = p.weight && p.height ? `${p.weight} kg / ${p.height} cm` : '-';
+            const calories = p.target_calories ? `${p.target_calories} kcal` : '-';
+
+            tr.innerHTML = `
+                <td><strong>${p.name}</strong></td>
+                <td>${p.email}</td>
+                <td><span class="badge-plan ${planBadgeClass}">${planLabel}</span></td>
+                <td>${weightHeight}</td>
+                <td>${calories}</td>
+                <td>
+                    <button class="btn-primary btn-view-diary" data-patient-id="${p.id}" style="font-size: 11px; padding: 4px 8px;">
+                        <i data-lucide="book-open" style="width: 12px; height: 12px;"></i> Ver Diário
+                    </button>
+                </td>
+            `;
+
+            tr.querySelector('.btn-view-diary').addEventListener('click', () => {
+                viewPatientDetails(p);
+            });
+
+            tbody.appendChild(tr);
+        });
+        lucide.createIcons();
+    }
+
+    async function viewPatientDetails(patient) {
+        // Mostra a tela de detalhes
+        const listLayout = document.getElementById('patients-list-view');
+        const detailsLayout = document.getElementById('patient-details-view');
+        
+        if (listLayout) listLayout.classList.add('hidden');
+        if (detailsLayout) detailsLayout.classList.remove('hidden');
+        
+        const nameLabel = document.getElementById('detail-patient-name');
+        const emailLabel = document.getElementById('detail-patient-email');
+        const hiddenId = document.getElementById('feedback-patient-id');
+        const contentText = document.getElementById('feedback-content');
+        
+        if (nameLabel) nameLabel.innerText = `Paciente: ${patient.name}`;
+        if (emailLabel) emailLabel.innerText = patient.email;
+        if (hiddenId) hiddenId.value = patient.id;
+        if (contentText) contentText.value = '';
+
+        // Preenche com placeholder/loading
+        const weightLabel = document.getElementById('detail-patient-weight');
+        const heightLabel = document.getElementById('detail-patient-height');
+        const goalLabel = document.getElementById('detail-patient-goal');
+        const caloriesLabel = document.getElementById('detail-patient-calories');
+        const waterStatus = document.getElementById('detail-water-status');
+        const fastingStatus = document.getElementById('detail-fasting-status');
+        const mealsBody = document.getElementById('detail-meals-table-body');
+        
+        if (weightLabel) weightLabel.innerText = patient.weight ? `${patient.weight} kg` : '-';
+        if (heightLabel) heightLabel.innerText = patient.height ? `${patient.height} cm` : '-';
+        if (goalLabel) goalLabel.innerText = patient.goal || '-';
+        if (caloriesLabel) caloriesLabel.innerText = patient.target_calories ? `${patient.target_calories} kcal` : '-';
+        if (waterStatus) waterStatus.innerText = 'Carregando...';
+        if (fastingStatus) fastingStatus.innerText = 'Carregando...';
+        if (mealsBody) mealsBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Carregando diário...</td></tr>`;
+
+        try {
+            const res = await fetch(`${API_URL}/professional/patients/${patient.id}/diary`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            if (!res.ok) throw new Error('Não foi possível carregar os detalhes do diário do paciente.');
+
+            const data = await res.json();
+            
+            // 1. Atualiza dados de perfil que podem estar mais atualizados no backend
+            if (data.profile) {
+                if (weightLabel) weightLabel.innerText = data.profile.weight ? `${data.profile.weight} kg` : '-';
+                if (heightLabel) heightLabel.innerText = data.profile.height ? `${data.profile.height} cm` : '-';
+                if (goalLabel) goalLabel.innerText = data.profile.goal || '-';
+                if (caloriesLabel) caloriesLabel.innerText = data.profile.target_calories ? `${data.profile.target_calories} kcal` : '-';
+            }
+
+            // 2. Consumo de água
+            if (data.water) {
+                if (waterStatus) waterStatus.innerText = `${data.water.consumed} / ${data.water.target} ml`;
+            } else {
+                if (waterStatus) waterStatus.innerText = '0 / 2500 ml';
+            }
+
+            // 3. Jejum ativo
+            if (data.fasting && data.fasting.active) {
+                const start = new Date(data.fasting.start_time);
+                const hrs = data.fasting.duration_goal;
+                if (fastingStatus) fastingStatus.innerText = `Ativo (Meta: ${hrs}h, Iniciado às ${start.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})})`;
+            } else {
+                if (fastingStatus) fastingStatus.innerText = 'Não ativo';
+            }
+
+            // 4. Refeições
+            if (mealsBody) {
+                mealsBody.innerHTML = '';
+                
+                if (!data.meals || data.meals.length === 0) {
+                    mealsBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--color-text-muted);">Nenhuma refeição registrada nos últimos dias.</td></tr>`;
+                } else {
+                    data.meals.forEach(m => {
+                        const tr = document.createElement('tr');
+                        const mealDate = new Date(m.date + 'T' + m.time);
+                        const formattedDateTime = `${mealDate.toLocaleDateString('pt-BR')} ${m.time.substring(0, 5)}`;
+                        
+                        const mealTypes = { breakfast: 'Café da Manhã', lunch: 'Almoço', dinner: 'Jantar', snack: 'Lanche', pre_workout: 'Pré-Treino', post_workout: 'Pós-Treino' };
+                        const typeLabel = mealTypes[m.meal_type] || m.meal_type;
+
+                        const carbs = m.carbs ? `${m.carbs}g` : '-';
+                        const protein = m.protein ? `${m.protein}g` : '-';
+                        const fat = m.fat ? `${m.fat}g` : '-';
+                        const macros = `C:${carbs} | P:${protein} | F:${fat}`;
+
+                        tr.innerHTML = `
+                            <td>${formattedDateTime}</td>
+                            <td><strong>${m.name}</strong><br><small>${m.description || ''}</small></td>
+                            <td><span class="badge-role user" style="background-color: rgba(255,255,255,0.05); color: var(--color-text);">${typeLabel}</span></td>
+                            <td>${m.calories ? `${m.calories} kcal` : '-'}</td>
+                            <td><small>${macros}</small></td>
+                        `;
+                        mealsBody.appendChild(tr);
+                    });
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+        lucide.createIcons();
     }
 });

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     plan VARCHAR(50) DEFAULT 'trial', -- 'trial', 'premium'
     trial_expires_at TIMESTAMP DEFAULT (NOW() + INTERVAL '7 days'),
     premium_expires_at TIMESTAMP DEFAULT NULL,
+    commission_percentage DECIMAL(5,2) DEFAULT 0.00, -- Comissão de profissionais sobre assinaturas de seus pacientes
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -130,6 +131,20 @@ INSERT INTO plans (name, display_name, price, duration_days, description, featur
 ('trial', 'Plano de Testes (7 dias)', 0.00, 7, 'Experimente todas as funcionalidades básicas do Slimo AI gratuitamente.', '["Controle de macros básico", "Acompanhamento de água", "Escanear pratos por IA"]'::jsonb),
 ('premium', 'Plano Premium Mensal', 29.90, 30, 'Desbloqueie orientação profissional com nutricionistas e personal trainers.', '["Receitas por IA ilimitadas", "Acompanhamento profissional completo", "Análise de refeições ilimitada"]'::jsonb)
 ON CONFLICT (name) DO NOTHING;
+
+-- 11. TABELA DE PAGAMENTOS E FATURAMENTO (PAYMENTS LOG)
+CREATE TABLE IF NOT EXISTS payments (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    amount DECIMAL(10,2) NOT NULL,
+    plan_name VARCHAR(100) NOT NULL,
+    payment_gateway VARCHAR(50) NOT NULL, -- 'mercadopago' ou 'asaas'
+    gateway_payment_id VARCHAR(255) UNIQUE,
+    status VARCHAR(50) NOT NULL DEFAULT 'approved',
+    professional_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Profissional comissionado
+    commission_amount DECIMAL(10,2) DEFAULT 0.00,                   -- Valor da comissão calculada
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Índices recomendados para otimização de consultas
 CREATE INDEX IF NOT EXISTS idx_meals_user_date ON meals(user_id, date);

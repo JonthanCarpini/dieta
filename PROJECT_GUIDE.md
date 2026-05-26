@@ -68,10 +68,10 @@ dieta/
 
 ## 4. Banco de Dados e Persistência
 
-Os dados do usuário agora são sincronizados diretamente com o PostgreSQL por meio de requisições Fetch autenticadas com `Authorization: Bearer <JWT_token>`. O `localStorage` é utilizado de forma secundária e como cache local.
+O dados do usuário agora são sincronizados diretamente com o PostgreSQL por meio de requisições Fetch autenticadas com `Authorization: Bearer <JWT_token>`. O `localStorage` é utilizado de forma secundária e como cache local.
 
 ### Tabelas Principais (`backend/schema.sql`):
-1. **`users`**: Armazena e-mail, senha hashed (ou null se Google), plano (`trial` ou `premium`), datas de expiração e cargo (`user`, `nutritionist`, `trainer`, `admin`).
+1. **`users`**: Armazena e-mail, senha hashed (ou null se Google), plano (`trial` ou `premium`), datas de expiração, cargo (`user`, `nutritionist`, `trainer`, `admin`) e percentual de comissão (`commission_percentage`).
 2. **`profiles`**: Dados de onboarding Mifflin-St Jeor do usuário e metas diárias calculadas de calorias e macros.
 3. **`meals`**: Registro detalhado das refeições do usuário contendo itens e totais em JSONB.
 4. **`water_log`**: Quantidade consumida diária de água vs meta do usuário.
@@ -81,6 +81,7 @@ Os dados do usuário agora são sincronizados diretamente com o PostgreSQL por m
 8. **`professional_messages`**: Mensagens de feedback, orientações e prescrições enviadas pelos profissionais.
 9. **`system_settings`**: Armazena pares chave/valor globais dinâmicos para tokens de API externa (Gemini, Google OAuth Client ID, Mercado Pago, Asaas).
 10. **`plans`**: Armazena planos comerciais configuráveis (identificador, preço, duração, descrição, benefícios).
+11. **`payments`**: Histórico detalhado das transações de pagamento da plataforma, integrando o cálculo e a distribuição das comissões aos profissionais vinculados (nutricionista/personal trainer).
 
 ---
 
@@ -96,10 +97,14 @@ Os dados do usuário agora são sincronizados diretamente com o PostgreSQL por m
 
 ### C. Acompanhamento e Vinculação Profissional
 * **Vincular Profissional**: Usuários premium podem selecionar, a partir de uma lista dinâmica obtida do banco, um Nutricionista e/ou Personal Trainer.
-* **Painel Profissional**: Nutricionistas e Personal Trainers logados são direcionados a uma interface exclusiva (`screen-professional`) onde visualizam a lista de seus pacientes vinculados, leem o diário de refeições atual e histórico, e enviam orientações que aparecem instantaneamente no perfil do paciente.
+* **Painel Profissional do App**: Área no frontend do usuário principal (`screen-professional`) onde ele vê orientações enviadas pelo seu nutricionista/personal trainer.
 
-### D. Painel de Administração
-* **Painel Admin Independente (`/admin/`)**: Área restrita para administradores acessível em `https://nutrir.online/admin/`. Ele centraliza o controle total da plataforma: gerenciamento de usuários (busca, promoção de cargo, alteração de assinaturas), listagem e cadastro de profissionais com plano premium vitalício, criação/edição/deleção de planos dinâmicos e inserção/atualização de credenciais de APIs (Gemini, Google Login, Asaas, Mercado Pago).
+### D. Painel de Administração e Portal do Profissional (`/admin/`)
+* **Painel de Controle Compartilhado**: Acesso unificado em `https://nutrir.online/admin/` para administradores e profissionais de saúde (nutricionistas e personal trainers):
+  * **Administradores**: Controle completo de usuários (promoção de cargo, plano, trial), cadastro de profissionais de saúde com comissão de vendas e inline editing, criação/gestão de planos e chaves/credenciais do sistema (Gemini, MP, Google Client ID, Asaas). Acessam também a aba global de **Faturamento** com o montante bruto de vendas, total de comissões pagas e lucro líquido da plataforma.
+  * **Profissionais**: Acesso restrito e personalizado às seguintes abas:
+    * **Meus Pacientes**: Permite visualizar a lista completa de pacientes vinculados a ele, inspecionar o diário recente de alimentação (refeições, hidratação diária, jejum ativo) e enviar feedback/prescrições em tempo real.
+    * **Faturamento**: Exibe as métricas de comissões acumuladas, total de pacientes ativos e lista detalhada das comissões geradas a partir das assinaturas dos seus clientes vinculados.
 
 ---
 

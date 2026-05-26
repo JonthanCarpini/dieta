@@ -23,7 +23,7 @@
                     <i data-lucide="shield" class="logo-icon"></i>
                 </div>
                 <h2>Slimo Admin</h2>
-                <p>Entre com suas credenciais de administrador</p>
+                <p>Entre com suas credenciais de administrador ou profissional</p>
             </div>
             
             <form id="admin-login-form">
@@ -50,19 +50,25 @@
                 <span>Slimo Admin</span>
             </div>
             <nav class="sidebar-nav">
-                <button class="nav-btn active" data-tab="overview">
+                <button class="nav-btn active" data-tab="overview" id="nav-overview">
                     <i data-lucide="layout-dashboard"></i> Visão Geral
                 </button>
-                <button class="nav-btn" data-tab="users">
+                <button class="nav-btn" data-tab="users" id="nav-users">
                     <i data-lucide="users"></i> Usuários
                 </button>
-                <button class="nav-btn" data-tab="professionals">
+                <button class="nav-btn" data-tab="professionals" id="nav-professionals">
                     <i data-lucide="user-cog"></i> Profissionais
                 </button>
-                <button class="nav-btn" data-tab="plans">
+                <button class="nav-btn" data-tab="plans" id="nav-plans">
                     <i data-lucide="credit-card"></i> Planos
                 </button>
-                <button class="nav-btn" data-tab="settings">
+                <button class="nav-btn" data-tab="billing" id="nav-billing">
+                    <i data-lucide="dollar-sign"></i> Faturamento
+                </button>
+                <button class="nav-btn" data-tab="patients" id="nav-patients">
+                    <i data-lucide="users"></i> Meus Pacientes
+                </button>
+                <button class="nav-btn" data-tab="settings" id="nav-settings">
                     <i data-lucide="key-round"></i> Credenciais
                 </button>
             </nav>
@@ -204,6 +210,10 @@
                                     <option value="trainer">Personal Trainer</option>
                                 </select>
                             </div>
+                            <div class="form-group">
+                                <label for="pro-commission">Comissão (%)</label>
+                                <input type="number" id="pro-commission" placeholder="Ex: 10.00" min="0" max="100" step="0.01" value="0" required>
+                            </div>
                             <button type="submit" class="btn-primary w-full margin-top-md">Cadastrar e Liberar Premium</button>
                         </form>
                     </div>
@@ -218,7 +228,7 @@
                                         <th>Nome</th>
                                         <th>E-mail</th>
                                         <th>Cargo</th>
-                                        <th>Plano</th>
+                                        <th>Comissão (%)</th>
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
@@ -368,6 +378,194 @@
                             <button type="submit" class="btn-primary" style="padding: 12px 24px; font-size:14px;">Salvar Todas as Credenciais</button>
                         </div>
                     </form>
+                </div>
+            </section>
+
+            <!-- ABA: FATURAMENTO E COMISSÕES -->
+            <section id="tab-billing" class="tab-content">
+                <div class="header-section">
+                    <h1 id="billing-title">Faturamento & Comissões</h1>
+                    <p id="billing-desc">Acompanhe as transações financeiras e repasses de comissão da plataforma</p>
+                </div>
+
+                <!-- Cards de Estatísticas de Faturamento (Admin) -->
+                <div id="billing-stats-admin" class="stats-grid hidden">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-green"><i data-lucide="dollar-sign"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Faturamento Bruto</span>
+                            <h3 id="billing-stat-gross">R$ 0,00</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-yellow"><i data-lucide="percent"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Comissões Pagas</span>
+                            <h3 id="billing-stat-commissions">R$ 0,00</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-blue"><i data-lucide="trending-up"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Faturamento Líquido</span>
+                            <h3 id="billing-stat-net">R$ 0,00</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cards de Estatísticas de Faturamento (Professional) -->
+                <div id="billing-stats-pro" class="stats-grid hidden">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-green"><i data-lucide="dollar-sign"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Minhas Comissões</span>
+                            <h3 id="pro-stat-commissions">R$ 0,00</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-blue"><i data-lucide="users"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Pacientes Ativos</span>
+                            <h3 id="pro-stat-patients">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Histórico Financeiro -->
+                <div class="dashboard-card margin-top-lg">
+                    <h3>Histórico de Transações</h3>
+                    <p class="description">Histórico dos pagamentos processados e das comissões distribuídas</p>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead id="billing-table-header">
+                                <!-- Preenchido dinamicamente via JS com base no cargo -->
+                            </thead>
+                            <tbody id="billing-table-body">
+                                <!-- Injetado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA: MEUS PACIENTES (EXCLUSIVO PROFISSIONAL) -->
+            <section id="tab-patients" class="tab-content">
+                <div class="header-section">
+                    <h1>Meus Pacientes</h1>
+                    <p>Acompanhe os dados de saúde, diários alimentares e envie orientações aos seus clientes vinculados</p>
+                </div>
+
+                <!-- Lista de Pacientes -->
+                <div id="patients-list-view" class="dashboard-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>E-mail</th>
+                                    <th>Plano</th>
+                                    <th>Peso / Altura</th>
+                                    <th>Meta Calorias</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patients-table-body">
+                                <!-- Injetado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Visualização de Detalhes do Paciente -->
+                <div id="patient-details-view" class="hidden">
+                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 24px;">
+                        <button id="btn-back-to-patients" class="btn-secondary">
+                            <i data-lucide="arrow-left"></i> Voltar para a lista
+                        </button>
+                        <h2 id="detail-patient-name" style="font-family: var(--font-display); font-weight:700;">Paciente: Nome</h2>
+                    </div>
+
+                    <div class="dashboard-row">
+                        <!-- Perfil e Orientação/Feedback -->
+                        <div class="dashboard-card col-4">
+                            <h3>Perfil de Saúde</h3>
+                            <div class="margin-top-md" style="display:flex; flex-direction:column; gap:12px; font-size:14px; border-bottom:1px solid var(--color-border); padding-bottom:16px; margin-bottom:16px;">
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span style="color:var(--color-text-muted);">E-mail:</span>
+                                    <span id="detail-patient-email" style="font-weight:500;">-</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span style="color:var(--color-text-muted);">Peso:</span>
+                                    <span id="detail-patient-weight" style="font-weight:500;">-</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span style="color:var(--color-text-muted);">Altura:</span>
+                                    <span id="detail-patient-height" style="font-weight:500;">-</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span style="color:var(--color-text-muted);">Objetivo:</span>
+                                    <span id="detail-patient-goal" style="font-weight:500;">-</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span style="color:var(--color-text-muted);">Meta Calórica:</span>
+                                    <span id="detail-patient-calories" style="font-weight:500; color:var(--color-primary); font-weight:600;">-</span>
+                                </div>
+                            </div>
+
+                            <h3>Enviar Nova Prescrição / Feedback</h3>
+                            <p class="description">Oriente seu paciente sobre dietas, treinos ou rotinas diretamente no app dele.</p>
+                            <form id="patient-feedback-form" class="margin-top-md">
+                                <input type="hidden" id="feedback-patient-id">
+                                <div class="form-group">
+                                    <label for="feedback-content">Prescrição / Mensagem</label>
+                                    <textarea id="feedback-content" placeholder="Escreva aqui as orientações, plano alimentar ou sugestões de treino..." style="height: 150px;" required></textarea>
+                                </div>
+                                <button type="submit" class="btn-primary w-full">Enviar para o Painel do Paciente</button>
+                            </form>
+                        </div>
+
+                        <!-- Diário do Paciente (Refeições, Água, Jejum) -->
+                        <div class="dashboard-card col-8">
+                            <h3>Diário Recente do Paciente</h3>
+                            <p class="description">Histórico de refeições, consumo de água e jejum intermitente</p>
+
+                            <!-- Mini grid de status diários -->
+                            <div class="stats-grid margin-top-md" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 24px;">
+                                <div class="stat-card" style="padding: 14px;">
+                                    <div class="stat-icon bg-blue" style="width:36px; height:36px; font-size:16px;"><i data-lucide="droplet"></i></div>
+                                    <div class="stat-details">
+                                        <span class="stat-label">Água Consumida (Hoje)</span>
+                                        <h4 id="detail-water-status" style="font-size:16px; font-weight:600;">0 / 2500 ml</h4>
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="padding: 14px;">
+                                    <div class="stat-icon bg-purple" style="width:36px; height:36px; font-size:16px;"><i data-lucide="timer"></i></div>
+                                    <div class="stat-details">
+                                        <span class="stat-label">Jejum Ativo</span>
+                                        <h4 id="detail-fasting-status" style="font-size:16px; font-weight:600;">Não ativo</h4>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h3>Refeições Registradas</h3>
+                            <div class="table-responsive margin-top-md" style="max-height: 400px; overflow-y: auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Data / Hora</th>
+                                            <th>Refeição</th>
+                                            <th>Tipo</th>
+                                            <th>Calorias</th>
+                                            <th>Macros (C/P/G)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detail-meals-table-body">
+                                        <!-- Injetado via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

@@ -30,46 +30,86 @@ app.use('/api/admin', adminRoutes);
 // 5. WEBHOOKS DE PAGAMENTOS (MERCADO PAGO & ASAAS)
 // ==========================================
 
+// Função auxiliar para registrar pagamentos e calcular comissões
+async function recordPayment(payerEmail, planName, gateway, gatewayPaymentId) {
+  try {
+    // 1. Busca dados do usuário pagador
+    const userRes = await db.query("SELECT id FROM users WHERE email = $1", [payerEmail.toLowerCase().trim()]);
+    if (userRes.rows.length === 0) return null;
+    const userId = userRes.rows[0].id;
+
+    // 2. Busca o preço e dados do plano
+    const planRes = await db.query("SELECT name, price, duration_days FROM plans WHERE name = $1", [planName]);
+    const planInfo = planRes.rows[0] || { name: 'premium', price: 29.90, duration_days: 30 };
+    const amount = parseFloat(planInfo.price);
+
+    // 3. Verifica se o usuário tem profissional vinculado (nutri ou personal)
+    const linksRes = await db.query(`
+      SELECT pl.professional_id, u.commission_percentage 
+      FROM professional_links pl
+      JOIN users u ON pl.professional_id = u.id
+      WHERE pl.user_id = $1
+    `, [userId]);
+
+    if (linksRes.rows.length === 0) {
+      // Nenhum profissional vinculado -> Registra pagamento sem comissão
+      await db.query(`
+        INSERT INTO payments (user_id, amount, plan_name, payment_gateway, gateway_payment_id, status, professional_id, commission_amount)
+        VALUES ($1, $2, $3, $4, $5, 'approved', NULL, 0.00)
+        ON CONFLICT (gateway_payment_id) DO NOTHING
+      `, [userId, amount, planInfo.name, gateway, gatewayPaymentId]);
+    } else {
+      // Um ou mais profissionais vinculados -> Registra pagamento com comissão para cada um
+      for (const link of linksRes.rows) {
+        const commissionVal = amount * (parseFloat(link.commission_percentage || 0) / 100);
+        const uniqueGatewayId = `${gatewayPaymentId}_${link.professional_id}`;
+        
+        await db.query(`
+          INSERT INTO payments (user_id, amount, plan_name, payment_gateway, gateway_payment_id, status, professional_id, commission_amount)
+          VALUES ($1, $2, $3, $4, $5, 'approved', $6, $7)
+          ON CONFLICT (gateway_payment_id) DO NOTHING
+        `, [userId, amount, planInfo.name, gateway, uniqueGatewayId, link.professional_id, commissionVal]);
+      }
+    }
+
+    return planInfo;
+  } catch (err) {
+    console.error("Erro ao registrar pagamento no banco:", err);
+    return null;
+  }
+}
+
 // Webhook Mercado Pago
 app.post('/api/payments/mercadopago-webhook', async (req, res) => {
   const { action, data, type } = req.body;
   
-  // No Mercado Pago, quando um pagamento é aprovado, recebemos uma notificação do tipo 'payment'
   if ((type === 'payment' || action === 'payment.created') && data && data.id) {
     try {
       console.log(`Mercado Pago Webhook recebido para pagamento: ${data.id}`);
-      
-      // Aqui faríamos um fetch à API do Mercado Pago usando process.env.MERCADO_PAGO_ACCESS_TOKEN
-      // para validar se o status está 'approved' e pegar o email/id do pagador.
-      // Exemplo simulado:
-      // const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${data.id}`, { headers: { Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}` } });
-      // const paymentDetails = await mpResponse.json();
-      
-      // Simulando que validamos e identificamos o e-mail do usuário pagador no metadata ou e-mail
-      // Para fins de teste/demo, pegaremos um e-mail vindo no payload ou logaremos.
       const payerEmail = req.body.payer_email || (req.body.data && req.body.data.email);
       
       if (payerEmail) {
-        // Busca a duração do plano no banco de dados
         const planName = req.body.plan_name || 'premium';
-        const planRes = await db.query("SELECT name, duration_days FROM plans WHERE name = $1", [planName]);
-        const planInfo = planRes.rows[0] || { name: 'premium', duration_days: 30 };
+        const gatewayPaymentId = req.body.payment_id || (req.body.data && req.body.data.id) || ('pay_' + Date.now());
+        
+        const planInfo = await recordPayment(payerEmail, planName, 'mercadopago', gatewayPaymentId);
+        
+        if (planInfo) {
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + planInfo.duration_days);
 
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + planInfo.duration_days);
-
-        await db.query(
-          "UPDATE users SET plan = $1, premium_expires_at = $2 WHERE email = $3",
-          [planInfo.name, expiresAt, payerEmail.toLowerCase().trim()]
-        );
-        console.log(`Plano ${planInfo.name} ativado via Mercado Pago para: ${payerEmail}`);
+          await db.query(
+            "UPDATE users SET plan = $1, premium_expires_at = $2 WHERE email = $3",
+            [planInfo.name, expiresAt, payerEmail.toLowerCase().trim()]
+          );
+          console.log(`Plano ${planInfo.name} ativado via Mercado Pago para: ${payerEmail}`);
+        }
       }
     } catch (err) {
       console.error("Erro ao processar Webhook Mercado Pago:", err);
     }
   }
 
-  // Responde com status 200/201 exigido pelo Mercado Pago para cessar tentativas
   res.status(200).send('OK');
 });
 
@@ -77,28 +117,27 @@ app.post('/api/payments/mercadopago-webhook', async (req, res) => {
 app.post('/api/payments/asaas-webhook', async (req, res) => {
   const { event, payment } = req.body;
 
-  // No Asaas, quando o pagamento da assinatura ou fatura é recebido
   if (event === 'PAYMENT_RECEIVED' && payment) {
     try {
       console.log(`Asaas Webhook recebido. Pagamento: ${payment.id}`);
-      
-      // Obtém o e-mail do cliente cadastrado no Asaas
-      // No mundo real, faríamos um GET a /v3/customers/{customer_id} usando o ASAAS_API_KEY
       const customerEmail = payment.customerEmail || req.body.email;
 
       if (customerEmail) {
         const planName = req.body.plan_name || 'premium';
-        const planRes = await db.query("SELECT name, duration_days FROM plans WHERE name = $1", [planName]);
-        const planInfo = planRes.rows[0] || { name: 'premium', duration_days: 30 };
+        const gatewayPaymentId = payment.id || ('pay_' + Date.now());
+        
+        const planInfo = await recordPayment(customerEmail, planName, 'asaas', gatewayPaymentId);
+        
+        if (planInfo) {
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + planInfo.duration_days);
 
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + planInfo.duration_days);
-
-        await db.query(
-          "UPDATE users SET plan = $1, premium_expires_at = $2 WHERE email = $3",
-          [planInfo.name, expiresAt, customerEmail.toLowerCase().trim()]
-        );
-        console.log(`Plano ${planInfo.name} ativado via Asaas para: ${customerEmail}`);
+          await db.query(
+            "UPDATE users SET plan = $1, premium_expires_at = $2 WHERE email = $3",
+            [planInfo.name, expiresAt, customerEmail.toLowerCase().trim()]
+          );
+          console.log(`Plano ${planInfo.name} ativado via Asaas para: ${customerEmail}`);
+        }
       }
     } catch (err) {
       console.error("Erro ao processar Webhook Asaas:", err);

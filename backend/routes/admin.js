@@ -4,8 +4,80 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
-// Rotas administrativas exigem login JWT e cargo estrito de Admin
+// Rotas administrativas exigem login JWT mínimo
 router.use(authenticateToken);
+
+// ====================================================
+// ROTAS ACESSÍVEIS POR PROFISSIONAIS E ADMINS (FATURAMENTO)
+// ====================================================
+router.get('/billing', async (req, res) => {
+  try {
+    const role = req.user.role;
+
+    if (role === 'admin') {
+      const totalGrossRes = await db.query("SELECT COALESCE(SUM(amount), 0) as total FROM payments");
+      const totalCommissionRes = await db.query("SELECT COALESCE(SUM(commission_amount), 0) as total FROM payments");
+      
+      const gross = parseFloat(totalGrossRes.rows[0].total);
+      const commission = parseFloat(totalCommissionRes.rows[0].total);
+      const net = gross - commission;
+
+      const historyRes = await db.query(`
+        SELECT p.id, p.amount, p.plan_name, p.payment_gateway, p.gateway_payment_id, p.commission_amount, p.created_at,
+               u.name as patient_name, u.email as patient_email,
+               pro.name as professional_name, pro.commission_percentage
+        FROM payments p
+        JOIN users u ON p.user_id = u.id
+        LEFT JOIN users pro ON p.professional_id = pro.id
+        ORDER BY p.created_at DESC
+        LIMIT 100
+      `);
+
+      res.json({
+        role: 'admin',
+        stats: { gross, commission, net },
+        history: historyRes.rows
+      });
+    } else if (role === 'nutritionist' || role === 'trainer') {
+      const professionalId = req.user.id;
+
+      const totalCommissionRes = await db.query(
+        "SELECT COALESCE(SUM(commission_amount), 0) as total FROM payments WHERE professional_id = $1", 
+        [professionalId]
+      );
+      const commission = parseFloat(totalCommissionRes.rows[0].total);
+
+      const patientsCountRes = await db.query(
+        "SELECT COUNT(*) as count FROM professional_links WHERE professional_id = $1",
+        [professionalId]
+      );
+      const activePatients = parseInt(patientsCountRes.rows[0].count);
+
+      const historyRes = await db.query(`
+        SELECT p.id, p.amount, p.plan_name, p.commission_amount, p.created_at,
+               u.name as patient_name, u.email as patient_email
+        FROM payments p
+        JOIN users u ON p.user_id = u.id
+        WHERE p.professional_id = $1
+        ORDER BY p.created_at DESC
+        LIMIT 100
+      `, [professionalId]);
+
+      res.json({
+        role,
+        stats: { commission, activePatients },
+        history: historyRes.rows
+      });
+    } else {
+      res.status(403).json({ error: 'Acesso proibido para este tipo de conta.' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar dados de faturamento.' });
+  }
+});
+
+// Exige cargo de administrador para todas as rotas abaixo
 router.use(requireRole(['admin']));
 
 // ==========================================
@@ -14,7 +86,7 @@ router.use(requireRole(['admin']));
 router.get('/users', async (req, res) => {
   try {
     const usersRes = await db.query(
-      `SELECT id, email, name, role, plan, trial_expires_at, premium_expires_at, created_at 
+      `SELECT id, email, name, role, plan, trial_expires_at, premium_expires_at, commission_percentage, created_at 
        FROM users 
        ORDER BY created_at DESC`
     );
@@ -104,7 +176,7 @@ router.post('/users/:id/plan', async (req, res) => {
 // 4. REGISTRAR PROFISSIONAL MANUALMENTE
 // ==========================================
 router.post('/register-professional', async (req, res) => {
-  const { email, password, name, role } = req.body;
+  const { email, password, name, role, commission_percentage } = req.body;
 
   if (!email || !password || !name || !role) {
     return res.status(400).json({ error: 'Preencha todos os campos obrigatórios.' });
@@ -113,6 +185,8 @@ router.post('/register-professional', async (req, res) => {
   if (!['nutritionist', 'trainer'].includes(role)) {
     return res.status(400).json({ error: 'Cargo de profissional deve ser nutritionist ou trainer.' });
   }
+
+  const commission = parseFloat(commission_percentage || 0);
 
   try {
     const checkUser = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
@@ -124,10 +198,10 @@ router.post('/register-professional', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     const newUser = await db.query(
-      `INSERT INTO users (email, password_hash, name, role, plan, premium_expires_at) 
-       VALUES ($1, $2, $3, $4, 'premium', NOW() + INTERVAL '10 years') 
-       RETURNING id, email, name, role`,
-      [email.toLowerCase().trim(), passwordHash, name, role]
+      `INSERT INTO users (email, password_hash, name, role, plan, premium_expires_at, commission_percentage) 
+       VALUES ($1, $2, $3, $4, 'premium', NOW() + INTERVAL '10 years', $5) 
+       RETURNING id, email, name, role, commission_percentage`,
+      [email.toLowerCase().trim(), passwordHash, name, role, commission]
     );
 
     res.status(201).json({
@@ -137,6 +211,39 @@ router.post('/register-professional', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao criar profissional.' });
+  }
+});
+
+// ==========================================
+// 4B. ALTERAR COMISSÃO DO PROFISSIONAL (ADMIN)
+// ==========================================
+router.post('/users/:id/commission', async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const { commission_percentage } = req.body;
+
+  if (commission_percentage === undefined || isNaN(parseFloat(commission_percentage))) {
+    return res.status(400).json({ error: 'Percentual de comissão inválido.' });
+  }
+
+  const commission = parseFloat(commission_percentage);
+  if (commission < 0 || commission > 100) {
+    return res.status(400).json({ error: 'O percentual de comissão deve ser entre 0% e 100%.' });
+  }
+
+  try {
+    const updated = await db.query(
+      'UPDATE users SET commission_percentage = $1 WHERE id = $2 RETURNING id, email, name, role, commission_percentage',
+      [commission, userId]
+    );
+
+    if (updated.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    res.json({ message: 'Comissão atualizada com sucesso.', user: updated.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar comissão.' });
   }
 });
 
