@@ -434,27 +434,24 @@
                     <div class="source-badge"><i data-lucide="check-circle"></i> Analisado com IA</div>
                 </div>
 
-                <div class="results-summary-card">
-                    <div class="results-calories">
+                <!-- Calorias + barra de meta diária -->
+                <div class="results-cal-card">
+                    <div class="results-cal-main">
                         <span class="kcal-number" id="result-total-calories">342</span>
-                        <span class="kcal-label">kcal no total</span>
+                        <span class="kcal-label">kcal nesta refeição</span>
                     </div>
-                    <div class="results-macros-row">
-                        <div class="result-macro-pill text-protein">
-                            <span class="label">Proteína</span>
-                            <span class="value" id="result-total-protein">24g</span>
+                    <div class="results-goal-bar-wrap">
+                        <div class="results-goal-bar-track">
+                            <div class="results-goal-bar-fill" id="result-goal-bar"></div>
                         </div>
-                        <div class="result-macro-pill text-carbs">
-                            <span class="label">Carbos</span>
-                            <span class="value" id="result-total-carbs">32g</span>
-                        </div>
-                        <div class="result-macro-pill text-fat">
-                            <span class="label">Gordura</span>
-                            <span class="value" id="result-total-fat">10g</span>
-                        </div>
+                        <span class="results-goal-pct" id="result-goal-pct"></span>
                     </div>
                 </div>
 
+                <!-- Macros com barras de progresso -->
+                <div class="results-macros-card" id="result-macros-card"></div>
+
+                <!-- Alimentos identificados -->
                 <div class="detected-foods-section">
                     <div class="section-title-row">
                         <h3>Alimentos Identificados</h3>

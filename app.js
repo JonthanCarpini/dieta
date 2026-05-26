@@ -2042,10 +2042,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function callGeminiForDailyRecipe(mealType, cal, p, c, f) {
         const token = localStorage.getItem('nutrir_token');
+        const profile = state.userProfile ? {
+            goal: state.userProfile.goal,
+            goalWeight: state.userProfile.goalWeight,
+            weight: state.userProfile.weight,
+            age: state.userProfile.age,
+            gender: state.userProfile.gender,
+            targetCalories: state.userProfile.targetCalories,
+            targetProtein: state.userProfile.targetProtein,
+            targetCarbs: state.userProfile.targetCarbs,
+            targetFat: state.userProfile.targetFat
+        } : null;
         const res = await fetch('/api/ai/generate-recipe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ mealType, cal, protein: p, carbs: c, fat: f })
+            body: JSON.stringify({ mealType, cal, protein: p, carbs: c, fat: f, profile })
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
@@ -2088,6 +2099,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function callGeminiForWeeklyPlan(mealType, profile) {
         const token = localStorage.getItem('nutrir_token');
+        const profilePayload = profile ? {
+            goal: profile.goal,
+            goalWeight: profile.goalWeight,
+            weight: profile.weight,
+            age: profile.age,
+            gender: profile.gender,
+            targetCalories: profile.targetCalories,
+            targetProtein: profile.targetProtein,
+            targetCarbs: profile.targetCarbs,
+            targetFat: profile.targetFat
+        } : null;
         const res = await fetch('/api/ai/generate-weekly', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -2096,7 +2118,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 targetCalories: profile.targetCalories,
                 targetProtein: profile.targetProtein,
                 targetCarbs: profile.targetCarbs,
-                targetFat: profile.targetFat
+                targetFat: profile.targetFat,
+                profile: profilePayload
             })
         });
         if (!res.ok) {
@@ -2866,41 +2889,77 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderResultsScreen() {
         const previewImg = document.getElementById('result-photo-preview');
-        const totalCalEl = document.getElementById('result-total-calories');
-        const totalProtEl = document.getElementById('result-total-protein');
-        const totalCarbsEl = document.getElementById('result-total-carbs');
-        const totalFatEl = document.getElementById('result-total-fat');
         const listEl = document.getElementById('detected-foods-list');
 
         previewImg.src = state.currentCapturedImage || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500';
 
         const meal = state.currentAnalyzingMeal;
-        totalCalEl.innerText = meal.total.calories;
-        totalProtEl.innerText = `${meal.total.protein}g`;
-        totalCarbsEl.innerText = `${meal.total.carbs}g`;
-        totalFatEl.innerText = `${meal.total.fat}g`;
+        const prof = state.userProfile;
 
+        // ── Calories card
+        document.getElementById('result-total-calories').innerText = meal.total.calories;
+
+        if (prof && prof.targetCalories) {
+            const pct = Math.min(Math.round((meal.total.calories / prof.targetCalories) * 100), 100);
+            const remaining = prof.targetCalories - meal.total.calories;
+            const goalBar = document.getElementById('result-goal-bar');
+            if (goalBar) {
+                goalBar.style.width = pct + '%';
+                goalBar.style.background = pct > 90 ? '#ef4444' : pct > 70 ? '#f97316' : 'var(--color-primary)';
+            }
+            const pctEl = document.getElementById('result-goal-pct');
+            if (pctEl) pctEl.innerText = `${pct}% da meta diária · restam ${remaining > 0 ? remaining : 0} kcal`;
+        }
+
+        // ── Macro rows with progress bars
+        const macros = [
+            { id: 'protein', label: 'Proteína',      val: meal.total.protein, target: prof?.targetProtein, color: '#22c55e' },
+            { id: 'carbs',   label: 'Carboidratos',  val: meal.total.carbs,   target: prof?.targetCarbs,   color: '#3b82f6' },
+            { id: 'fat',     label: 'Gorduras',       val: meal.total.fat,     target: prof?.targetFat,     color: '#f97316' },
+        ];
+        const macrosCard = document.getElementById('result-macros-card');
+        if (macrosCard) {
+            macrosCard.innerHTML = macros.map(m => {
+                const pct = m.target ? Math.min(Math.round((m.val / m.target) * 100), 100) : null;
+                const goalLabel = pct !== null ? `${m.val}g de ${m.target}g (${pct}%)` : `${m.val}g`;
+                return `
+                <div class="result-macro-row">
+                    <div class="rmr-header">
+                        <span class="rmr-name" style="color:${m.color}">${m.label}</span>
+                        <span class="rmr-value">${m.val}g</span>
+                    </div>
+                    ${pct !== null ? `
+                    <div class="rmr-bar-track">
+                        <div class="rmr-bar-fill" style="width:${pct}%;background:${m.color}"></div>
+                    </div>` : ''}
+                    <span class="rmr-goal-label">${goalLabel}</span>
+                </div>`;
+            }).join('');
+        }
+
+        // ── Food items list
         listEl.innerHTML = '';
-
         meal.items.forEach((item, index) => {
             const card = document.createElement('div');
-            card.className = 'food-item-card';
+            card.className = 'food-item-card-v2';
             card.innerHTML = `
-                <div class="food-item-details">
-                    <span class="food-name">${item.name}</span>
-                    <span class="food-sub">${item.weight_g}g</span>
-                    <div class="food-macros">
-                        <span>P: ${item.protein}g</span>
-                        <span>C: ${item.carbs}g</span>
-                        <span>G: ${item.fat}g</span>
+                <div class="ficv2-top">
+                    <span class="ficv2-name">${item.name}</span>
+                    <div class="ficv2-right">
+                        <span class="ficv2-cal">${item.calories}<span class="ficv2-cal-unit">kcal</span></span>
+                        <i data-lucide="edit-3" class="ficv2-edit-icon"></i>
                     </div>
                 </div>
-                <div class="food-item-right-wrap">
-                    <span class="food-cal-display">${item.calories} <span>kcal</span></span>
-                    <i data-lucide="edit-3" class="edit-indicator" style="width: 16px; height: 16px;"></i>
+                <div class="ficv2-bottom">
+                    <span class="ficv2-weight">${item.weight_g}g</span>
+                    <div class="ficv2-macros">
+                        <span class="ficv2-tag ficv2-tag-p">P ${item.protein}g</span>
+                        <span class="ficv2-tag ficv2-tag-c">C ${item.carbs}g</span>
+                        <span class="ficv2-tag ficv2-tag-f">G ${item.fat}g</span>
+                        ${item.fiber ? `<span class="ficv2-tag ficv2-tag-fi">Fib ${item.fiber}g</span>` : ''}
+                    </div>
                 </div>
             `;
-            
             card.addEventListener('click', () => openEditFoodModal(index));
             listEl.appendChild(card);
         });

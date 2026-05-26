@@ -121,24 +121,71 @@ async function callLLM(cfg, prompt, imageBase64 = null) {
 
 // ── Prompts ───────────────────────────────────────────────────
 
+const MEAL_LABELS = { breakfast: 'café da manhã', lunch: 'almoço', dinner: 'jantar', snack: 'lanche', all: 'refeição' };
+const GOAL_LABELS  = { lose: 'emagrecer / perda de gordura', gain: 'ganho de massa muscular', maintain: 'manutenção de peso e saúde' };
+const GENDER_LABELS = { male: 'masculino', female: 'feminino' };
+
+function profileContext(p) {
+  if (!p || !p.goal) return '';
+  return `
+PERFIL DO CLIENTE:
+- Objetivo: ${GOAL_LABELS[p.goal] || p.goal}
+- Peso atual: ${p.weight || '?'}kg | Meta: ${p.goalWeight || '?'}kg
+- Gênero: ${GENDER_LABELS[p.gender] || p.gender || '?'} | Idade: ${p.age || '?'} anos
+- Meta diária: ${p.targetCalories || '?'} kcal | P ${p.targetProtein || '?'}g | C ${p.targetCarbs || '?'}g | G ${p.targetFat || '?'}g
+`;
+}
+
 function promptAnalyzeFood() {
-  return `Você é um nutricionista especialista em identificar pratos de comida por imagem. Analise a imagem e retorne um objeto JSON com os alimentos identificados, peso estimado (g) e macronutrientes.
-Responda APENAS com JSON puro (sem markdown):
-{"items":[{"name":"Nome","weight_g":150,"calories":210,"protein":24,"carbs":2,"fat":12}],"total":{"calories":210,"protein":24,"carbs":2,"fat":12}}`;
+  return `Você é um nutricionista especialista em identificar pratos de comida por imagem.
+Analise a imagem com precisão: identifique cada alimento visível, estime o peso real em gramas com base no tamanho aparente e calcule os macronutrientes corretos.
+Seja preciso: uma pera média pesa ~170g e tem ~70 kcal, não 96 kcal. Use valores reais do TACO/IBGE.
+Responda APENAS com JSON puro (sem markdown, sem explicações):
+{"items":[{"name":"Nome do alimento","weight_g":150,"calories":210,"protein":24,"carbs":2,"fat":12,"fiber":3}],"total":{"calories":210,"protein":24,"carbs":2,"fat":12,"fiber":3}}`;
 }
 
-function promptDailyRecipe(mealType, cal, protein, carbs, fat) {
-  const t = mealType === 'all' ? 'qualquer tipo de refeição saudável' : `refeição do tipo: ${mealType}`;
-  return `Você é um chef e nutricionista. Crie uma receita saudável em português para ${t} com aproximadamente: ${cal} kcal, ${protein}g proteína, ${carbs}g carboidratos, ${fat}g gordura.
+function promptDailyRecipe(mealType, cal, protein, carbs, fat, profile) {
+  const mealLabel = MEAL_LABELS[mealType] || mealType;
+  const ctx = profileContext(profile);
+  return `Você é um chef e nutricionista brasileiro especializado em receitas práticas e saborosas para o dia a dia.
+${ctx}
+RECEITA SOLICITADA:
+- Tipo de refeição: ${mealLabel}
+- Calorias desta refeição: ~${cal} kcal
+- Macros alvo: ~${protein}g proteína | ~${carbs}g carbos | ~${fat}g gordura
+
+REGRAS OBRIGATÓRIAS:
+1. Use APENAS ingredientes facilmente encontrados em qualquer supermercado brasileiro (frango, ovos, arroz, feijão, legumes comuns, etc.)
+2. Tempo máximo de preparo: 30 minutos
+3. Receita REAL com nome criativo — não genérica como "Frango com Legumes"
+4. Modo de preparo em passos numerados claros
+5. As quantidades dos ingredientes devem resultar nos macros especificados
+6. Adequada ao objetivo do cliente: ${GOAL_LABELS[profile?.goal] || 'saudável'}
+
 Responda APENAS com JSON puro (sem markdown):
-{"name":"Nome da receita","time_min":15,"calories":320,"protein":24,"carbs":30,"fat":8,"ingredients":[{"name":"Ingrediente","amount":100,"unit":"g"}],"directions":"Modo de preparo."}`;
+{"name":"Nome criativo da receita","time_min":20,"calories":${cal},"protein":${protein},"carbs":${carbs},"fat":${fat},"ingredients":[{"name":"Ingrediente","amount":100,"unit":"g"}],"directions":"1. Passo um.\\n2. Passo dois.\\n3. Passo três."}`;
 }
 
-function promptWeeklyPlan(mealType, calPerMeal, protPerMeal, carbPerMeal, fatPerMeal) {
-  const t = mealType === 'all' ? 'refeições variadas (café, almoço, jantar, lanche)' : `refeições do tipo: ${mealType}`;
-  return `Você é um chef e nutricionista. Crie 7 receitas saudáveis diferentes em português (uma por dia, dias 1 a 7) do tipo ${t}, cada uma com ~${calPerMeal} kcal, ~${protPerMeal}g proteína, ~${carbPerMeal}g carbo, ~${fatPerMeal}g gordura.
+function promptWeeklyPlan(mealType, calPerMeal, protPerMeal, carbPerMeal, fatPerMeal, profile) {
+  const mealLabel = mealType === 'all' ? 'refeições variadas (café da manhã, almoço, jantar, lanche — alternando)' : `${MEAL_LABELS[mealType] || mealType}`;
+  const ctx = profileContext(profile);
+  return `Você é um chef e nutricionista brasileiro especializado em planejamento alimentar prático.
+${ctx}
+PLANO SEMANAL SOLICITADO:
+- Tipo: ${mealLabel}
+- Cada receita: ~${calPerMeal} kcal | ~${protPerMeal}g proteína | ~${carbPerMeal}g carbos | ~${fatPerMeal}g gordura
+
+REGRAS OBRIGATÓRIAS:
+1. 7 receitas DIFERENTES — sem repetição de pratos
+2. Use APENAS ingredientes facilmente encontrados em supermercados brasileiros
+3. Tempo máximo por receita: 35 minutos
+4. Receitas REAIS e variadas (não genéricas) — inclua pratos da culinária brasileira saudável
+5. Progressão lógica para a semana: varie proteínas (frango, peixe, ovos, leguminosas)
+6. Adequadas ao objetivo: ${GOAL_LABELS[profile?.goal] || 'saudável'}
+7. Modo de preparo em passos numerados
+
 Responda APENAS com JSON puro (sem markdown) — array com exatamente 7 objetos:
-[{"day":1,"name":"Nome","time_min":20,"calories":400,"protein":30,"carbs":40,"fat":10,"ingredients":[{"name":"Ingrediente","amount":100,"unit":"g"}],"directions":"Modo de preparo."}]`;
+[{"day":1,"name":"Nome criativo","time_min":20,"calories":${calPerMeal},"protein":${protPerMeal},"carbs":${carbPerMeal},"fat":${fatPerMeal},"ingredients":[{"name":"Ingrediente","amount":100,"unit":"g"}],"directions":"1. Passo um.\\n2. Passo dois."}]`;
 }
 
 // ── Routes ────────────────────────────────────────────────────
@@ -164,9 +211,9 @@ router.post('/analyze-food', authenticateToken, async (req, res) => {
 router.post('/generate-recipe', authenticateToken, async (req, res) => {
   const t0 = Date.now();
   try {
-    const { mealType = 'all', cal, protein, carbs, fat } = req.body;
+    const { mealType = 'all', cal, protein, carbs, fat, profile } = req.body;
     const cfg = await getLLMConfig();
-    const { text, provider, model } = await callLLM(cfg, promptDailyRecipe(mealType, cal, protein, carbs, fat));
+    const { text, provider, model } = await callLLM(cfg, promptDailyRecipe(mealType, cal, protein, carbs, fat, profile));
     const recipe = JSON.parse(text);
     res.json({ recipe, mealType, _meta: { provider, model, latency_ms: Date.now() - t0 } });
   } catch (err) {
@@ -179,13 +226,13 @@ router.post('/generate-recipe', authenticateToken, async (req, res) => {
 router.post('/generate-weekly', authenticateToken, async (req, res) => {
   const t0 = Date.now();
   try {
-    const { mealType = 'all', targetCalories, targetProtein, targetCarbs, targetFat } = req.body;
+    const { mealType = 'all', targetCalories, targetProtein, targetCarbs, targetFat, profile } = req.body;
     const cfg = await getLLMConfig();
     const cal = Math.round(targetCalories / 3);
     const prot = Math.round(targetProtein / 3);
     const carb = Math.round(targetCarbs / 3);
     const fat = Math.round(targetFat / 3);
-    const { text, provider, model } = await callLLM(cfg, promptWeeklyPlan(mealType, cal, prot, carb, fat));
+    const { text, provider, model } = await callLLM(cfg, promptWeeklyPlan(mealType, cal, prot, carb, fat, profile));
     const plans = JSON.parse(text);
     res.json({ plans, mealType, _meta: { provider, model, latency_ms: Date.now() - t0 } });
   } catch (err) {
