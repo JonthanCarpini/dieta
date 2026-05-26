@@ -161,24 +161,112 @@ router.get('/settings', async (req, res) => {
 // 6. SALVAR CONFIGURAÇÕES DO SISTEMA (ADMIN)
 // ==========================================
 router.post('/settings', async (req, res) => {
-  const { gemini_api_key } = req.body;
-  if (gemini_api_key === undefined) {
-    return res.status(400).json({ error: 'Parâmetro gemini_api_key ausente.' });
-  }
-
+  const settings = req.body;
+  
   try {
-    await db.query(`
-      INSERT INTO system_settings (key, value, updated_at)
-      VALUES ('gemini_api_key', $1, NOW())
-      ON CONFLICT (key) DO UPDATE SET
-        value = EXCLUDED.value,
-        updated_at = NOW()
-    `, [gemini_api_key]);
-
+    for (const [key, value] of Object.entries(settings)) {
+      if (value !== undefined) {
+        await db.query(`
+          INSERT INTO system_settings (key, value, updated_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (key) DO UPDATE SET
+            value = EXCLUDED.value,
+            updated_at = NOW()
+        `, [key, value]);
+      }
+    }
     res.json({ message: 'Configurações salvas com sucesso.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao salvar configurações.' });
+  }
+});
+
+// ==========================================
+// 7. OBTER TODOS OS PLANOS DO SISTEMA
+// ==========================================
+router.get('/plans', async (req, res) => {
+  try {
+    const plansRes = await db.query('SELECT * FROM plans ORDER BY id ASC');
+    res.json(plansRes.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar planos.' });
+  }
+});
+
+// ==========================================
+// 8. CRIAR/ATUALIZAR PLANO
+// ==========================================
+router.post('/plans', async (req, res) => {
+  const { id, name, display_name, price, duration_days, description, features } = req.body;
+
+  if (!name || !display_name || price === undefined || duration_days === undefined) {
+    return res.status(400).json({ error: 'Preencha os campos obrigatórios.' });
+  }
+
+  const featuresJson = typeof features === 'string' ? features : JSON.stringify(features || []);
+
+  try {
+    if (id) {
+      // Atualizar plano existente
+      const updated = await db.query(`
+        UPDATE plans 
+        SET name = $1, display_name = $2, price = $3, duration_days = $4, description = $5, features = $6
+        WHERE id = $7
+        RETURNING *
+      `, [name.toLowerCase().trim(), display_name, price, duration_days, description, featuresJson, id]);
+      
+      res.json({ message: 'Plano atualizado com sucesso.', plan: updated.rows[0] });
+    } else {
+      // Criar novo plano
+      const inserted = await db.query(`
+        INSERT INTO plans (name, display_name, price, duration_days, description, features)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (name) DO UPDATE SET
+          display_name = EXCLUDED.display_name,
+          price = EXCLUDED.price,
+          duration_days = EXCLUDED.duration_days,
+          description = EXCLUDED.description,
+          features = EXCLUDED.features
+        RETURNING *
+      `, [name.toLowerCase().trim(), display_name, price, duration_days, description, featuresJson]);
+      
+      res.json({ message: 'Plano criado com sucesso.', plan: inserted.rows[0] });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar plano.' });
+  }
+});
+
+// ==========================================
+// 9. EXCLUIR PLANO
+// ==========================================
+router.delete('/plans/:id', async (req, res) => {
+  const planId = parseInt(req.params.id);
+  
+  try {
+    const planRes = await db.query('SELECT name FROM plans WHERE id = $1', [planId]);
+    if (planRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Plano não encontrado.' });
+    }
+    const planName = planRes.rows[0].name;
+
+    if (planName === 'trial' || planName === 'premium') {
+      return res.status(400).json({ error: 'Os planos padrão (trial, premium) não podem ser excluídos.' });
+    }
+
+    // Altera os usuários que estão nesse plano para o plano 'trial'
+    await db.query("UPDATE users SET plan = 'trial', premium_expires_at = NULL WHERE plan = $1", [planName]);
+
+    // Deleta o plano
+    await db.query('DELETE FROM plans WHERE id = $1', [planId]);
+
+    res.json({ message: 'Plano excluído com sucesso. Usuários migrados para o plano Trial.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir plano.' });
   }
 });
 

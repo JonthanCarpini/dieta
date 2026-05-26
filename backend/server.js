@@ -50,15 +50,19 @@ app.post('/api/payments/mercadopago-webhook', async (req, res) => {
       const payerEmail = req.body.payer_email || (req.body.data && req.body.data.email);
       
       if (payerEmail) {
-        // Atualiza o plano do usuário para Premium por 30 dias
+        // Busca a duração do plano no banco de dados
+        const planName = req.body.plan_name || 'premium';
+        const planRes = await db.query("SELECT name, duration_days FROM plans WHERE name = $1", [planName]);
+        const planInfo = planRes.rows[0] || { name: 'premium', duration_days: 30 };
+
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
+        expiresAt.setDate(expiresAt.getDate() + planInfo.duration_days);
 
         await db.query(
-          "UPDATE users SET plan = 'premium', premium_expires_at = $1 WHERE email = $2",
-          [expiresAt, payerEmail.toLowerCase().trim()]
+          "UPDATE users SET plan = $1, premium_expires_at = $2 WHERE email = $3",
+          [planInfo.name, expiresAt, payerEmail.toLowerCase().trim()]
         );
-        console.log(`Plano Premium ativado via Mercado Pago para: ${payerEmail}`);
+        console.log(`Plano ${planInfo.name} ativado via Mercado Pago para: ${payerEmail}`);
       }
     } catch (err) {
       console.error("Erro ao processar Webhook Mercado Pago:", err);
@@ -83,14 +87,18 @@ app.post('/api/payments/asaas-webhook', async (req, res) => {
       const customerEmail = payment.customerEmail || req.body.email;
 
       if (customerEmail) {
+        const planName = req.body.plan_name || 'premium';
+        const planRes = await db.query("SELECT name, duration_days FROM plans WHERE name = $1", [planName]);
+        const planInfo = planRes.rows[0] || { name: 'premium', duration_days: 30 };
+
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
+        expiresAt.setDate(expiresAt.getDate() + planInfo.duration_days);
 
         await db.query(
-          "UPDATE users SET plan = 'premium', premium_expires_at = $1 WHERE email = $2",
-          [expiresAt, customerEmail.toLowerCase().trim()]
+          "UPDATE users SET plan = $1, premium_expires_at = $2 WHERE email = $3",
+          [planInfo.name, expiresAt, customerEmail.toLowerCase().trim()]
         );
-        console.log(`Plano Premium ativado via Asaas para: ${customerEmail}`);
+        console.log(`Plano ${planInfo.name} ativado via Asaas para: ${customerEmail}`);
       }
     } catch (err) {
       console.error("Erro ao processar Webhook Asaas:", err);

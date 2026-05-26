@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Admin - Slimo AI</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- CSS Estilos -->
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body class="dark-theme">
+    
+    <!-- 1. TELA DE LOGIN ADMIN (Caso não autenticado/admin) -->
+    <div id="login-container" class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-shield">
+                    <i data-lucide="shield" class="logo-icon"></i>
+                </div>
+                <h2>Slimo Admin</h2>
+                <p>Entre com suas credenciais de administrador</p>
+            </div>
+            
+            <form id="admin-login-form">
+                <div class="form-group">
+                    <label for="login-email">E-mail</label>
+                    <input type="email" id="login-email" placeholder="admin@nutrir.online" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Senha</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn-primary w-full">Entrar no Painel</button>
+            </form>
+            <div id="login-error-msg" class="error-banner hidden"></div>
+        </div>
+    </div>
+
+    <!-- 2. LAYOUT DO DASHBOARD ADMIN (Caso autenticado) -->
+    <div id="admin-dashboard" class="dashboard-layout hidden">
+        <!-- Sidebar lateral -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i data-lucide="shield-check" class="shield-green"></i>
+                <span>Slimo Admin</span>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" data-tab="overview">
+                    <i data-lucide="layout-dashboard"></i> Visão Geral
+                </button>
+                <button class="nav-btn" data-tab="users">
+                    <i data-lucide="users"></i> Usuários
+                </button>
+                <button class="nav-btn" data-tab="professionals">
+                    <i data-lucide="user-cog"></i> Profissionais
+                </button>
+                <button class="nav-btn" data-tab="plans">
+                    <i data-lucide="credit-card"></i> Planos
+                </button>
+                <button class="nav-btn" data-tab="settings">
+                    <i data-lucide="key-round"></i> Credenciais
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="btn-back-to-app" class="btn-secondary w-full" style="margin-bottom: 8px;">
+                    <i data-lucide="home"></i> Ir para o App
+                </button>
+                <button id="btn-logout" class="btn-danger w-full">
+                    <i data-lucide="log-out"></i> Sair
+                </button>
+            </div>
+        </aside>
+
+        <!-- Área de Conteúdo Principal -->
+        <main class="main-content">
+            
+            <!-- ABA: VISÃO GERAL (OVERVIEW) -->
+            <section id="tab-overview" class="tab-content active">
+                <div class="header-section">
+                    <h1>Visão Geral</h1>
+                    <p>Métricas gerais do Slimo AI em tempo real</p>
+                </div>
+
+                <!-- Cards de Estatísticas -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-blue"><i data-lucide="users"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Total de Usuários</span>
+                            <h3 id="stat-total-users">0</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-yellow"><i data-lucide="star"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Usuários Premium</span>
+                            <h3 id="stat-premium-users">0</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-green"><i data-lucide="heart"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Profissionais Ativos</span>
+                            <h3 id="stat-professionals">0</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-purple"><i data-lucide="file-key"></i></div>
+                        <div class="stat-details">
+                            <span class="stat-label">Chave Gemini Ativa</span>
+                            <h3 id="stat-gemini-status">Inativa</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ações rápidas -->
+                <div class="dashboard-row margin-top-lg">
+                    <div class="dashboard-card col-12">
+                        <h3>Ações Rápidas de Configuração</h3>
+                        <p class="description">Atalhos rápidos para gerenciar as partes mais cruciais do sistema.</p>
+                        <div class="quick-actions-list">
+                            <button class="quick-action-btn" onclick="switchTab('settings')">
+                                <i data-lucide="key"></i> Configurar Chaves de API
+                            </button>
+                            <button class="quick-action-btn" onclick="switchTab('plans')">
+                                <i data-lucide="plus-circle"></i> Criar Novo Plano
+                            </button>
+                            <button class="quick-action-btn" onclick="switchTab('professionals')">
+                                <i data-lucide="user-plus"></i> Cadastrar Profissional
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA: GERENCIAMENTO DE USUÁRIOS -->
+            <section id="tab-users" class="tab-content">
+                <div class="header-section">
+                    <h1>Gerenciamento de Usuários</h1>
+                    <p>Gerencie cargos, assinaturas e contas cadastradas</p>
+                </div>
+
+                <div class="dashboard-card">
+                    <div class="table-actions">
+                        <div class="search-box">
+                            <i data-lucide="search"></i>
+                            <input type="text" id="user-search-input" placeholder="Pesquisar por nome ou e-mail...">
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>E-mail</th>
+                                    <th>Cargo</th>
+                                    <th>Plano</th>
+                                    <th>Expiração do Plano</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <!-- Usuários injetados por JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA: CADASTRO E GERENCIAMENTO DE PROFISSIONAIS -->
+            <section id="tab-professionals" class="tab-content">
+                <div class="header-section">
+                    <h1>Profissionais de Saúde</h1>
+                    <p>Cadastre e liste nutricionistas e personal trainers da plataforma</p>
+                </div>
+
+                <div class="dashboard-row">
+                    <!-- Formulário de cadastro -->
+                    <div class="dashboard-card col-4">
+                        <h3>Registrar Profissional</h3>
+                        <form id="pro-register-form" class="margin-top-md">
+                            <div class="form-group">
+                                <label for="pro-name">Nome Completo</label>
+                                <input type="text" id="pro-name" placeholder="Ex: Dr. Marcelo Nutri" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="pro-email">E-mail</label>
+                                <input type="email" id="pro-email" placeholder="marcelo@nutrir.online" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="pro-password">Senha Provisória</label>
+                                <input type="password" id="pro-password" placeholder="Mínimo 6 caracteres" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="pro-role">Especialidade / Cargo</label>
+                                <select id="pro-role" required>
+                                    <option value="nutritionist">Nutricionista</option>
+                                    <option value="trainer">Personal Trainer</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn-primary w-full margin-top-md">Cadastrar e Liberar Premium</button>
+                        </form>
+                    </div>
+
+                    <!-- Lista de profissionais -->
+                    <div class="dashboard-card col-8">
+                        <h3>Profissionais Cadastrados</h3>
+                        <div class="table-responsive margin-top-md">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>E-mail</th>
+                                        <th>Cargo</th>
+                                        <th>Plano</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pros-table-body">
+                                    <!-- Injetado via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA: PLANOS (PLAN configurator) -->
+            <section id="tab-plans" class="tab-content">
+                <div class="header-section">
+                    <h1>Configuração de Planos</h1>
+                    <p>Crie, edite e remova planos comerciais e de testes</p>
+                </div>
+
+                <div class="dashboard-row">
+                    <!-- Formulário de criar plano -->
+                    <div class="dashboard-card col-4">
+                        <h3 id="plan-form-title">Criar Novo Plano</h3>
+                        <form id="plan-config-form" class="margin-top-md">
+                            <input type="hidden" id="plan-id">
+                            <div class="form-group">
+                                <label for="plan-name">Identificador (slug)</label>
+                                <input type="text" id="plan-name" placeholder="Ex: anual" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="plan-display-name">Nome de Exibição</label>
+                                <input type="text" id="plan-display-name" placeholder="Ex: Plano Anual Premium" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="plan-price">Preço (R$)</label>
+                                <input type="number" id="plan-price" step="0.01" min="0" placeholder="Ex: 199.90" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="plan-duration">Duração (dias)</label>
+                                <input type="number" id="plan-duration" min="1" placeholder="Ex: 365" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="plan-description">Descrição</label>
+                                <textarea id="plan-description" placeholder="Breve resumo comercial..." style="height: 60px;"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="plan-features">Benefícios (um por linha)</label>
+                                <textarea id="plan-features" placeholder="Ex: Receitas ilimitadas&#10;Gráficos premium&#10;Acompanhamento profissional" style="height: 90px;"></textarea>
+                            </div>
+                            <div class="btn-group margin-top-md">
+                                <button type="submit" class="btn-primary w-full" id="btn-save-plan">Salvar Plano</button>
+                                <button type="button" class="btn-secondary w-full hidden" id="btn-cancel-plan-edit">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Lista de planos -->
+                    <div class="dashboard-card col-8">
+                        <h3>Planos Disponíveis</h3>
+                        <div class="table-responsive margin-top-md">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Identificador</th>
+                                        <th>Nome</th>
+                                        <th>Preço</th>
+                                        <th>Duração (dias)</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="plans-table-body">
+                                    <!-- Injetado via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA: CREDENCIAIS (SETTINGS / KEYS) -->
+            <section id="tab-settings" class="tab-content">
+                <div class="header-section">
+                    <h1>Configuração de Chaves e Credenciais</h1>
+                    <p>Gerencie as integrações globais e tokens do sistema de forma segura</p>
+                </div>
+
+                <div class="dashboard-card max-width-lg">
+                    <form id="global-settings-form" style="display:flex; flex-direction:column; gap:20px;">
+                        
+                        <!-- Chave do Gemini -->
+                        <div class="settings-field-group">
+                            <div class="field-info">
+                                <h4>Chave de API do Gemini</h4>
+                                <p class="description">Utilizada globalmente para escaneamento de fotos e geração de planos/receitas por inteligência artificial.</p>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-password-wrapper">
+                                    <input type="password" id="setting-gemini-key" placeholder="AIzaSy..." class="masked-input">
+                                    <button class="toggle-visibility-btn" type="button" data-target="setting-gemini-key"><i data-lucide="eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Google Client ID -->
+                        <div class="settings-field-group">
+                            <div class="field-info">
+                                <h4>Google OAuth Client ID</h4>
+                                <p class="description">Chave pública utilizada para autenticar o login social dos usuários na página de login.</p>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-password-wrapper">
+                                    <input type="password" id="setting-google-id" placeholder="your_client_id.apps.googleusercontent.com" class="masked-input">
+                                    <button class="toggle-visibility-btn" type="button" data-target="setting-google-id"><i data-lucide="eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Token do Mercado Pago -->
+                        <div class="settings-field-group">
+                            <div class="field-info">
+                                <h4>Mercado Pago Access Token</h4>
+                                <p class="description">Token de API do Mercado Pago para verificação e criação de cobranças Pix.</p>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-password-wrapper">
+                                    <input type="password" id="setting-mp-token" placeholder="APP_USR-..." class="masked-input">
+                                    <button class="toggle-visibility-btn" type="button" data-target="setting-mp-token"><i data-lucide="eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chave do Asaas -->
+                        <div class="settings-field-group">
+                            <div class="field-info">
+                                <h4>Asaas API Key</h4>
+                                <p class="description">Token de API para automação e consultas financeiras na plataforma de pagamento Asaas.</p>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-password-wrapper">
+                                    <input type="password" id="setting-asaas-key" placeholder="$aasaas_key_..." class="masked-input">
+                                    <button class="toggle-visibility-btn" type="button" data-target="setting-asaas-key"><i data-lucide="eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="margin-top-md" style="display:flex; justify-content:flex-end;">
+                            <button type="submit" class="btn-primary" style="padding: 12px 24px; font-size:14px;">Salvar Todas as Credenciais</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Script Principal -->
+    <script src="admin.js"></script>
+</body>
+</html>

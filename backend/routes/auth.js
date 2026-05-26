@@ -98,10 +98,18 @@ router.post('/google', async (req, res) => {
   }
 
   try {
+    // Carrega o Google Client ID dinamicamente
+    const clientKeyRes = await db.query("SELECT value FROM system_settings WHERE key = 'google_client_id'");
+    const googleClientId = (clientKeyRes.rows[0] && clientKeyRes.rows[0].value && clientKeyRes.rows[0].value.trim() !== '') 
+      ? clientKeyRes.rows[0].value.trim() 
+      : process.env.GOOGLE_CLIENT_ID;
+
+    const dynamicGoogleClient = new OAuth2Client(googleClientId);
+
     // Valida Token com a biblioteca oficial do Google
-    const ticket = await googleClient.verifyIdToken({
+    const ticket = await dynamicGoogleClient.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID
+      audience: googleClientId
     });
 
     const payload = ticket.getPayload();
@@ -142,10 +150,17 @@ router.post('/google', async (req, res) => {
 });
 
 // 4. CONFIGURAÇÃO CLIENT-SIDE (GOOGLE_CLIENT_ID)
-router.get('/config', (req, res) => {
-  res.json({
-    googleClientId: process.env.GOOGLE_CLIENT_ID || ''
-  });
+router.get('/config', async (req, res) => {
+  try {
+    const clientKeyRes = await db.query("SELECT value FROM system_settings WHERE key = 'google_client_id'");
+    const googleClientId = (clientKeyRes.rows[0] && clientKeyRes.rows[0].value && clientKeyRes.rows[0].value.trim() !== '') 
+      ? clientKeyRes.rows[0].value.trim() 
+      : (process.env.GOOGLE_CLIENT_ID || '');
+    res.json({ googleClientId });
+  } catch (err) {
+    console.error(err);
+    res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID || '' });
+  }
 });
 
 module.exports = router;

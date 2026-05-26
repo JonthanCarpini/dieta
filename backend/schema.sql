@@ -105,8 +105,31 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insere chave padrão vazia do Gemini
-INSERT INTO system_settings (key, value) VALUES ('gemini_api_key', '') ON CONFLICT DO NOTHING;
+-- Insere chaves de API padrão vazias
+INSERT INTO system_settings (key, value) VALUES 
+('gemini_api_key', ''),
+('google_client_id', ''),
+('mercadopago_token', ''),
+('asaas_key', '')
+ON CONFLICT (key) DO NOTHING;
+
+-- 10. TABELA DE PLANOS DO SISTEMA
+CREATE TABLE IF NOT EXISTS plans (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    duration_days INTEGER NOT NULL DEFAULT 30,
+    description TEXT,
+    features JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insere planos padrões caso não existam
+INSERT INTO plans (name, display_name, price, duration_days, description, features) VALUES 
+('trial', 'Plano de Testes (7 dias)', 0.00, 7, 'Experimente todas as funcionalidades básicas do Slimo AI gratuitamente.', '["Controle de macros básico", "Acompanhamento de água", "Escanear pratos por IA"]'::jsonb),
+('premium', 'Plano Premium Mensal', 29.90, 30, 'Desbloqueie orientação profissional com nutricionistas e personal trainers.', '["Receitas por IA ilimitadas", "Acompanhamento profissional completo", "Análise de refeições ilimitada"]'::jsonb)
+ON CONFLICT (name) DO NOTHING;
 
 -- Índices recomendados para otimização de consultas
 CREATE INDEX IF NOT EXISTS idx_meals_user_date ON meals(user_id, date);
