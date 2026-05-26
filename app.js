@@ -5,6 +5,11 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 0. CONFIGURAÇÃO DA API
+    const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? 'http://localhost:5000/api' 
+        : '/api';
+
     // 1. ESTADO GLOBAL DA APLICAÇÃO
     const state = {
         userProfile: null,       // Perfil do usuário (peso, metas, onboarding)
@@ -133,6 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. ELEMENTOS DO DOM
     const screens = {
+        login: document.getElementById('screen-login'),
+        professional: document.getElementById('screen-professional'),
+        admin: document.getElementById('screen-admin'),
         onboarding: document.getElementById('screen-onboarding'),
         dashboard: document.getElementById('screen-dashboard'),
         scanner: document.getElementById('screen-scanner'),
@@ -150,89 +158,895 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. INICIALIZAÇÃO DO APP
     initApp();
 
-    function initApp() {
-        // Carrega dados locais
-        loadStateFromLocalStorage();
-
+    async function initApp() {
         // Configura ouvintes globais
         setupEventListeners();
+        setupAuthListeners();
+        setupAdminListeners();
+        setupProfessionalListeners();
 
         // Configura ícones Lucide
         lucide.createIcons();
 
-        // Direcionamento inicial de tela
-        if (state.userProfile) {
-            showScreen('screen-dashboard');
-            updateDashboard();
+        // Verifica token e carrega estado da API
+        const token = localStorage.getItem('slimo_token');
+        if (token) {
+            const success = await loadStateFromAPI(token);
+            if (success) {
+                // Roteia baseado no cargo (role)
+                if (state.user.role === 'nutritionist' || state.user.role === 'trainer') {
+                    showScreen('screen-professional');
+                } else if (state.user.role === 'admin') {
+                    showScreen('screen-admin');
+                } else {
+                    if (state.userProfile) {
+                        showScreen('screen-dashboard');
+                        updateDashboard();
+                    } else {
+                        showScreen('screen-onboarding');
+                        setupOnboardingSliders();
+                    }
+                }
+            } else {
+                showScreen('screen-login');
+            }
         } else {
-            showScreen('screen-onboarding');
-            setupOnboardingSliders();
+            showScreen('screen-login');
         }
 
         // Inicia cronômetro de jejum se ativo
         if (state.fastingActive) {
             startFastingTimer();
         }
+
+        // Inicializa Google Login Button
+        initGoogleLogin();
     }
 
     // 6. CARREGAR E SALVAR ESTADOS
-    function loadStateFromLocalStorage() {
-        const todayStr = getTodayDateString();
-        const profile = localStorage.getItem('slimo_profile');
-        const logs = localStorage.getItem('slimo_meals_log');
-        const apiKey = localStorage.getItem('slimo_gemini_key');
-        const water = localStorage.getItem('slimo_water_consumed');
-        const waterGoal = localStorage.getItem('slimo_water_target');
-        const fasting = localStorage.getItem('slimo_fasting_active');
-        const fastingStart = localStorage.getItem('slimo_fasting_start_time');
-        const fastingGoal = localStorage.getItem('slimo_fasting_goal');
-        const lastReset = localStorage.getItem('slimo_last_date_reset');
+    async function loadStateFromAPI(token) {
+        try {
+            // 1. Carrega Perfil
+            const profileRes = await fetch(`${API_URL}/user/profile`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!profileRes.ok) {
+                if (profileRes.status === 401 || profileRes.status === 403) {
+                    localStorage.removeItem('slimo_token');
+                }
+                return false;
+            }
+            const data = await profileRes.json();
+            state.user = data.user;
+            
+            // Mapeia DB columns de volta para o perfil do state
+            if (data.profile) {
+                state.userProfile = {
+                    gender: data.profile.gender,
+                    age: data.profile.age,
+                    weight: parseFloat(data.profile.weight),
+                    height: data.profile.height,
+                    activity: parseFloat(data.profile.activity),
+                    goal: data.profile.goal,
+                    goalWeight: parseFloat(data.profile.goal_weight),
+                    speed: parseFloat(data.profile.speed),
+                    targetCalories: data.profile.target_calories,
+                    targetProtein: data.profile.target_protein,
+                    targetCarbs: data.profile.target_carbs,
+                    targetFat: data.profile.target_fat,
+                    dateCalculated: data.profile.updated_at ? data.profile.updated_at.split('T')[0] : getTodayDateString()
+                };
+            } else {
+                state.userProfile = null;
+            }
 
-        const savedRecipes = localStorage.getItem('slimo_saved_ai_recipes');
-        const savedPlans = localStorage.getItem('slimo_saved_weekly_plans');
+            // 2. Carrega Refeições
+            const mealsRes = await fetch(`${API_URL}/user/meals`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (mealsRes.ok) {
+                const meals = await mealsRes.json();
+                state.mealsLog = meals.map(m => ({
+                    id: m.id,
+                    date: m.date.split('T')[0],
+                    time: m.time.slice(0, 5),
+                    name: m.name,
+                    items: typeof m.items === 'string' ? JSON.parse(m.items) : m.items,
+                    total: typeof m.total === 'string' ? JSON.parse(m.total) : m.total
+                }));
+            }
 
-        if (profile) state.userProfile = JSON.parse(profile);
-        if (logs) state.mealsLog = JSON.parse(logs);
-        if (savedRecipes) state.savedAiRecipes = JSON.parse(savedRecipes);
-        if (savedPlans) state.savedWeeklyPlans = JSON.parse(savedPlans);
+            // 3. Carrega Água
+            const today = getTodayDateString();
+            const waterRes = await fetch(`${API_URL}/user/water?date=${today}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (waterRes.ok) {
+                const water = await waterRes.json();
+                state.waterConsumed = water.consumed || 0;
+                state.waterTarget = water.target || 2500;
+            }
 
-        if (apiKey) {
-            state.geminiApiKey = apiKey;
-            document.getElementById('input-api-key').value = apiKey;
+            // 4. Carrega Jejum
+            const fastingRes = await fetch(`${API_URL}/user/fasting`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (fastingRes.ok) {
+                const fasting = await fastingRes.json();
+                if (fasting) {
+                    state.fastingActive = true;
+                    state.fastingStartTime = new Date(fasting.start_time);
+                    state.fastingDurationGoal = fasting.duration_goal;
+                } else {
+                    state.fastingActive = false;
+                }
+            }
+
+            // 5. Carrega Receitas IA
+            const recipesRes = await fetch(`${API_URL}/user/recipes`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (recipesRes.ok) {
+                const recipes = await recipesRes.json();
+                state.savedAiRecipes = recipes.filter(r => r.type === 'daily').map(r => ({
+                    id: r.id,
+                    type: r.type,
+                    name: r.name,
+                    ... (typeof r.data === 'string' ? JSON.parse(r.data) : r.data)
+                }));
+                state.savedWeeklyPlans = recipes.filter(r => r.type === 'weekly').map(r => ({
+                    id: r.id,
+                    type: r.type,
+                    name: r.name,
+                    recipes: typeof r.data === 'string' ? JSON.parse(r.data).recipes : r.data.recipes
+                }));
+            }
+
+            // Carrega api key local se houver
+            const apiKey = localStorage.getItem('slimo_gemini_key');
+            if (apiKey) {
+                state.geminiApiKey = apiKey;
+                document.getElementById('input-api-key').value = apiKey;
+            }
+            updateApiStatusIndicator();
+
+            return true;
+        } catch (err) {
+            console.error("Erro ao carregar estado da API:", err);
+            return false;
         }
-
-        // Controle de Reset Diário de Água
-        if (lastReset !== todayStr) {
-            state.waterConsumed = 0;
-            localStorage.setItem('slimo_water_consumed', 0);
-            localStorage.setItem('slimo_last_date_reset', todayStr);
-        } else {
-            if (water) state.waterConsumed = parseInt(water);
-        }
-
-        if (waterGoal) state.waterTarget = parseInt(waterGoal);
-        if (fasting) state.fastingActive = (fasting === 'true');
-        if (fastingStart) state.fastingStartTime = new Date(fastingStart);
-        if (fastingGoal) state.fastingDurationGoal = parseInt(fastingGoal);
-
-        updateApiStatusIndicator();
     }
 
-    function saveProfileToLocalStorage(profile) {
+    async function saveProfileToLocalStorage(profile) {
         state.userProfile = profile;
         localStorage.setItem('slimo_profile', JSON.stringify(profile));
+
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+
+        try {
+            await fetch(`${API_URL}/user/profile`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    gender: profile.gender,
+                    age: profile.age,
+                    weight: profile.weight,
+                    height: profile.height,
+                    activity: profile.activity,
+                    goal: profile.goal,
+                    goal_weight: profile.goalWeight,
+                    speed: profile.speed,
+                    target_calories: profile.targetCalories,
+                    target_protein: profile.targetProtein,
+                    target_carbs: profile.targetCarbs,
+                    target_fat: profile.targetFat
+                })
+            });
+        } catch (err) {
+            console.error("Erro ao salvar perfil na API:", err);
+        }
     }
 
-    function saveMealsToLocalStorage() {
+    async function saveMealsToLocalStorage() {
         localStorage.setItem('slimo_meals_log', JSON.stringify(state.mealsLog));
+
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+
+        // Envia as refeições para sincronizar no backend
+        for (const meal of state.mealsLog) {
+            try {
+                await fetch(`${API_URL}/user/meals`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        id: meal.id,
+                        date: meal.date,
+                        time: meal.time,
+                        name: meal.name,
+                        items: meal.items,
+                        total: meal.total
+                    })
+                });
+            } catch (err) {
+                console.error(`Erro ao salvar refeição ${meal.id} na API:`, err);
+            }
+        }
     }
 
-    function saveAiRecipesToLocalStorage() {
+    async function deleteMealFromAPI(mealId) {
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+        try {
+            await fetch(`${API_URL}/user/meals/${mealId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        } catch (err) {
+            console.error("Erro ao deletar refeição na API:", err);
+        }
+    }
+
+    async function saveWaterToAPI() {
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+        try {
+            await fetch(`${API_URL}/user/water`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    date: getTodayDateString(),
+                    consumed: state.waterConsumed,
+                    target: state.waterTarget
+                })
+            });
+        } catch (err) {
+            console.error("Erro ao salvar água na API:", err);
+        }
+    }
+
+    async function saveFastingToAPI(active) {
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+        try {
+            await fetch(`${API_URL}/user/fasting`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    start_time: state.fastingStartTime ? state.fastingStartTime.toISOString() : new Date().toISOString(),
+                    duration_goal: state.fastingDurationGoal,
+                    active: active
+                })
+            });
+        } catch (err) {
+            console.error("Erro ao salvar jejum na API:", err);
+        }
+    }
+
+    async function saveAiRecipesToLocalStorage() {
         localStorage.setItem('slimo_saved_ai_recipes', JSON.stringify(state.savedAiRecipes));
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+
+        for (const recipe of state.savedAiRecipes) {
+            try {
+                await fetch(`${API_URL}/user/recipes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        id: recipe.id,
+                        type: 'daily',
+                        name: recipe.name,
+                        data: recipe
+                    })
+                });
+            } catch (err) {
+                console.error("Erro ao salvar receita de IA na API:", err);
+            }
+        }
     }
 
-    function saveWeeklyPlansToLocalStorage() {
+    async function saveWeeklyPlansToLocalStorage() {
         localStorage.setItem('slimo_saved_weekly_plans', JSON.stringify(state.savedWeeklyPlans));
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+
+        for (const plan of state.savedWeeklyPlans) {
+            try {
+                await fetch(`${API_URL}/user/recipes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        id: plan.id,
+                        type: 'weekly',
+                        name: plan.name || 'Plano Semanal',
+                        data: plan
+                    })
+                });
+            } catch (err) {
+                console.error("Erro ao salvar plano de IA na API:", err);
+            }
+        }
+    }
+
+    function getTodayDateString() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+
+    // ==========================================================
+    // AUTENTICAÇÃO - EVENTOS E MÉTODOS
+    // ==========================================================
+    let isRegisterMode = false;
+
+    function setupAuthListeners() {
+        const loginForm = document.getElementById('login-form');
+        const btnToggleAuthMode = document.getElementById('btn-toggle-auth-mode');
+        const lblAuthToggleText = document.getElementById('lbl-auth-toggle-text');
+        const groupAuthName = document.getElementById('group-auth-name');
+        const btnAuthSubmit = document.getElementById('btn-auth-submit');
+
+        if (!loginForm || !btnToggleAuthMode) return;
+
+        btnToggleAuthMode.addEventListener('click', () => {
+            isRegisterMode = !isRegisterMode;
+            if (isRegisterMode) {
+                groupAuthName.classList.remove('hidden');
+                btnAuthSubmit.innerText = 'CRIAR CONTA';
+                lblAuthToggleText.innerText = 'Já tem uma conta?';
+                btnToggleAuthMode.innerText = 'Fazer Login';
+                document.getElementById('login-name').required = true;
+            } else {
+                groupAuthName.classList.add('hidden');
+                btnAuthSubmit.innerText = 'ENTRAR';
+                lblAuthToggleText.innerText = 'Não tem uma conta?';
+                btnToggleAuthMode.innerText = 'Criar Conta';
+                document.getElementById('login-name').required = false;
+            }
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const name = document.getElementById('login-name').value;
+
+            const url = isRegisterMode ? `${API_URL}/auth/register` : `${API_URL}/auth/login`;
+            const payload = isRegisterMode ? { email, password, name } : { email, password };
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || 'Erro na requisição.');
+                }
+
+                localStorage.setItem('slimo_token', data.token);
+                await initApp();
+            } catch (err) {
+                alert(`Erro de autenticação: ${err.message}`);
+            }
+        });
+    }
+
+    async function initGoogleLogin() {
+        try {
+            const configRes = await fetch(`${API_URL}/auth/config`);
+            const config = await configRes.json();
+            const client_id = config.googleClientId;
+
+            if (!client_id || client_id.includes('your_google_oauth_client_id')) {
+                console.warn('Google Client ID não configurado ou padrão.');
+                return;
+            }
+
+            if (typeof google === 'undefined') {
+                console.error('SDK do Google Identity Services não carregado.');
+                return;
+            }
+
+            google.accounts.id.initialize({
+                client_id: client_id,
+                callback: handleGoogleLoginResponse
+            });
+
+            google.accounts.id.renderButton(
+                document.getElementById('google-login-btn'),
+                { theme: 'outline', size: 'large', width: '100%' }
+            );
+        } catch (err) {
+            console.error('Erro ao inicializar Google Login:', err);
+        }
+    }
+
+    async function handleGoogleLoginResponse(response) {
+        try {
+            const res = await fetch(`${API_URL}/auth/google`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credential: response.credential })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Erro na autenticação do Google.');
+            }
+
+            localStorage.setItem('slimo_token', data.token);
+            await initApp();
+        } catch (err) {
+            alert(`Falha no Login Google: ${err.message}`);
+        }
+    }
+
+    // ==========================================================
+    // PAINEL DO ADMINISTRADOR - EVENTOS E MÉTODOS
+    // ==========================================================
+    async function renderAdminPanel() {
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+
+        try {
+            const res = await fetch(`${API_URL}/admin/users`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Não foi possível carregar os usuários.');
+            const users = await res.json();
+
+            const container = document.getElementById('admin-users-container');
+            container.innerHTML = '';
+
+            if (users.length === 0) {
+                container.innerHTML = '<p class="settings-description">Nenhum usuário cadastrado.</p>';
+                return;
+            }
+
+            users.forEach(u => {
+                const userCard = document.createElement('div');
+                userCard.className = 'history-day-card';
+                userCard.style.padding = '12px';
+                userCard.style.display = 'flex';
+                userCard.style.flexDirection = 'column';
+                userCard.style.gap = '8px';
+
+                const planStr = u.plan === 'premium' ? '<span class="ai-pill" style="background:#fee440; color:#000;">PREMIUM</span>' : '<span class="ai-pill" style="background:#6c757d; color:#fff;">TRIAL</span>';
+                const roleStr = u.role === 'admin' ? '[Admin]' : u.role === 'nutritionist' ? '[Nutri]' : u.role === 'trainer' ? '[Trainer]' : '[User]';
+
+                userCard.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong>${u.name}</strong> <span style="font-size:11px; opacity:0.6;">${roleStr}</span>
+                            <div style="font-size:11px; opacity:0.5;">${u.email}</div>
+                        </div>
+                        <div>
+                            ${planStr}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:4px;">
+                        <select class="select-user-role" data-user-id="${u.id}" style="font-size:11px; padding:4px; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff;">
+                            <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
+                            <option value="nutritionist" ${u.role === 'nutritionist' ? 'selected' : ''}>Nutricionista</option>
+                            <option value="trainer" ${u.role === 'trainer' ? 'selected' : ''}>Personal Trainer</option>
+                            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                        <button class="btn-toggle-plan btn-secondary" data-user-id="${u.id}" data-current-plan="${u.plan}" style="font-size:11px; padding:4px 8px; height:auto; border-radius:6px;">
+                            Alternar Plano
+                        </button>
+                    </div>
+                `;
+
+                userCard.querySelector('.select-user-role').addEventListener('change', async (e) => {
+                    const newRole = e.target.value;
+                    try {
+                        const roleRes = await fetch(`${API_URL}/admin/users/${u.id}/role`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ role: newRole })
+                        });
+                        const rData = await roleRes.json();
+                        if (!roleRes.ok) throw new Error(rData.error || 'Erro ao alterar cargo.');
+                        alert('Cargo atualizado com sucesso!');
+                        renderAdminPanel();
+                    } catch (err) {
+                        alert(err.message);
+                    }
+                });
+
+                userCard.querySelector('.btn-toggle-plan').addEventListener('click', async () => {
+                    const newPlan = u.plan === 'premium' ? 'trial' : 'premium';
+                    try {
+                        const planRes = await fetch(`${API_URL}/admin/users/${u.id}/plan`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ plan: newPlan, durationDays: 30 })
+                        });
+                        const pData = await planRes.json();
+                        if (!planRes.ok) throw new Error(pData.error || 'Erro ao alterar plano.');
+                        alert('Plano atualizado com sucesso!');
+                        renderAdminPanel();
+                    } catch (err) {
+                        alert(err.message);
+                    }
+                });
+
+                container.appendChild(userCard);
+            });
+        } catch (err) {
+            console.error('Erro ao renderizar painel admin:', err);
+        }
+    }
+
+    function setupAdminListeners() {
+        const form = document.getElementById('admin-register-pro-form');
+        if (!form) return;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('admin-pro-name').value;
+            const email = document.getElementById('admin-pro-email').value;
+            const password = document.getElementById('admin-pro-password').value;
+            const role = document.getElementById('admin-pro-role').value;
+
+            const token = localStorage.getItem('slimo_token');
+            try {
+                const res = await fetch(`${API_URL}/admin/register-professional`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, email, password, role })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro ao cadastrar profissional.');
+
+                alert('Profissional cadastrado com sucesso!');
+                form.reset();
+                renderAdminPanel();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+
+        document.getElementById('btn-admin-logout').addEventListener('click', () => {
+            localStorage.removeItem('slimo_token');
+            showScreen('screen-login');
+        });
+    }
+
+    // ==========================================================
+    // PAINEL DO PROFISSIONAL - EVENTOS E MÉTODOS
+    // ==========================================================
+    let selectedPatientId = null;
+
+    async function renderProfessionalPanel() {
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+
+        try {
+            const roleBadge = document.getElementById('professional-role-badge');
+            const welcomeText = document.getElementById('professional-welcome-text');
+            if (state.user) {
+                roleBadge.innerText = state.user.role === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+                welcomeText.innerText = `Painel do Profissional - ${state.user.name}`;
+            }
+
+            const res = await fetch(`${API_URL}/professional/patients`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Erro ao buscar pacientes.');
+            const patients = await res.json();
+
+            const container = document.getElementById('professional-patients-container');
+            container.innerHTML = '';
+
+            if (patients.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Nenhum paciente vinculado ao seu painel.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            patients.forEach(p => {
+                const patientCard = document.createElement('div');
+                patientCard.className = 'history-day-card';
+                patientCard.style.padding = '12px';
+                patientCard.style.cursor = 'pointer';
+                patientCard.style.display = 'flex';
+                patientCard.style.justifyContent = 'space-between';
+                patientCard.style.alignItems = 'center';
+
+                patientCard.innerHTML = `
+                    <div>
+                        <strong>${p.name}</strong>
+                        <div style="font-size:12px; opacity:0.6;">E-mail: ${p.email}</div>
+                        <div style="font-size:11px; opacity:0.5; margin-top:2px;">
+                            Meta: ${p.goal === 'lose' ? 'Emagrecer' : p.goal === 'gain' ? 'Ganhar Peso' : 'Manter Peso'} (${p.target_calories || 0} kcal)
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-right" style="opacity:0.5;"></i>
+                `;
+
+                patientCard.addEventListener('click', () => openPatientDetailsModal(p.id, p.name));
+
+                container.appendChild(patientCard);
+            });
+            lucide.createIcons();
+        } catch (err) {
+            console.error('Erro ao renderizar painel profissional:', err);
+        }
+    }
+
+    async function openPatientDetailsModal(patientId, patientName) {
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+
+        selectedPatientId = patientId;
+        document.getElementById('patient-modal-name').innerText = patientName;
+        document.getElementById('input-patient-feedback').value = '';
+
+        try {
+            const res = await fetch(`${API_URL}/professional/patients/${patientId}/diary`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Não foi possível buscar os registros do paciente.');
+            const data = await res.json();
+
+            const total = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+            const todayStr = getTodayDateString();
+            const todayMeals = data.meals.filter(m => m.date.split('T')[0] === todayStr);
+
+            todayMeals.forEach(m => {
+                const mTotal = typeof m.total === 'string' ? JSON.parse(m.total) : m.total;
+                total.calories += mTotal.calories || 0;
+                total.protein += mTotal.protein || 0;
+                total.carbs += mTotal.carbs || 0;
+                total.fat += mTotal.fat || 0;
+            });
+
+            document.getElementById('patient-cal-summary').innerText = `${total.calories} kcal`;
+            document.getElementById('patient-prot-summary').innerText = `${total.protein}g`;
+            document.getElementById('patient-carbs-summary').innerText = `${total.carbs}g`;
+            document.getElementById('patient-fat-summary').innerText = `${total.fat}g`;
+
+            const mealsList = document.getElementById('patient-meals-list');
+            mealsList.innerHTML = '';
+
+            if (data.meals.length === 0) {
+                mealsList.innerHTML = '<p style="font-size:12px; opacity:0.6; text-align:center; padding:12px;">Nenhuma refeição registrada.</p>';
+            } else {
+                data.meals.forEach(m => {
+                    const mTotal = typeof m.total === 'string' ? JSON.parse(m.total) : m.total;
+                    const items = typeof m.items === 'string' ? JSON.parse(m.items) : m.items;
+                    const mDiv = document.createElement('div');
+                    mDiv.className = 'history-day-card';
+                    mDiv.style.padding = '8px';
+                    mDiv.style.fontSize = '12px';
+
+                    mDiv.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <strong>${m.name}</strong>
+                            <span style="opacity:0.6;">${m.date.split('T')[0]} - ${m.time.slice(0, 5)}</span>
+                        </div>
+                        <div style="opacity:0.8;">${items.map(it => `${it.name} (${it.weight_g || it.weight}g)`).join(', ')}</div>
+                        <div style="font-size:11px; opacity:0.6; margin-top:2px;">
+                            Kcal: ${mTotal.calories} | P: ${mTotal.protein}g | C: ${mTotal.carbs}g | F: ${mTotal.fat}g
+                        </div>
+                    `;
+                    mealsList.appendChild(mDiv);
+                });
+            }
+
+            document.getElementById('patient-diary-modal').classList.add('active');
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    function setupProfessionalListeners() {
+        document.getElementById('btn-close-patient-modal').addEventListener('click', () => {
+            document.getElementById('patient-diary-modal').classList.remove('active');
+        });
+        document.getElementById('btn-cancel-patient-feedback').addEventListener('click', () => {
+            document.getElementById('patient-diary-modal').classList.remove('active');
+        });
+
+        document.getElementById('btn-save-patient-feedback').addEventListener('click', async () => {
+            const content = document.getElementById('input-patient-feedback').value;
+            if (!content.trim()) {
+                alert('Escreva a orientação antes de enviar.');
+                return;
+            }
+
+            const token = localStorage.getItem('slimo_token');
+            try {
+                const res = await fetch(`${API_URL}/professional/patients/${selectedPatientId}/feedback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ content })
+                });
+                if (!res.ok) throw new Error('Falha ao enviar feedback.');
+
+                alert('Feedback enviado com sucesso!');
+                document.getElementById('patient-diary-modal').classList.remove('active');
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+
+        document.getElementById('btn-professional-logout').addEventListener('click', () => {
+            localStorage.removeItem('slimo_token');
+            showScreen('screen-login');
+        });
+    }
+
+    // ==========================================================
+    // ACOMPANHAMENTO PROFISSIONAL - DIÁLOGO DO PACIENTE (PERFIL)
+    // ==========================================================
+    async function renderUserProfessionalSettings() {
+        const area = document.getElementById('professional-status-area');
+        if (!area) return;
+
+        if (!state.user || !state.user.isPremiumActive) {
+            area.innerHTML = `
+                <p class="settings-description">Faça o upgrade para o plano Premium para vincular seu nutricionista e personal trainer.</p>
+                <button class="btn-primary w-full" id="btn-upgrade-premium">Upgrade para Premium</button>
+            `;
+            document.getElementById('btn-upgrade-premium').addEventListener('click', simulatePremiumPayment);
+            return;
+        }
+
+        const token = localStorage.getItem('slimo_token');
+        try {
+            const prosRes = await fetch(`${API_URL}/user/available-professionals`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!prosRes.ok) throw new Error('Falha ao buscar profissionais.');
+            const professionals = await prosRes.json();
+
+            const nutritionists = professionals.filter(p => p.role === 'nutritionist');
+            const trainers = professionals.filter(p => p.role === 'trainer');
+
+            const feedbackRes = await fetch(`${API_URL}/user/professional-feedbacks`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const feedbacks = feedbackRes.ok ? await feedbackRes.json() : [];
+
+            area.innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+                    <div>
+                        <label style="font-size:12px; opacity:0.8;">Vincular Nutricionista</label>
+                        <div style="display:flex; gap:8px; margin-top:4px;">
+                            <select id="select-link-nutri" style="flex:1; font-size:12px; padding:8px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff;">
+                                <option value="">Selecione um Nutricionista...</option>
+                                ${nutritionists.map(n => `<option value="${n.id}">${n.name}</option>`).join('')}
+                            </select>
+                            <button class="btn-primary" id="btn-save-link-nutri" style="padding:0 12px; font-size:12px; height:auto; border-radius:8px;">Vincular</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:12px; opacity:0.8;">Vincular Personal Trainer</label>
+                        <div style="display:flex; gap:8px; margin-top:4px;">
+                            <select id="select-link-trainer" style="flex:1; font-size:12px; padding:8px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff;">
+                                <option value="">Selecione um Personal...</option>
+                                ${trainers.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+                            </select>
+                            <button class="btn-primary" id="btn-save-link-trainer" style="padding:0 12px; font-size:12px; height:auto; border-radius:8px;">Vincular</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider-line"></div>
+                <h4 style="margin-top:12px; margin-bottom:8px;">Orientações Recebidas</h4>
+                <div id="professional-feedbacks-list" style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto;">
+                    ${feedbacks.length === 0 ? '<p style="font-size:11px; opacity:0.5; text-align:center; padding:12px;">Nenhuma orientação recebida ainda.</p>' : feedbacks.map(f => `
+                        <div class="history-day-card" style="padding:10px; font-size:12px;">
+                            <div style="display:flex; justify-content:between; margin-bottom:4px;">
+                                <strong>${f.professional_name} (${f.type === 'nutritionist' ? 'Nutri' : 'Personal'})</strong>
+                                <span style="font-size:10px; opacity:0.5; margin-left:auto;">${new Date(f.created_at).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                            <p style="opacity:0.9; line-height:1.4;">${f.content}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            document.getElementById('btn-save-link-nutri').addEventListener('click', async () => {
+                const val = document.getElementById('select-link-nutri').value;
+                if (!val) return alert('Selecione um nutricionista.');
+                await linkProfessional(val, 'nutritionist');
+            });
+
+            document.getElementById('btn-save-link-trainer').addEventListener('click', async () => {
+                const val = document.getElementById('select-link-trainer').value;
+                if (!val) return alert('Selecione um personal trainer.');
+                await linkProfessional(val, 'trainer');
+            });
+
+        } catch (err) {
+            console.error('Erro ao renderizar acompanhamento profissional no perfil:', err);
+        }
+    }
+
+    async function linkProfessional(proId, type) {
+        const token = localStorage.getItem('slimo_token');
+        try {
+            const res = await fetch(`${API_URL}/user/link-professional`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ professional_id: proId, type })
+            });
+            if (!res.ok) throw new Error('Não foi possível vincular o profissional.');
+            alert('Profissional vinculado com sucesso!');
+            renderUserProfessionalSettings();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    async function simulatePremiumPayment() {
+        const token = localStorage.getItem('slimo_token');
+        if (!token) return;
+
+        if (confirm("Você será redirecionado para a simulação de pagamento via Mercado Pago/Asaas (PIX). Confirmar upgrade premium por 30 dias?")) {
+            try {
+                const res = await fetch(`${API_URL}/payments/mercadopago-webhook`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'payment.created',
+                        type: 'payment',
+                        payer_email: state.user.email,
+                        data: { id: 'payment_' + Date.now(), email: state.user.email }
+                    })
+                });
+
+                if (res.ok) {
+                    alert("Pagamento PIX Aprovado com Sucesso! Sua assinatura Premium de 30 dias está ativa.");
+                    await initApp();
+                } else {
+                    alert("Falha na simulação de pagamento.");
+                }
+            } catch (err) {
+                console.error("Erro na simulação do pagamento:", err);
+            }
+        }
     }
 
     function getTodayDateString() {
@@ -263,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', () => {
         targetScreen.classList.add('active');
 
         // Exibição do Bottom Nav
-        const noNavScreens = ['screen-onboarding', 'screen-scanner', 'screen-results', 'screen-food-search'];
+        const noNavScreens = ['screen-login', 'screen-onboarding', 'screen-scanner', 'screen-results', 'screen-food-search', 'screen-professional', 'screen-admin'];
         if (noNavScreens.includes(screenId)) {
             nav.style.display = 'none';
         } else {
@@ -294,6 +1108,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (screenId === 'screen-settings') {
             renderSettingsPage();
+            renderUserProfessionalSettings();
+        }
+        if (screenId === 'screen-professional') {
+            renderProfessionalPanel();
+        }
+        if (screenId === 'screen-admin') {
+            renderAdminPanel();
         }
     }
 
@@ -1542,6 +2363,7 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
         state.fastingDurationGoal = parseInt(e.target.value);
         localStorage.setItem('slimo_fasting_goal', state.fastingDurationGoal);
         renderFastingScreen();
+        saveFastingToAPI(state.fastingActive);
     });
 
     btnToggleFasting.addEventListener('click', () => {
@@ -1553,6 +2375,7 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
             localStorage.setItem('slimo_fasting_start_time', state.fastingStartTime.toISOString());
             
             startFastingTimer();
+            saveFastingToAPI(true);
             alert("Jejum iniciado! Mantenha o foco!");
         } else {
             // Interrompe Jejum
@@ -1567,6 +2390,7 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
                     state.fastingInterval = null;
                 }
                 
+                saveFastingToAPI(false);
                 alert("Jejum encerrado com sucesso!");
             }
         }
@@ -2352,8 +3176,10 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n�
                 item.querySelector('.meal-delete-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (confirm("Remover esta refeição?")) {
+                        const mealId = meal.id;
                         state.mealsLog = state.mealsLog.filter(m => m.id !== meal.id);
                         saveMealsToLocalStorage();
+                        deleteMealFromAPI(mealId);
                         updateDashboard();
                     }
                 });
@@ -2514,6 +3340,7 @@ Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (n�
             state.waterConsumed = 0;
             localStorage.setItem('slimo_water_consumed', 0);
             updateWaterWidget();
+            saveWaterToAPI();
         });
 
         // Scanner triggers

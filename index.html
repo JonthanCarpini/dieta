@@ -18,6 +18,9 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
+
+    <!-- Google Identity Services (Login Social) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="dark-theme">
     
@@ -25,9 +28,53 @@
     <div class="app-container">
         
         <!-- ========================================== -->
+        <!-- 0. TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) -->
+        <!-- ========================================== -->
+        <section id="screen-login" class="screen active">
+            <div class="welcome-header">
+                <div class="logo-badge">Slimo <span class="ai-pill">AI</span></div>
+                <h1>Pronto para focar?</h1>
+                <p>Faça login ou crie sua conta para salvar seus dados na nuvem.</p>
+            </div>
+            
+            <div class="scrollable-content login-body">
+                <form id="login-form" class="auth-form">
+                    <!-- Campo de Nome (exibido apenas no modo de cadastro) -->
+                    <div class="form-group hidden" id="group-auth-name">
+                        <label for="login-name">Seu Nome</label>
+                        <input type="text" id="login-name" placeholder="Ex: João Silva">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-email">E-mail</label>
+                        <input type="email" id="login-email" placeholder="nome@exemplo.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Senha</label>
+                        <input type="password" id="login-password" placeholder="Sua senha" required>
+                    </div>
+                    <button type="submit" class="btn-primary w-full" id="btn-auth-submit">ENTRAR</button>
+                </form>
+
+                <div class="auth-toggle-row">
+                    <span id="lbl-auth-toggle-text">Não tem uma conta?</span>
+                    <button class="btn-text-only" id="btn-toggle-auth-mode">Criar Conta</button>
+                </div>
+
+                <div class="auth-divider">
+                    <span>ou</span>
+                </div>
+
+                <!-- Botão de Login Social do Google -->
+                <div class="google-signin-wrapper">
+                    <div id="google-login-btn"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
         <!-- 1. TELA DE ONBOARDING (METAS SOB MEDIDA)  -->
         <!-- ========================================== -->
-        <section id="screen-onboarding" class="screen active">
+        <section id="screen-onboarding" class="screen">
             <div class="welcome-header">
                 <div class="logo-badge">Slimo <span class="ai-pill">AI</span></div>
                 <h1>Crie seu plano de metas sob medida.</h1>
@@ -697,6 +744,19 @@
                     </button>
                 </div>
 
+                <!-- Acompanhamento Profissional -->
+                <div class="settings-card" id="premium-professional-card">
+                    <div class="card-header-icon border-gemini">
+                        <i data-lucide="users" class="text-gemini"></i>
+                        <h3>Acompanhamento Profissional</h3>
+                    </div>
+                    <div id="professional-status-area">
+                        <!-- Será preenchido via JS baseado se é Premium ou Trial -->
+                        <p class="settings-description">Faça o upgrade para o plano Premium para vincular seu nutricionista e personal trainer.</p>
+                        <button class="btn-primary w-full" id="btn-upgrade-premium">Upgrade para Premium</button>
+                    </div>
+                </div>
+
                 <!-- Limpeza de dados -->
                 <div class="settings-card danger-zone">
                     <h3>Zona de Risco</h3>
@@ -705,6 +765,88 @@
                         <i data-lucide="trash-2"></i>
                         Resetar Todos os Dados
                     </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 9. TELA DE PROFISSIONAIS (NUTRI / PERSONAL) -->
+        <!-- ========================================== -->
+        <section id="screen-professional" class="screen">
+            <header class="scanner-header">
+                <div class="user-greeting">
+                    <span class="date-today" id="professional-role-badge">Nutricionista</span>
+                    <h2 id="professional-welcome-text">Painel do Profissional</h2>
+                </div>
+                <button class="icon-btn" id="btn-professional-logout" title="Sair"><i data-lucide="log-out"></i></button>
+            </header>
+
+            <div class="scrollable-content professional-content">
+                <div class="stats-overview-card">
+                    <h4>Seus Pacientes Vinculados</h4>
+                    <p class="settings-description" style="font-size:12px; margin-top:4px;">Selecione um paciente para ver o diário alimentar completo e prescrever orientações.</p>
+                </div>
+
+                <div class="patients-list-section margin-top-lg">
+                    <div class="patients-list" id="professional-patients-container" style="display:flex; flex-direction:column; gap:12px;">
+                        <!-- Injetado via JS -->
+                        <div class="empty-state">
+                            <p>Nenhum paciente vinculado ao seu painel.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 10. TELA DE ADMINISTRADOR (ADMIN)         -->
+        <!-- ========================================== -->
+        <section id="screen-admin" class="screen">
+            <header class="scanner-header">
+                <div class="user-greeting">
+                    <span class="date-today">Painel de Controle</span>
+                    <h2>Administração Geral</h2>
+                </div>
+                <button class="icon-btn" id="btn-admin-logout" title="Sair"><i data-lucide="log-out"></i></button>
+            </header>
+
+            <div class="scrollable-content admin-content">
+                <!-- Ações rápidas de Admin -->
+                <div class="settings-card">
+                    <div class="card-header-icon border-profile">
+                        <i data-lucide="user-plus" class="text-profile"></i>
+                        <h3>Cadastrar Novo Profissional</h3>
+                    </div>
+                    <form id="admin-register-pro-form" class="margin-top-md" style="display:flex; flex-direction:column; gap:12px;">
+                        <div class="form-group">
+                            <label for="admin-pro-name">Nome Completo</label>
+                            <input type="text" id="admin-pro-name" placeholder="Ex: Dr. Carlos Nutri" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-pro-email">E-mail</label>
+                            <input type="email" id="admin-pro-email" placeholder="carlos@nutrir.online" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-pro-password">Senha Provisória</label>
+                            <input type="password" id="admin-pro-password" placeholder="Senha provisória" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-pro-role">Cargo do Profissional</label>
+                            <select id="admin-pro-role" required>
+                                <option value="nutritionist">Nutricionista</option>
+                                <option value="trainer">Personal Trainer</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary w-full margin-top-md">Cadastrar Profissional</button>
+                    </form>
+                </div>
+
+                <!-- Lista de Usuários do Sistema -->
+                <div class="settings-card margin-top-lg">
+                    <h3>Usuários Cadastrados</h3>
+                    <div class="admin-users-list" id="admin-users-container" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+                        <!-- Injetado via JS -->
+                    </div>
                 </div>
             </div>
         </section>
@@ -1003,6 +1145,58 @@
             <div class="modal-footer flex-column">
                 <button class="btn-primary w-full" id="btn-save-modal-item">SALVAR ALTERAÇÕES</button>
                 <button class="btn-danger w-full margin-top-md" id="btn-delete-modal-item">EXCLUIR ITEM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes do Paciente (Para Nutricionista / Personal) -->
+    <div class="modal-overlay" id="patient-diary-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="patient-modal-name">Nome do Paciente</h3>
+                <button class="icon-btn" id="btn-close-patient-modal"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body scrollable-modal-content" style="display:flex; flex-direction:column; gap:16px;">
+                <!-- Resumo dos Macros de Hoje do Paciente -->
+                <div class="stats-overview-card" style="padding:12px;">
+                    <h4 style="margin-bottom:8px;">Ingestão de Hoje</h4>
+                    <div class="target-stats-grid" style="grid-template-columns: repeat(4, 1fr); gap:8px;">
+                        <div class="t-stat">
+                            <span class="t-val" id="patient-cal-summary" style="font-size:14px;">0 kcal</span>
+                            <span class="t-lbl">Calorias</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val" id="patient-prot-summary" style="font-size:14px;">0g</span>
+                            <span class="t-lbl">Prot</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val" id="patient-carbs-summary" style="font-size:14px;">0g</span>
+                            <span class="t-lbl">Carbo</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val" id="patient-fat-summary" style="font-size:14px;">0g</span>
+                            <span class="t-lbl">Gord</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Diário Alimentar do Paciente -->
+                <div>
+                    <h4 style="margin-bottom:6px;">Histórico de Refeições</h4>
+                    <div class="meals-list" id="patient-meals-list" style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+                        <!-- Injetado via JS -->
+                    </div>
+                </div>
+
+                <!-- Enviar Orientação / Mensagem -->
+                <div class="form-group">
+                    <label for="input-patient-feedback">Prescrever Orientação / Feedback</label>
+                    <textarea id="input-patient-feedback" rows="4" placeholder="Digite as novas orientações, metas ou feedback para a semana..." style="width:100%; border-radius:12px; padding:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#fff; font-family:inherit; font-size:13px; resize:none;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-cancel-patient-feedback">Cancelar</button>
+                <button class="btn-primary" id="btn-save-patient-feedback">Enviar Orientação</button>
             </div>
         </div>
     </div>
