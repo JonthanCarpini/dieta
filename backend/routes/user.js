@@ -384,6 +384,35 @@ router.get('/professionals/:id/availability', async (req, res) => {
   }
 });
 
+// Obter consultas agendadas de um profissional em uma data específica (horários ocupados)
+router.get('/professionals/:id/busy-slots', async (req, res) => {
+  if (req.user.isPlanExpired) {
+    return res.status(403).json({ error: 'Sua assinatura expirou.' });
+  }
+  const professionalId = parseInt(req.params.id);
+  const { date } = req.query; // YYYY-MM-DD
+
+  if (!date) {
+    return res.status(400).json({ error: 'Data não informada.' });
+  }
+
+  try {
+    const result = await db.query(
+      `SELECT start_time, end_time FROM appointments 
+       WHERE professional_id = $1 
+         AND appointment_date = $2 
+         AND status = 'scheduled'
+       ORDER BY start_time`,
+      [professionalId, date]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar horários ocupados do profissional.' });
+  }
+});
+
 // Agendar consulta (video chamada)
 router.post('/appointments', async (req, res) => {
   if (req.user.isPlanExpired) {

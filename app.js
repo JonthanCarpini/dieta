@@ -1181,6 +1181,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const appointments = appRes.ok ? await appRes.json() : [];
+            state.myAppointments = appointments;
 
             // 4. Renderiza profissionais vinculados
             const listContainer = document.getElementById('my-pros-linked-list');
@@ -1216,7 +1217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span style="font-size:11px; opacity:0.6; display:block; margin-top:2px;">${roleLabel}</span>
                                 <span style="font-size:11px; opacity:0.4;">${p.email}</span>
                             </div>
-                            <button class="btn-primary btn-book-appointment-trigger" data-pro-id="${p.id}" data-pro-name="${p.name}" style="font-size:11px; padding:6px 12px; height:auto; border-radius:8px;">
+                            <button class="btn-primary btn-book-appointment-trigger" data-pro-id="${p.id}" data-pro-name="${p.name}" data-pro-role="${p.role}" style="font-size:11px; padding:6px 12px; height:auto; border-radius:8px;">
                                 <i data-lucide="video" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i>
                                 Agendar
                             </button>
@@ -1232,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     card.querySelector('.btn-book-appointment-trigger').addEventListener('click', (e) => {
                         const target = e.currentTarget;
-                        openBookAppointmentModal(target.dataset.proId, target.dataset.proName);
+                        openBookAppointmentModal(target.dataset.proId, target.dataset.proName, target.dataset.proRole);
                     });
 
                     listContainer.appendChild(card);
@@ -1321,13 +1322,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function openBookAppointmentModal(proId, proName) {
+    async function openBookAppointmentModal(proId, proName, proRole) {
         document.getElementById('book-appointment-pro-id').value = proId;
         document.getElementById('book-appointment-pro-info').innerText = `Agende uma consulta por vídeo com ${proName}.`;
         
+        // 1. Exibir informações de cotas do plano para o tipo de profissional
+        const quotaInfoContainer = document.getElementById('book-appointment-quota-info');
+        if (quotaInfoContainer) {
+            const roleLabel = proRole === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+            const limit = proRole === 'nutritionist' 
+              ? (state.user.max_nutritionist_appointments_per_month || 0) 
+              : (state.user.max_trainer_appointments_per_month || 0);
+
+            const appointments = state.myAppointments || [];
+            const nowObj = new Date();
+            const currentYear = nowObj.getFullYear();
+            const currentMonth = nowObj.getMonth();
+
+            const activeThisMonth = appointments.filter(app => {
+                if (app.status === 'cancelled') return false;
+                if (app.professional_role !== proRole) return false;
+                
+                const appDate = new Date(app.appointment_date);
+                return appDate.getFullYear() === currentYear && appDate.getMonth() === currentMonth;
+            }).length;
+
+            const remaining = Math.max(0, limit - activeThisMonth);
+
+            quotaInfoContainer.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
+                    <span style="opacity:0.7;">Direito no Plano (${roleLabel}):</span>
+                    <strong>${limit} consultas/mês</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
+                    <span style="opacity:0.7;">Consultas Usadas no Mês Atual:</span>
+                    <strong>${activeThisMonth}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.05); padding-top:4px; margin-top:4px;">
+                    <span style="opacity:0.7;">Restantes:</span>
+                    <strong style="color:${remaining > 0 ? '#22c55e' : '#ef4444'};">${remaining}</strong>
+                </div>
+            `;
+        }
+
         const todayStr = getTodayDateString();
-        document.getElementById('book-appointment-date').value = todayStr;
-        document.getElementById('book-appointment-date').min = todayStr;
+        const dateInput = document.getElementById('book-appointment-date');
+        dateInput.value = todayStr;
+        dateInput.min = todayStr;
 
         document.getElementById('book-appointment-start').value = '';
         document.getElementById('book-appointment-end').value = '';
@@ -1342,6 +1383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!res.ok) throw new Error('Falha ao buscar agenda do profissional.');
             const slots = await res.json();
+            state.currentProSlots = slots;
 
             slotsContainer.innerHTML = '';
             if (slots.length === 0) {
@@ -1364,6 +1406,73 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             slotsContainer.innerHTML = `<p style="font-size:11px; opacity:0.5; color:#ef4444;">${err.message}</p>`;
         }
+
+        // Configuração reativa para o dia e horários de agendamento do profissional
+        const updateAvailabilityForSelectedDate = async () => {
+            const selectedDate = dateInput.value;
+            if (!selectedDate) return;
+
+            const dateParts = selectedDate.split('-');
+            const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+            const dayOfWeek = dateObj.getDay();
+
+            const daySlots = (state.currentProSlots || []).filter(slot => slot.day_of_week === dayOfWeek);
+            const detailContainer = document.getElementById('book-appointment-date-details');
+            if (!detailContainer) return;
+
+            if (daySlots.length === 0) {
+                detailContainer.innerHTML = `
+                    <div style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); padding:10px; border-radius:8px; font-size:12px; margin-top:10px;">
+                        <strong>Indisponível:</strong> Este profissional não atende neste dia da semana.
+                    </div>
+                `;
+                return;
+            }
+
+            detailContainer.innerHTML = '<p style="font-size:11px; opacity:0.5; margin-top:10px;">Buscando agendamentos do dia...</p>';
+            try {
+                const busyRes = await fetch(`${API_URL}/user/professionals/${proId}/busy-slots?date=${selectedDate}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const busySlots = busyRes.ok ? await busyRes.json() : [];
+
+                let slotsHtml = daySlots.map(slot => `
+                    <div style="margin-bottom:4px;">
+                        • ${slot.start_time.slice(0, 5)} às ${slot.end_time.slice(0, 5)}
+                    </div>
+                `).join('');
+
+                let busyHtml = '<span style="color:#22c55e;">Nenhuma consulta agendada neste dia (Livre).</span>';
+                if (busySlots.length > 0) {
+                    busyHtml = busySlots.map(busy => `
+                        <div style="background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.1); color:#ef4444; display:inline-block; padding:3px 8px; border-radius:6px; font-size:11px; margin-right:6px; margin-top:4px;">
+                            ${busy.start_time.slice(0, 5)} - ${busy.end_time.slice(0, 5)}
+                        </div>
+                    `).join('');
+                }
+
+                detailContainer.innerHTML = `
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:8px; font-size:12px; margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                        <div>
+                            <span style="opacity:0.6; display:block; margin-bottom:4px; font-size:10px; font-weight:600; text-transform:uppercase;">Janelas de Atendimento:</span>
+                            <div style="font-weight:600;">${slotsHtml}</div>
+                        </div>
+                        <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:8px;">
+                            <span style="opacity:0.6; display:block; margin-bottom:4px; font-size:10px; font-weight:600; text-transform:uppercase;">Agendados (Indisponíveis):</span>
+                            <div>${busyHtml}</div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                detailContainer.innerHTML = `<p style="font-size:11px; opacity:0.5; color:#ef4444; margin-top:10px;">${err.message}</p>`;
+            }
+        };
+
+        dateInput.removeEventListener('change', updateAvailabilityForSelectedDate);
+        dateInput.addEventListener('change', updateAvailabilityForSelectedDate);
+        
+        // Dispara uma vez inicial após obter os horários de atendimento da semana
+        setTimeout(updateAvailabilityForSelectedDate, 500);
 
         document.getElementById('modal-book-appointment').classList.add('active');
     }
