@@ -159,6 +159,15 @@ A plataforma é orquestrada por completo usando Docker Compose na VPS (`178.238.
 
 * **Idioma Obrigatório**: Todas as documentações (`.md`), comentários no código, mensagens de erro, logs do terminal e, principalmente, **mensagens de commits do Git DEVEM obrigatoriamente ser escritos em português (Brasil)**. commits em outros idiomas não serão aceitos.
 
+* **Sistema de Design — Obsidian**: O layout visual de todo o projeto segue o **design system Obsidian** definido na pasta `Nutrir/`. Os tokens principais são:
+  - Cor de fundo: `#0a0a0c`
+  - Acento âmbar: `#f5c14d` (primário) / `#e0a13a` (hover)
+  - Texto principal: `#f4f1ec`; texto secundário: `rgba(244,241,236,0.45)`
+  - Cards glass: `background: rgba(255,250,240,0.04)`, `border: rgba(255,250,240,0.08)`, `backdrop-filter: blur(20px)`
+  - Fontes: `Geist` (sans) e `Geist Mono` (numérico/mono) — carregadas via Google Fonts
+  - Grain de fundo ativo por padrão via pseudo-elemento `::after` no `body` / `app-container`
+  - Não alterar os nomes de classe existentes no HTML (`screen-dashboard`, `calorie-card`, etc.) — apenas os estilos CSS são substituídos.
+
 * **Fluxo Obrigatório Pós-Alteração**: Ao finalizar qualquer conjunto de alterações no projeto, o seguinte fluxo DEVE ser executado obrigatoriamente, nesta ordem:
 
   1. **Commit Git** — Criar um commit descritivo com todas as alterações realizadas:
