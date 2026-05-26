@@ -158,21 +158,32 @@ Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais:
 **Profissionais**:
 - **Meus Pacientes**: Lista, diário recente e envio de feedbacks.
 - **Faturamento**: Comissões acumuladas e pacientes ativos.
-- **Agenda**: Configuração de disponibilidade semanal via `professional_availability`.
+- **Agenda**: Grade visual interativa de disponibilidade semanal (ver seção abaixo).
 - **Aba Consultas**: Acompanhamento de todas as videochamadas agendadas por seus pacientes vinculados e opção de cancelamento.
 
-### F. Tela de Análise Nutricional (Scanner)
+### F. Agenda de Disponibilidade (Profissional) — Grade Visual
+
+A aba **Minha Agenda** do painel profissional usa uma grade clicável 7×28 (dias × slots de 30 min, 07h–20h30):
+
+- **Interação**: clique para alternar livre/bloqueado; arraste para selecionar múltiplos slots de uma vez; botão no cabeçalho de cada coluna alterna o dia inteiro.
+- **Presets**: "Dias Úteis 8h–18h", "Semana Completa 8h–18h", "Limpar Tudo".
+- **Contador ao vivo**: exibe quantos slots estão selecionados e total de horas/semana.
+- **Persistência no banco**: o backend (`POST /api/admin/availability`) expande cada intervalo recebido em slots individuais de 30 minutos antes de inserir em `professional_availability`. Ex: `08:00–10:00` gera 4 linhas: `08:00–08:30`, `08:30–09:00`, `09:00–09:30`, `09:30–10:00`.
+- **Motivo**: cada linha no banco representa exatamente 1 vaga de consulta de 30 minutos, permitindo que o frontend de agendamento exiba slots individuais diretamente.
+- **Validação de agendamento**: ao criar uma consulta, o backend normaliza os horários para `HH:MM` (`.substring(0,5)`) antes de comparar com os slots do banco — necessário porque o PostgreSQL retorna colunas `time` no formato `HH:MM:SS`.
+
+### G. Tela de Análise Nutricional (Scanner)
 A tela `screen-results` exibe após análise de imagem:
 - **Card de calorias**: Total em âmbar + barra de progresso vs meta diária (fica vermelha acima de 90%).
 - **Card de macros**: Barras horizontais para Proteína (verde), Carboidratos (azul) e Gordura (laranja) mostrando valor atual vs meta diária com percentual.
 - **Cards de alimentos**: Nome + kcal em âmbar no topo; badge de peso + tags coloridas (P/C/G/Fibra) embaixo. Clicável para edição.
 - **Compressão de imagem**: Frontend redimensiona para max 900px e comprime em JPEG 0.80 antes de enviar — câmera e upload de arquivo. Botão "Analisar" fica bloqueado com "Processando..." durante o resize (evita race condition).
 
-### G. Tela Diário (Dashboard)
+### H. Tela Diário (Dashboard)
 - **Painel de macros**: substituiu o grid de 3 colunas por um card único com 3 linhas horizontais — nome + barra de progresso + `consumido/meta g`. Todos os valores arredondados (`Math.round`).
 - **Refeições expandíveis**: clicar no cabeçalho ou no botão chevron revela a lista de alimentos individuais com peso e calorias. Tags coloridas P/C/G em cada refeição.
 
-### H. Tela Histórico
+### I. Tela Histórico
 - **Card de meta**: badge com o objetivo do usuário (`Emagrecer` / `Ganhar Massa` / `Manutenção`); macros com cores por tipo.
 - **Cards de dia**: nome do dia + data, calorias com cor semântica (verde = 85–105% da meta, azul = abaixo, vermelho = acima), barra de progresso, tags P/C/G e botão expandir para ver refeições individuais do dia com horário e macros.
 
