@@ -334,6 +334,8 @@ router.get('/professional-feedbacks', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar feedbacks de profissionais.' });
   }
+});
+
 // ==========================================
 // 7. CONSULTAS E AGENDAMENTOS (VIDEO CHAMADAS)
 // ==========================================
