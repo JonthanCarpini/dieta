@@ -764,10 +764,16 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
 
 /* Corner + header */
 .sg-corner {
-    width: 52px;
+    width: 56px;
     background: rgba(255,250,240,0.03);
     border-bottom: 1px solid var(--color-border);
     border-right: 1px solid var(--color-border);
+    font-size: 9px;
+    font-family: var(--font-mono);
+    color: var(--color-text-subtle);
+    text-align: center;
+    vertical-align: bottom;
+    padding-bottom: 6px;
 }
 
 .sg-day-header {
@@ -814,35 +820,47 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
 
 /* Time labels */
 .sg-time-label {
-    width: 52px;
+    width: 56px;
     padding: 0 8px 0 0;
-    font-size: 9.5px;
+    font-size: 10px;
     font-family: var(--font-mono);
     color: var(--color-text-subtle);
     text-align: right;
     background: rgba(255,250,240,0.015);
     border-right: 1px solid var(--color-border);
     white-space: nowrap;
-    vertical-align: top;
-    padding-top: 2px;
+    vertical-align: middle;
+}
+.sg-hour-mark .sg-time-label {
+    color: var(--color-text-muted);
+    font-weight: 600;
 }
 
-/* Rows */
-.sg-row    { height: 15px; }
-.sg-hour-mark { height: 18px; border-top: 1px solid rgba(255,250,240,0.07); }
+/* Rows — each row = 1 consulta de 30 min */
+.sg-row       { height: 32px; border-bottom: 1px solid rgba(255,250,240,0.04); }
+.sg-hour-mark { height: 34px; border-top: 2px solid rgba(255,250,240,0.09); }
 
 /* Cells */
 .sg-cell {
-    border-right: 1px solid rgba(255,250,240,0.04);
-    border-bottom: 1px solid rgba(255,250,240,0.02);
+    border-right: 1px solid rgba(255,250,240,0.05);
     cursor: crosshair;
     transition: background 0.08s;
-}
-.sg-row:not(.sg-hour-mark) .sg-cell {
-    border-bottom-style: dashed;
+    position: relative;
 }
 .sg-cell:hover:not(.sg-selected) {
     background: rgba(245,193,77,0.10);
+}
+.sg-cell:hover::after {
+    content: attr(data-time);
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-family: var(--font-mono);
+    color: var(--color-text-subtle);
+    white-space: nowrap;
+    pointer-events: none;
 }
 .sg-cell.sg-selected {
     background: rgba(245,193,77,0.28);
@@ -850,6 +868,9 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
 }
 .sg-cell.sg-selected:hover {
     background: rgba(245,193,77,0.40);
+}
+.sg-cell.sg-selected::after {
+    color: rgba(245,193,77,0.6);
 }
 
 /* ── LLM Provider Selector ── */

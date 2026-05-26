@@ -1307,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<td class="sg-cell${sel ? ' sg-selected' : ''}" data-key="${key}" data-dow="${d.dow}" data-time="${t}"></td>`;
             }).join('');
             return `<tr class="sg-row${isHour ? ' sg-hour-mark' : ''}">
-                <td class="sg-time-label">${isHour ? t : ''}</td>${tds}
+                <td class="sg-time-label">${t}</td>${tds}
             </tr>`;
         }).join('');
 
@@ -1325,15 +1325,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="sched-info" id="sched-info"></span>
             </div>
             <div class="sg-legend">
-                <span class="sg-legend-item sg-legend-free">Disponível</span>
+                <span class="sg-legend-item sg-legend-free">Disponível (1 consulta)</span>
                 <span class="sg-legend-item sg-legend-blocked">Bloqueado</span>
-                <span class="sg-legend-hint">Clique para alternar · Arraste para selecionar múltiplos</span>
+                <span class="sg-legend-hint">Cada linha = 1 consulta de 30 min · Clique ou arraste para alternar</span>
             </div>
             <div class="sg-scroll-wrap">
                 <table class="sg-table" id="sg-table" cellspacing="0" cellpadding="0">
                     <thead>
                         <tr>
-                            <th class="sg-corner"></th>
+                            <th class="sg-corner">30min</th>
                             ${headerCells}
                         </tr>
                     </thead>
