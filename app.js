@@ -3526,23 +3526,26 @@ document.addEventListener('DOMContentLoaded', () => {
         
         fileUploader.addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file) {
-                uploadFilename.innerText = file.name;
-                btnAnalyzeUpload.removeAttribute('disabled');
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const tmpCanvas = document.createElement('canvas');
-                        tmpCanvas.width  = img.width;
-                        tmpCanvas.height = img.height;
-                        tmpCanvas.getContext('2d').drawImage(img, 0, 0);
-                        state.currentCapturedImage = resizeImageToBase64(tmpCanvas);
-                    };
-                    img.src = event.target.result;
+            if (!file) return;
+            uploadFilename.innerText = file.name;
+            btnAnalyzeUpload.setAttribute('disabled', 'true');
+            btnAnalyzeUpload.innerText = 'Processando...';
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const tmpCanvas = document.createElement('canvas');
+                    tmpCanvas.width  = img.width;
+                    tmpCanvas.height = img.height;
+                    tmpCanvas.getContext('2d').drawImage(img, 0, 0);
+                    state.currentCapturedImage = resizeImageToBase64(tmpCanvas);
+                    btnAnalyzeUpload.removeAttribute('disabled');
+                    btnAnalyzeUpload.innerText = 'Analisar Foto';
                 };
-                reader.readAsDataURL(file);
-            }
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
         });
 
         btnAnalyzeUpload.addEventListener('click', () => {
