@@ -2012,39 +2012,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const carbsRemaining = Math.max(10, profile.targetCarbs - carbsConsumed);
             const fatRemaining = Math.max(5, profile.targetFat - fatConsumed);
 
-            if (state.geminiApiKey && state.geminiApiKey.trim() !== '') {
-                try {
-                    if (period === 'daily') {
-                        loaderStatus.innerText = `Gemini gerando uma receita de ${mealType === 'all' ? 'qualquer tipo' : mealType} de ${calRemaining} kcal...`;
-                        const generatedRecipe = await callGeminiForDailyRecipe(mealType, calRemaining, protRemaining, carbsRemaining, fatRemaining);
-                        
-                        state.savedAiRecipes.push(generatedRecipe);
-                        saveAiRecipesToLocalStorage();
-                        renderSavedAiRecipes();
-                        
-                        loader.classList.add('hidden');
-                        openRecipeDetailModal(generatedRecipe);
-                    } else {
-                        loaderStatus.innerText = `Gemini gerando um plano semanal (7 dias de receitas) adaptado para ${profile.targetCalories} kcal/dia...`;
-                        const generatedPlan = await callGeminiForWeeklyPlan(mealType, profile);
-                        
-                        state.savedWeeklyPlans.push(generatedPlan);
-                        saveWeeklyPlansToLocalStorage();
-                        renderSavedWeeklyPlans();
-                        
-                        loader.classList.add('hidden');
-                        alert("Plano semanal gerado com sucesso! Clique no plano abaixo para expandir e acessar as receitas de cada dia.");
-                    }
-                } catch (err) {
-                    console.error("Erro na geração por IA real: ", err);
-                    alert("Falha de conexão com a IA. Mostrando receitas simuladas.");
-                    runMockGeneration(mealType, period, profile, calRemaining, protRemaining, carbsRemaining, fatRemaining);
+            try {
+                if (period === 'daily') {
+                    loaderStatus.innerText = `IA gerando uma receita de ${mealType === 'all' ? 'qualquer tipo' : mealType} de ${calRemaining} kcal...`;
+                    const generatedRecipe = await callGeminiForDailyRecipe(mealType, calRemaining, protRemaining, carbsRemaining, fatRemaining);
+                    state.savedAiRecipes.push(generatedRecipe);
+                    saveAiRecipesToLocalStorage();
+                    renderSavedAiRecipes();
                     loader.classList.add('hidden');
+                    openRecipeDetailModal(generatedRecipe);
+                } else {
+                    loaderStatus.innerText = `IA gerando um plano semanal adaptado para ${profile.targetCalories} kcal/dia...`;
+                    const generatedPlan = await callGeminiForWeeklyPlan(mealType, profile);
+                    state.savedWeeklyPlans.push(generatedPlan);
+                    saveWeeklyPlansToLocalStorage();
+                    renderSavedWeeklyPlans();
+                    loader.classList.add('hidden');
+                    alert("Plano semanal gerado com sucesso! Clique no plano abaixo para expandir e acessar as receitas de cada dia.");
                 }
-            } else {
-                // Mock modo demonstração
-                loaderStatus.innerText = "Modo Demo: Simulando geração inteligente com IA...";
-                await new Promise(resolve => setTimeout(resolve, 2000));
+            } catch (err) {
+                console.error("Erro na geração por IA: ", err);
+                const errMsg = err.message.includes('configurada') ? err.message : "IA indisponível. Exibindo receitas de demonstração.";
+                alert(errMsg);
                 runMockGeneration(mealType, period, profile, calRemaining, protRemaining, carbsRemaining, fatRemaining);
                 loader.classList.add('hidden');
             }
@@ -2052,44 +2041,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function callGeminiForDailyRecipe(mealType, cal, p, c, f) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`;
-        const mealTypeStr = mealType === 'all' ? 'qualquer tipo de refeição saudável' : `refeição do tipo: ${mealType}`;
-        const prompt = `Você é um chef e nutricionista experiente. Crie uma receita saudável, rápida e realista em português para ser consumida como ${mealTypeStr}.
-A receita deve utilizar aproximadamente o seguinte limite nutricional:
-- Calorias: ${cal} kcal
-- Proteínas: ${p}g
-- Carboidratos: ${c}g
-- Gorduras: ${f}g
-
-Responda ESTRITAMENTE em formato JSON puro (sem formatar bloco de código markdown como \`\`\`json, apenas a string JSON limpa e direta) contendo os seguintes campos:
-{
-  "name": "Nome descritivo e gostoso da receita",
-  "time_min": 15,
-  "calories": 320,
-  "protein": 24,
-  "carbs": 30,
-  "fat": 8,
-  "ingredients": [
-    { "name": "Nome exato do ingrediente", "amount": 100, "unit": "g" }
-  ],
-  "directions": "Modo de preparo passo a passo resumido."
-}`;
-
-        const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-        };
-
-        const res = await fetch(url, {
+        const token = localStorage.getItem('nutrir_token');
+        const res = await fetch('/api/ai/generate-recipe', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ mealType, cal, protein: p, carbs: c, fat: f })
         });
-
-        if (!res.ok) throw new Error("API call failed");
-        const data = await res.json();
-        const jsonText = data.candidates[0].content.parts[0].text;
-        const recipeResult = JSON.parse(jsonText);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Falha ao gerar receita');
+        }
+        const { recipe: r, mealType: mt } = await res.json();
 
         const imagesByCategory = {
             breakfast: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400",
@@ -2097,74 +2059,41 @@ Responda ESTRITAMENTE em formato JSON puro (sem formatar bloco de código markdo
             dinner: "https://images.unsplash.com/photo-1547592165-e1d17fed6005?w=400",
             snack: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
         };
-
+        const cat = mt === 'all' ? 'lunch' : mt;
         return {
             id: "ai_recipe_daily_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
-            name: recipeResult.name,
-            category: mealType === 'all' ? 'lunch' : mealType,
-            time_min: recipeResult.time_min || 15,
-            image: imagesByCategory[mealType] || imagesByCategory['lunch'],
-            calories_base: recipeResult.calories,
-            protein_base: recipeResult.protein,
-            carbs_base: recipeResult.carbs,
-            fat_base: recipeResult.fat,
+            name: r.name,
+            category: cat,
+            time_min: r.time_min || 15,
+            image: imagesByCategory[cat] || imagesByCategory['lunch'],
+            calories_base: r.calories,
+            protein_base: r.protein,
+            carbs_base: r.carbs,
+            fat_base: r.fat,
             fiber_base: 2.0,
-            ingredients: recipeResult.ingredients.map(i => ({ name: i.name, amount_base: i.amount, unit: i.unit })),
-            directions: recipeResult.directions
+            ingredients: r.ingredients.map(i => ({ name: i.name, amount_base: i.amount, unit: i.unit })),
+            directions: r.directions
         };
     }
 
     async function callGeminiForWeeklyPlan(mealType, profile) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`;
-        
-        // Estimativa média de macros por refeição para o plano (1/3 do dia)
-        const calPerMeal = Math.round(profile.targetCalories / 3);
-        const protPerMeal = Math.round(profile.targetProtein / 3);
-        const carbsPerMeal = Math.round(profile.targetCarbs / 3);
-        const fatPerMeal = Math.round(profile.targetFat / 3);
-
-        const mealTypeStr = mealType === 'all' ? 'refeições variadas (café, almoço, janta, lanche) ao longo dos dias' : `refeições estritamente do tipo: ${mealType}`;
-
-        const prompt = `Você é um chef e nutricionista. Crie um plano de 7 dias completos com 7 receitas saudáveis diferentes e variadas em português (uma receita para cada dia da semana, identificados de dia 1 a dia 7).
-O tipo de refeição deve ser: ${mealTypeStr}.
-Cada receita deve ter aproximadamente o seguinte valor nutricional médio:
-- Calorias: ${calPerMeal} kcal
-- Proteínas: ${protPerMeal}g
-- Carboidratos: ${carbsPerMeal}g
-- Gorduras: ${fatPerMeal}g
-
-Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a string JSON limpa) que seja um array contendo exatamente 7 objetos seguindo esta estrutura:
-[
-  {
-    "day": 1,
-    "name": "Nome da receita do dia 1",
-    "time_min": 20,
-    "calories": 400,
-    "protein": 30,
-    "carbs": 40,
-    "fat": 10,
-    "ingredients": [
-      { "name": "Ingrediente", "amount": 100, "unit": "g" }
-    ],
-    "directions": "Modo de preparo rápido."
-  }
-]`;
-
-        const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-        };
-
-        const res = await fetch(url, {
+        const token = localStorage.getItem('nutrir_token');
+        const res = await fetch('/api/ai/generate-weekly', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                mealType,
+                targetCalories: profile.targetCalories,
+                targetProtein: profile.targetProtein,
+                targetCarbs: profile.targetCarbs,
+                targetFat: profile.targetFat
+            })
         });
-
-        if (!res.ok) throw new Error("API call failed");
-        const data = await res.json();
-        const jsonText = data.candidates[0].content.parts[0].text;
-        const plansArray = JSON.parse(jsonText);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Falha ao gerar plano semanal');
+        }
+        const { plans: plansArray, mealType: mt } = await res.json();
 
         const imagesByCategory = {
             breakfast: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400",
@@ -2174,8 +2103,8 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
         };
 
         const mappedRecipes = plansArray.map((r, index) => {
-            let cat = mealType;
-            if (mealType === 'all') {
+            let cat = mt;
+            if (mt === 'all') {
                 const rotation = ['breakfast', 'lunch', 'dinner', 'snack'];
                 cat = rotation[index % rotation.length];
             }
@@ -2206,7 +2135,7 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
         return {
             id: 'plan_' + Date.now(),
             date: new Date().toLocaleDateString('pt-BR'),
-            mealType: portugueseMealType[mealType] || mealType,
+            mealType: portugueseMealType[mt] || mt,
             recipes: mappedRecipes
         };
     }
@@ -2833,78 +2762,36 @@ Responda ESTRITAMENTE em formato JSON (sem bloco de código markdown, apenas a s
         loader.classList.remove('hidden');
         loaderStatus.innerText = "Iniciando reconhecimento de alimentos...";
 
-        if (state.geminiApiKey && state.geminiApiKey.trim() !== '') {
-            try {
-                loaderStatus.innerText = "IA Nutrir analisando texturas e volumes do prato...";
-                
-                const base64Data = state.currentCapturedImage.split(',')[1];
-                const response = await callGeminiApi(base64Data);
-                
-                loaderStatus.innerText = "Estimando calorias e pesos...";
-                state.currentAnalyzingMeal = response;
-                
-                renderResultsScreen();
-                showScreen('screen-results');
-            } catch (err) {
-                console.error("Erro na API do Gemini: ", err);
-                loaderStatus.innerText = "Falha na conexão de IA. Iniciando modo demonstração para simular o prato...";
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                simulateImageScan();
-            } finally {
-                loader.classList.add('hidden');
-            }
-        } else {
-            loaderStatus.innerText = "Modo Demo: Simulando análise visual do prato...";
-            await new Promise(resolve => setTimeout(resolve, 2500));
+        try {
+            loaderStatus.innerText = "IA Nutrir analisando texturas e volumes do prato...";
+            const base64Data = state.currentCapturedImage.split(',')[1];
+            const response = await callGeminiApi(base64Data);
+            loaderStatus.innerText = "Estimando calorias e pesos...";
+            state.currentAnalyzingMeal = response;
+            renderResultsScreen();
+            showScreen('screen-results');
+        } catch (err) {
+            console.error("Erro na API do Gemini: ", err);
+            loaderStatus.innerText = "IA indisponível. Iniciando modo demonstração...";
+            await new Promise(resolve => setTimeout(resolve, 1500));
             simulateImageScan();
+        } finally {
             loader.classList.add('hidden');
         }
     }
 
     async function callGeminiApi(base64Image) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiApiKey}`;
-        const promptText = `Você é um nutricionista especialista em identificar pratos de comida por imagem. Analise a imagem fornecida e retorne um objeto JSON contendo os alimentos identificados, o peso estimado (g), e os macronutrientes (calorias, carboidratos (g), proteínas (g), gorduras (g)) de cada um.
-Responda ESTRITAMENTE em formato JSON puro obedecendo a esta exata estrutura (não coloque em bloco de código de markdown como \`\`\`json, apenas envie a string JSON limpa e direta):
-{
-  "items": [
-    { "name": "Nome do Alimento", "weight_g": 150, "calories": 210, "protein": 24, "carbs": 2, "fat": 12 }
-  ],
-  "total": { "calories": 210, "protein": 24, "carbs": 2, "fat": 12 }
-}`;
-
-        const payload = {
-            contents: [
-                {
-                    parts: [
-                        { text: promptText },
-                        {
-                            inlineData: {
-                                mimeType: "image/jpeg",
-                                data: base64Image
-                            }
-                        }
-                    ]
-                }
-            ],
-            generationConfig: { responseMimeType: "application/json" }
-        };
-
-        const response = await fetch(url, {
+        const token = localStorage.getItem('nutrir_token');
+        const response = await fetch('/api/ai/analyze-food', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ image: base64Image })
         });
-
-        if (!response.ok) throw new Error("HTTP error!");
-        const data = await response.json();
-        
-        try {
-            const rawJsonText = data.candidates[0].content.parts[0].text;
-            return JSON.parse(rawJsonText);
-        } catch (parseErr) {
-            console.error("Erro parsing: ", parseErr);
-            throw new Error("Resposta inválida.");
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || 'Falha ao analisar imagem');
         }
+        return response.json();
     }
 
     function simulateImageScan() {
