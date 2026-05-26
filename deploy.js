@@ -35,7 +35,7 @@ const script = `
     cat << 'EOF' > /root/dieta/backend/.env
 PORT=5000
 NODE_ENV=production
-DATABASE_URL=postgresql://postgres:c11560011@db:5432/nutrir
+DATABASE_URL=postgresql://postgres:c11560011@db:5432/slimo
 JWT_SECRET=super_secret_jwt_key_nutrir_2026_change_me
 GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
 MERCADO_PAGO_ACCESS_TOKEN=APP_USR-your_mercado_pago_token_here
