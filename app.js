@@ -558,8 +558,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const config = await configRes.json();
             const client_id = config.googleClientId;
 
-            if (!client_id || client_id.includes('your_google_oauth_client_id')) {
-                console.warn('Google Client ID não configurado ou padrão.');
+            // Valid Google OAuth client IDs always end with .apps.googleusercontent.com
+            if (!client_id || !client_id.endsWith('.apps.googleusercontent.com')) {
+                // Silently skip — Google login simply won't appear if not configured
                 return;
             }
 

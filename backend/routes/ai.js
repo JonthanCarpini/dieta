@@ -16,38 +16,50 @@ async function getLLMConfig() {
 
 // ── Provider: Gemini (with fallback) ─────────────────────────
 
+// v1beta supports responseMimeType (JSON mode); v1 does not
 const GEMINI_CANDIDATES = [
-  { api: 'v1beta', model: 'gemini-2.5-flash' },
-  { api: 'v1beta', model: 'gemini-2.0-flash' },
-  { api: 'v1',     model: 'gemini-2.0-flash' },
-  { api: 'v1beta', model: 'gemini-1.5-flash' },
-  { api: 'v1',     model: 'gemini-1.5-flash' },
-  { api: 'v1beta', model: 'gemini-1.5-flash-latest' },
+  { api: 'v1beta', model: 'gemini-2.5-flash',        jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-2.0-flash',        jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-2.0-flash-lite',   jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-1.5-flash',        jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-1.5-flash-002',    jsonMode: true  },
+  { api: 'v1beta', model: 'gemini-1.5-flash-001',    jsonMode: true  },
+  { api: 'v1',     model: 'gemini-1.5-flash',        jsonMode: false },
+  { api: 'v1',     model: 'gemini-1.5-pro',          jsonMode: false },
+  { api: 'v1beta', model: 'gemini-1.0-pro',          jsonMode: false },
 ];
+
+function extractJson(text) {
+  // Strip markdown code fences if model ignores the no-markdown instruction
+  const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (m) return m[1].trim();
+  const first = text.indexOf('{') !== -1 ? text.indexOf('{') : text.indexOf('[');
+  const last  = text.lastIndexOf('}') !== -1 && text.lastIndexOf('}') > text.lastIndexOf(']') ? text.lastIndexOf('}') : text.lastIndexOf(']');
+  if (first !== -1 && last !== -1) return text.slice(first, last + 1);
+  return text;
+}
 
 async function callGemini(apiKey, prompt, imageBase64 = null) {
   const parts = [{ text: prompt }];
   if (imageBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
-  const payload = {
-    contents: [{ parts }],
-    generationConfig: { responseMimeType: 'application/json' }
-  };
 
   let lastErr;
-  for (const { api, model } of GEMINI_CANDIDATES) {
+  for (const { api, model, jsonMode } of GEMINI_CANDIDATES) {
+    const generationConfig = jsonMode ? { responseMimeType: 'application/json' } : {};
+    const payload = { contents: [{ parts }], generationConfig };
     const url = `https://generativelanguage.googleapis.com/${api}/models/${model}:generateContent?key=${apiKey}`;
     const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (r.ok) {
       const data = await r.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error('Resposta vazia do Gemini');
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) { lastErr = `Gemini resposta vazia (${api}/${model})`; continue; }
+      const text = jsonMode ? raw : extractJson(raw);
       console.log(`Gemini OK: ${api}/${model}`);
       return { text, model: `${model} (${api})` };
     }
     const body = await r.text();
     lastErr = `Gemini ${r.status} (${api}/${model}): ${body}`;
     console.warn(lastErr);
-    // fallback on overload or model not found; stop on auth errors
     if (r.status === 401 || r.status === 403) break;
   }
   throw new Error(lastErr);
