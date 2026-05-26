@@ -2759,6 +2759,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (video) video.srcObject = null;
     }
 
+    // Redimensiona qualquer imagem para max 900px e comprime em JPEG 0.80
+    // Mantém proporção, garante payload < 1MB
+    function resizeImageToBase64(sourceCanvas, maxPx = 900, quality = 0.80) {
+        const w = sourceCanvas.width;
+        const h = sourceCanvas.height;
+        const scale = Math.min(1, maxPx / Math.max(w, h));
+        const out = document.createElement('canvas');
+        out.width  = Math.round(w * scale);
+        out.height = Math.round(h * scale);
+        out.getContext('2d').drawImage(sourceCanvas, 0, 0, out.width, out.height);
+        return out.toDataURL('image/jpeg', quality);
+    }
+
     function capturePhoto() {
         const video = document.getElementById('camera-stream');
         const canvas = document.getElementById('photo-canvas');
@@ -2777,7 +2790,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sy = (video.videoHeight - size) / 2;
         context.drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
-        state.currentCapturedImage = canvas.toDataURL('image/jpeg', 0.85);
+        state.currentCapturedImage = resizeImageToBase64(canvas);
 
         stopCameraStream();
         analyzeFoodPhoto();
@@ -3518,7 +3531,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnAnalyzeUpload.removeAttribute('disabled');
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    state.currentCapturedImage = event.target.result;
+                    const img = new Image();
+                    img.onload = () => {
+                        const tmpCanvas = document.createElement('canvas');
+                        tmpCanvas.width  = img.width;
+                        tmpCanvas.height = img.height;
+                        tmpCanvas.getContext('2d').drawImage(img, 0, 0);
+                        state.currentCapturedImage = resizeImageToBase64(tmpCanvas);
+                    };
+                    img.src = event.target.result;
                 };
                 reader.readAsDataURL(file);
             }
