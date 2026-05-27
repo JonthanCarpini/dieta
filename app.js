@@ -4285,13 +4285,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasClinicalData = profile.comorbidities || profile.intolerances || profile.dietary_restrictions;
         const formContent = document.getElementById('clinical-form-content');
         const savedSummary = document.getElementById('clinical-saved-summary');
-        if (hasClinicalData && formContent && savedSummary) {
-            formContent.classList.add('hidden');
-            savedSummary.classList.remove('hidden');
-            if (window.lucide) window.lucide.createIcons();
-        } else if (formContent && savedSummary) {
-            formContent.classList.remove('hidden');
-            savedSummary.classList.add('hidden');
+        if (formContent && savedSummary) {
+            if (hasClinicalData) {
+                formContent.style.display = 'none';
+                savedSummary.style.display = 'flex';
+                if (window.lucide) window.lucide.createIcons();
+            } else {
+                formContent.style.display = '';
+                savedSummary.style.display = 'none';
+            }
         }
 
         // Renderiza o histórico de peso na Área Evolutiva
@@ -4740,9 +4742,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Colapsa o formulário e mostra resumo de sucesso
                     const formContent = document.getElementById('clinical-form-content');
                     const savedSummary = document.getElementById('clinical-saved-summary');
-                    if (formContent) formContent.classList.add('hidden');
+                    if (formContent) formContent.style.display = 'none';
                     if (savedSummary) {
-                        savedSummary.classList.remove('hidden');
+                        savedSummary.style.display = 'flex';
                         if (window.lucide) window.lucide.createIcons();
                     }
 
@@ -4760,8 +4762,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const btnEditClinical = document.getElementById('btn-edit-clinical');
             if (btnEditClinical) {
                 btnEditClinical.addEventListener('click', () => {
-                    document.getElementById('clinical-form-content').classList.remove('hidden');
-                    document.getElementById('clinical-saved-summary').classList.add('hidden');
+                    document.getElementById('clinical-form-content').style.display = '';
+                    document.getElementById('clinical-saved-summary').style.display = 'none';
                 });
             }
         }
