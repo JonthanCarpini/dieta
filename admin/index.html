@@ -697,6 +697,9 @@
                                 <button class="patient-tab-btn" data-patient-tab="exams" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
                                     <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> Exames
                                 </button>
+                                <button class="patient-tab-btn" data-patient-tab="measurements" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
+                                    <i data-lucide="ruler" style="width: 14px; height: 14px;"></i> Antropometria
+                                </button>
                             </div>
 
                             <!-- CONTEÚDO DE ABAS -->
@@ -784,6 +787,111 @@
                                         </button>
                                     </form>
                                     <div id="clinical-success-msg" class="success-banner hidden" style="margin-top: 10px;">Ficha clínica salva com sucesso!</div>
+                                </div>
+
+                                <!-- ABA 4: ANTROPOMETRIA -->
+                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-measurements">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                                        <div>
+                                            <h3 style="margin:0;">Dados Antropométricos</h3>
+                                            <p class="description" style="margin:4px 0 0;">Registre e acompanhe a evolução das medidas corporais ao longo do tempo.</p>
+                                        </div>
+                                        <button class="btn-primary btn-sm" id="btn-toggle-meas-form" style="white-space:nowrap;">
+                                            <i data-lucide="plus" style="width:14px;height:14px;"></i> Nova Medição
+                                        </button>
+                                    </div>
+
+                                    <!-- Formulário de nova medição (oculto por padrão) -->
+                                    <div id="meas-form-wrap" class="hidden" style="background:rgba(255,250,240,0.03); border:1px solid rgba(255,250,240,0.08); border-radius:12px; padding:20px; margin-bottom:20px;">
+                                        <h4 style="margin:0 0 16px; font-size:13px; color:var(--color-primary); text-transform:uppercase; letter-spacing:.06em;">Nova Avaliação</h4>
+                                        <form id="patient-meas-form">
+                                            <!-- Linha 1: data + peso + altura -->
+                                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px;">
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Data da Avaliação</label>
+                                                    <input type="date" id="meas-date" required>
+                                                </div>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Peso (kg)</label>
+                                                    <input type="number" id="meas-weight" step="0.1" min="0" placeholder="Ex: 72.5">
+                                                </div>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Altura (cm)</label>
+                                                    <input type="number" id="meas-height" step="0.1" min="0" placeholder="Ex: 168">
+                                                </div>
+                                            </div>
+                                            <!-- Linha 2: % gordura + massa muscular -->
+                                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>% Gordura Corporal</label>
+                                                    <input type="number" id="meas-fat" step="0.1" min="0" max="80" placeholder="Ex: 22.5">
+                                                </div>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Massa Muscular (kg)</label>
+                                                    <input type="number" id="meas-muscle" step="0.1" min="0" placeholder="Ex: 35.2">
+                                                </div>
+                                            </div>
+                                            <!-- Linha 3: circunferências -->
+                                            <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:12px;">
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Cintura (cm)</label>
+                                                    <input type="number" id="meas-waist" step="0.1" min="0" placeholder="80">
+                                                </div>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Quadril (cm)</label>
+                                                    <input type="number" id="meas-hip" step="0.1" min="0" placeholder="95">
+                                                </div>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Tórax (cm)</label>
+                                                    <input type="number" id="meas-chest" step="0.1" min="0" placeholder="90">
+                                                </div>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Braço (cm)</label>
+                                                    <input type="number" id="meas-arm" step="0.1" min="0" placeholder="30">
+                                                </div>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label>Coxa (cm)</label>
+                                                    <input type="number" id="meas-thigh" step="0.1" min="0" placeholder="52">
+                                                </div>
+                                            </div>
+                                            <!-- Observações -->
+                                            <div class="form-group" style="margin-bottom:12px;">
+                                                <label>Observações</label>
+                                                <textarea id="meas-notes" placeholder="Anotações sobre a avaliação..." style="height:64px; resize:vertical;"></textarea>
+                                            </div>
+                                            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                                                <button type="button" class="btn-secondary btn-sm" id="btn-cancel-meas-form">Cancelar</button>
+                                                <button type="submit" class="btn-primary btn-sm">
+                                                    <i data-lucide="save" style="width:13px;height:13px;"></i> Salvar Medição
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    <!-- Histórico de medições -->
+                                    <div class="table-responsive" style="max-height:420px; overflow-y:auto;">
+                                        <table class="data-table" id="meas-history-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Data</th>
+                                                    <th>Peso</th>
+                                                    <th>IMC</th>
+                                                    <th>% Gord.</th>
+                                                    <th>M. Musc.</th>
+                                                    <th>Cintura</th>
+                                                    <th>Quadril</th>
+                                                    <th>RCQ</th>
+                                                    <th>Tórax</th>
+                                                    <th>Braço</th>
+                                                    <th>Coxa</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="meas-history-body">
+                                                <tr><td colspan="12" style="text-align:center; color:var(--color-text-muted); padding:20px;">Nenhuma medição registrada.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
 
                                 <!-- ABA 3: EXAMES -->

@@ -407,4 +407,67 @@ router.post('/exams/:examId/notes', async (req, res) => {
   }
 });
 
+// ==========================================
+// DADOS ANTROPOMÉTRICOS DO PACIENTE
+// ==========================================
+
+// GET /professional/patients/:id/measurements — lista todas as medições
+router.get('/patients/:id/measurements', verifyPatientAccess, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT * FROM patient_measurements WHERE patient_id = $1 ORDER BY measured_at DESC, created_at DESC`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar dados antropométricos.' });
+  }
+});
+
+// POST /professional/patients/:id/measurements — registra nova medição
+router.post('/patients/:id/measurements', verifyPatientAccess, async (req, res) => {
+  const {
+    measured_at, weight_kg, height_cm, body_fat_pct, muscle_mass_kg,
+    waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, notes
+  } = req.body;
+  try {
+    const result = await db.query(
+      `INSERT INTO patient_measurements
+         (patient_id, professional_id, measured_at, weight_kg, height_cm,
+          body_fat_pct, muscle_mass_kg, waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [
+        req.params.id, req.user.id,
+        measured_at || new Date().toISOString().split('T')[0],
+        weight_kg    || null, height_cm   || null,
+        body_fat_pct || null, muscle_mass_kg || null,
+        waist_cm     || null, hip_cm      || null,
+        chest_cm     || null, arm_cm      || null,
+        thigh_cm     || null, notes       || null
+      ]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar medição.' });
+  }
+});
+
+// DELETE /professional/patients/:id/measurements/:measId — remove uma medição
+router.delete('/patients/:id/measurements/:measId', verifyPatientAccess, async (req, res) => {
+  try {
+    const check = await db.query(
+      'SELECT id FROM patient_measurements WHERE id = $1 AND patient_id = $2',
+      [req.params.measId, req.params.id]
+    );
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Medição não encontrada.' });
+    await db.query('DELETE FROM patient_measurements WHERE id = $1', [req.params.measId]);
+    res.json({ message: 'Medição excluída.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir medição.' });
+  }
+});
+
 module.exports = router;

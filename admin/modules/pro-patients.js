@@ -218,6 +218,7 @@ export async function viewPatientDetails(patient) {
 
     loadPatientClinicalData(patient.id);
     loadPatientExamsData(patient.id);
+    loadPatientMeasurements(patient.id);
 
     if (window.lucide) window.lucide.createIcons();
 }
@@ -1538,4 +1539,165 @@ export function initProPatients() {
             }
         });
     }
+}
+
+// ==========================================
+// DADOS ANTROPOMÉTRICOS
+// ==========================================
+
+export async function loadPatientMeasurements(patientId) {
+    const tbody = document.getElementById('meas-history-body');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; color:var(--color-text-muted); padding:20px;">Carregando...</td></tr>`;
+
+    // Configura formulário se ainda não inicializado para este paciente
+    _setupMeasFormListeners(patientId);
+
+    try {
+        const res = await fetch(`${API_URL}/professional/patients/${patientId}/measurements`, {
+            headers: { 'Authorization': `Bearer ${adminState.token}` }
+        });
+        const measurements = await res.json();
+        _renderMeasurementsTable(measurements, patientId);
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; color:var(--color-danger);">Erro ao carregar medições.</td></tr>`;
+    }
+}
+
+function _renderMeasurementsTable(measurements, patientId) {
+    const tbody = document.getElementById('meas-history-body');
+    if (!tbody) return;
+
+    if (!measurements || measurements.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; color:var(--color-text-muted); padding:20px;">Nenhuma medição registrada.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = measurements.map(m => {
+        const bmi = (m.weight_kg && m.height_cm)
+            ? (m.weight_kg / Math.pow(m.height_cm / 100, 2)).toFixed(1)
+            : '-';
+        const rcq = (m.waist_cm && m.hip_cm)
+            ? (m.waist_cm / m.hip_cm).toFixed(2)
+            : '-';
+        const fmt = v => v != null ? parseFloat(v).toFixed(1) : '-';
+        const dateStr = String(m.measured_at).split('T')[0];
+        const [y, mo, d] = dateStr.split('-');
+        const datePt = `${d}/${mo}/${y}`;
+
+        return `<tr>
+            <td style="font-weight:600; white-space:nowrap;">${datePt}</td>
+            <td>${fmt(m.weight_kg)} <span style="font-size:10px;color:var(--color-text-muted);">kg</span></td>
+            <td><span style="color:${_bmiColor(bmi)};">${bmi}</span></td>
+            <td>${fmt(m.body_fat_pct)}${m.body_fat_pct != null ? '%' : ''}</td>
+            <td>${fmt(m.muscle_mass_kg)}${m.muscle_mass_kg != null ? ' kg' : ''}</td>
+            <td>${fmt(m.waist_cm)}</td>
+            <td>${fmt(m.hip_cm)}</td>
+            <td>${rcq}</td>
+            <td>${fmt(m.chest_cm)}</td>
+            <td>${fmt(m.arm_cm)}</td>
+            <td>${fmt(m.thigh_cm)}</td>
+            <td>
+                <button class="btn-danger btn-sm meas-del-btn" data-meas-id="${m.id}" data-patient-id="${patientId}" title="Excluir medição" style="padding:3px 8px; font-size:11px;">
+                    <i data-lucide="trash-2" style="width:12px;height:12px;"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.meas-del-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('Excluir esta medição?')) return;
+            const measId = btn.dataset.measId;
+            const pid = btn.dataset.patientId;
+            try {
+                const res = await fetch(`${API_URL}/professional/patients/${pid}/measurements/${measId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${adminState.token}` }
+                });
+                if (!res.ok) throw new Error('Erro ao excluir.');
+                loadPatientMeasurements(pid);
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+}
+
+function _bmiColor(bmi) {
+    const v = parseFloat(bmi);
+    if (isNaN(v)) return 'var(--color-text-muted)';
+    if (v < 18.5) return '#60a5fa';
+    if (v < 25)   return '#4ade80';
+    if (v < 30)   return '#f5c14d';
+    return '#f87171';
+}
+
+let _measFormInitialized = false;
+
+function _setupMeasFormListeners(patientId) {
+    if (_measFormInitialized) {
+        // Apenas atualiza o patientId de referência
+        adminState._measPatientId = patientId;
+        return;
+    }
+    _measFormInitialized = true;
+    adminState._measPatientId = patientId;
+
+    // Preenche data de hoje por padrão
+    const dateInput = document.getElementById('meas-date');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Toggle do formulário
+    document.getElementById('btn-toggle-meas-form')?.addEventListener('click', () => {
+        const wrap = document.getElementById('meas-form-wrap');
+        if (wrap) {
+            wrap.classList.toggle('hidden');
+            // Preenche data ao abrir
+            const d = document.getElementById('meas-date');
+            if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+        }
+    });
+
+    document.getElementById('btn-cancel-meas-form')?.addEventListener('click', () => {
+        document.getElementById('meas-form-wrap')?.classList.add('hidden');
+    });
+
+    // Submit do formulário
+    document.getElementById('patient-meas-form')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        const pid = adminState._measPatientId;
+        const payload = {
+            measured_at:     document.getElementById('meas-date')?.value    || null,
+            weight_kg:       parseFloat(document.getElementById('meas-weight')?.value)  || null,
+            height_cm:       parseFloat(document.getElementById('meas-height')?.value)  || null,
+            body_fat_pct:    parseFloat(document.getElementById('meas-fat')?.value)     || null,
+            muscle_mass_kg:  parseFloat(document.getElementById('meas-muscle')?.value)  || null,
+            waist_cm:        parseFloat(document.getElementById('meas-waist')?.value)   || null,
+            hip_cm:          parseFloat(document.getElementById('meas-hip')?.value)     || null,
+            chest_cm:        parseFloat(document.getElementById('meas-chest')?.value)   || null,
+            arm_cm:          parseFloat(document.getElementById('meas-arm')?.value)     || null,
+            thigh_cm:        parseFloat(document.getElementById('meas-thigh')?.value)   || null,
+            notes:           document.getElementById('meas-notes')?.value               || null,
+        };
+        try {
+            const res = await fetch(`${API_URL}/professional/patients/${pid}/measurements`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Erro ao salvar.'); }
+            document.getElementById('patient-meas-form')?.reset();
+            document.getElementById('meas-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('meas-form-wrap')?.classList.add('hidden');
+            loadPatientMeasurements(pid);
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+}
 }

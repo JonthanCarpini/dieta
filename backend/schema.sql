@@ -214,3 +214,23 @@ CREATE TABLE IF NOT EXISTS weekly_plans (
 CREATE INDEX IF NOT EXISTS idx_weekly_plans_professional ON weekly_plans(professional_id);
 CREATE INDEX IF NOT EXISTS idx_weekly_plans_patient ON weekly_plans(patient_id);
 
+-- 16. DADOS ANTROPOMÉTRICOS (MEDIÇÕES REGISTRADAS PELO PROFISSIONAL)
+CREATE TABLE IF NOT EXISTS patient_measurements (
+    id SERIAL PRIMARY KEY,
+    patient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    professional_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    measured_at DATE NOT NULL DEFAULT CURRENT_DATE,
+    weight_kg DECIMAL(5,2),
+    height_cm DECIMAL(5,2),
+    body_fat_pct DECIMAL(4,1),
+    muscle_mass_kg DECIMAL(5,2),
+    waist_cm DECIMAL(5,2),
+    hip_cm DECIMAL(5,2),
+    chest_cm DECIMAL(5,2),
+    arm_cm DECIMAL(5,2),
+    thigh_cm DECIMAL(5,2),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_patient_measurements_patient ON patient_measurements(patient_id, measured_at DESC);
+
