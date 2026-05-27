@@ -11,6 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- CSS Estilos -->
     <link rel="stylesheet" href="admin.css">
 </head>
@@ -822,6 +824,9 @@
                 <button class="vc-tab-btn active" id="vc-tab-btn-diary" data-vc-tab="diary">
                     <i data-lucide="utensils" style="width:14px; height:14px;"></i> Diário Alimentar
                 </button>
+                <button class="vc-tab-btn" id="vc-tab-btn-weight" data-vc-tab="weight">
+                    <i data-lucide="trending-up" style="width:14px; height:14px;"></i> Evolução de Peso
+                </button>
                 <button class="vc-tab-btn" id="vc-tab-btn-feedback" data-vc-tab="feedback">
                     <i data-lucide="file-text" style="width:14px; height:14px;"></i> Prescrições e Orientações
                 </button>
@@ -837,7 +842,59 @@
                     </div>
                 </div>
 
-                <!-- ABA 2: Prescrições e Orientações -->
+                <!-- ABA 2: Evolução de Peso -->
+                <div class="vc-tab-content" id="vc-tab-content-weight" style="overflow-y:auto; padding:16px; box-sizing:border-box;">
+                    <!-- Cards de resumo de peso -->
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:16px;">
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:10px; text-align:center;">
+                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Peso Inicial</span>
+                            <strong id="vc-w-initial" style="font-size:15px; font-weight:700; color:#fff;">-</strong>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:10px; text-align:center;">
+                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Peso Atual</span>
+                            <strong id="vc-w-current" style="font-size:15px; font-weight:700; color:var(--color-primary);">-</strong>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:10px; text-align:center;">
+                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Meta de Peso</span>
+                            <strong id="vc-w-target" style="font-size:15px; font-weight:700; color:#22c55e;">-</strong>
+                        </div>
+                    </div>
+
+                    <!-- Resumo da conquista / Resultado alcançado -->
+                    <div id="vc-w-achievement-card" style="background:rgba(254,228,64,0.05); border:1px solid rgba(254,228,64,0.15); border-radius:10px; padding:12px; margin-bottom:16px; display:flex; align-items:center; gap:10px; font-size:12.5px; color:#fee440; line-height:1.4;">
+                        <i data-lucide="award" style="width:20px; height:20px; flex-shrink:0; color:#fee440;"></i>
+                        <span id="vc-w-achievement-text">Carregando evolução...</span>
+                    </div>
+
+                    <!-- Gráfico -->
+                    <div style="background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:16px; margin-bottom:16px; height:240px; position:relative; box-sizing:border-box;">
+                        <h4 style="margin:0 0 12px 0; font-size:13px; font-weight:600; opacity:0.8; color:#fff;">Histórico de Evolução vs Meta</h4>
+                        <div style="width:100%; height:calc(100% - 28px); position:relative;">
+                            <canvas id="vc-weight-chart" style="width:100%; height:100%;"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Novas Medições -->
+                    <div>
+                        <h4 style="margin:0 0 8px 0; font-size:13px; font-weight:600; opacity:0.8; color:#fff;">Histórico de Medições</h4>
+                        <div class="table-responsive" style="max-height:180px; overflow-y:auto; border:1px solid rgba(255,255,255,0.05); border-radius:8px; background:rgba(0,0,0,0.1);">
+                            <table class="data-table" style="font-size:12px; width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 6px 8px;">Data</th>
+                                        <th style="padding: 6px 8px;">Peso (kg)</th>
+                                        <th style="padding: 6px 8px; text-align:right;">Alteração</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vc-tab-weight-history-body">
+                                    <tr><td colspan="3" style="text-align:center; opacity:0.5; padding:12px;">Nenhum peso registrado.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA 3: Prescrições e Orientações -->
                 <div class="vc-tab-content" id="vc-tab-content-feedback">
                     <div style="display:flex; flex-direction:column; flex:1; min-height:0;">
                         <!-- Enviar nova orientação -->
@@ -856,7 +913,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
         </div>
     </div>
 

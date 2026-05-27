@@ -1797,6 +1797,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isMicMuted = false;
     let isCamOff = false;
     let remoteCandidatesQueue = [];
+    let vcWeightChartInstance = null;
 
     async function startVideoCall(link, patient) {
         let roomName = 'nutrir-room';
@@ -1844,12 +1845,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Garantir que a primeira aba esteja ativa por padrão
         const btnDiary = document.getElementById('vc-tab-btn-diary');
         const btnFeedback = document.getElementById('vc-tab-btn-feedback');
+        const btnWeight = document.getElementById('vc-tab-btn-weight');
         if (btnDiary) btnDiary.classList.add('active');
         if (btnFeedback) btnFeedback.classList.remove('active');
+        if (btnWeight) btnWeight.classList.remove('active');
+        
         const contentDiary = document.getElementById('vc-tab-content-diary');
         const contentFeedback = document.getElementById('vc-tab-content-feedback');
+        const contentWeight = document.getElementById('vc-tab-content-weight');
         if (contentDiary) contentDiary.classList.add('active');
         if (contentFeedback) contentFeedback.classList.remove('active');
+        if (contentWeight) contentWeight.classList.remove('active');
 
         if (patient) {
             if (vcPatientName) vcPatientName.textContent = patient.name;
@@ -1871,193 +1877,376 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Fazer fetch assíncrono dos dados do paciente, diário e histórico de pesos
             (async () => {
-                // Carregar histórico de peso para a vídeo chamada
+                let weights = [];
+                let diaryData = null;
+
+                // Carregar histórico de peso para a vídeo chamada (loading)
                 const vcWeightHistoryBody = document.getElementById('vc-weight-history-body');
+                const vcTabWeightHistoryBody = document.getElementById('vc-tab-weight-history-body');
                 if (vcWeightHistoryBody) {
                     vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding: 12px; opacity:0.5;">Carregando pesos...</td></tr>';
                 }
-                
+                if (vcTabWeightHistoryBody) {
+                    vcTabWeightHistoryBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 12px; opacity:0.5;">Carregando pesos...</td></tr>';
+                }
+
+                // 1. Fetch weight log
                 try {
                     const weightRes = await fetch(`${API_URL}/professional/patients/${patient.id}/weight-log`, {
                         headers: { 'Authorization': `Bearer ${adminState.token}` }
                     });
                     if (weightRes.ok) {
-                        const weights = await weightRes.json();
-                        if (vcWeightHistoryBody) {
-                            vcWeightHistoryBody.innerHTML = '';
-                            if (!weights || weights.length === 0) {
-                                vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; opacity:0.5; padding: 12px;">Nenhum peso registrado.</td></tr>';
-                            } else {
-                                const sortedWeights = [...weights].reverse();
-                                sortedWeights.forEach(w => {
-                                    const tr = document.createElement('tr');
-                                    const [year, month, day] = w.date.split('-');
-                                    const formattedDate = `${day}/${month}/${year}`;
-                                    tr.innerHTML = `
-                                        <td style="padding: 6px 8px;">${formattedDate}</td>
-                                        <td style="padding: 6px 8px;"><strong>${w.weight} kg</strong></td>
-                                    `;
-                                    vcWeightHistoryBody.appendChild(tr);
-                                });
-                            }
-                        }
-                    } else {
-                        throw new Error();
+                        weights = await weightRes.json();
                     }
-                } catch (wErr) {
-                    console.error("Erro ao carregar pesos da video chamada:", wErr);
-                    if (vcWeightHistoryBody) {
-                        vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--color-danger); padding: 12px;">Erro ao carregar pesos.</td></tr>';
+                } catch (err) {
+                    console.error("Erro ao buscar weight log:", err);
+                }
+
+                // 2. Fetch diary & profile
+                try {
+                    const diaryRes = await fetch(`${API_URL}/professional/patients/${patient.id}/diary`, {
+                        headers: { 'Authorization': `Bearer ${adminState.token}` }
+                    });
+                    if (diaryRes.ok) {
+                        diaryData = await diaryRes.json();
+                    }
+                } catch (err) {
+                    console.error("Erro ao buscar diário:", err);
+                }
+
+                // Renderizar o accordion simples de peso
+                if (vcWeightHistoryBody) {
+                    vcWeightHistoryBody.innerHTML = '';
+                    if (!weights || weights.length === 0) {
+                        vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; opacity:0.5; padding: 12px;">Nenhum peso registrado.</td></tr>';
+                    } else {
+                        const sortedWeights = [...weights].reverse();
+                        sortedWeights.forEach(w => {
+                            const tr = document.createElement('tr');
+                            const [year, month, day] = w.date.split('-');
+                            const formattedDate = `${day}/${month}/${year}`;
+                            tr.innerHTML = `
+                                <td style="padding: 6px 8px;">${formattedDate}</td>
+                                <td style="padding: 6px 8px;"><strong>${w.weight} kg</strong></td>
+                            `;
+                            vcWeightHistoryBody.appendChild(tr);
+                        });
                     }
                 }
 
-                try {
-                    const res = await fetch(`${API_URL}/professional/patients/${patient.id}/diary`, {
-                        headers: { 'Authorization': `Bearer ${adminState.token}` }
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        
-                        if (data.profile) {
-                            if (vcPatientWeight) vcPatientWeight.textContent = data.profile.weight ? `${data.profile.weight} kg` : '-';
-                            if (vcPatientHeight) vcPatientHeight.textContent = data.profile.height ? `${data.profile.height} cm` : '-';
-                            if (vcPatientGoal) vcPatientGoal.textContent = data.profile.goal || '-';
-                            if (vcPatientCalories) vcPatientCalories.textContent = data.profile.target_calories ? `${data.profile.target_calories} kcal` : '-';
-                        } else {
-                            if (vcPatientWeight) vcPatientWeight.textContent = '-';
-                            if (vcPatientHeight) vcPatientHeight.textContent = '-';
-                            if (vcPatientGoal) vcPatientGoal.textContent = '-';
-                            if (vcPatientCalories) vcPatientCalories.textContent = '-';
+                // Preencher dados do cabeçalho da vídeo chamada
+                if (diaryData) {
+                    if (diaryData.profile) {
+                        if (vcPatientWeight) vcPatientWeight.textContent = diaryData.profile.weight ? `${diaryData.profile.weight} kg` : '-';
+                        if (vcPatientHeight) vcPatientHeight.textContent = diaryData.profile.height ? `${diaryData.profile.height} cm` : '-';
+                        if (vcPatientGoal) {
+                            const goalLabels = { lose: 'Emagrecer', gain: 'Ganhar Peso', maintain: 'Manter Peso' };
+                            vcPatientGoal.textContent = goalLabels[diaryData.profile.goal] || diaryData.profile.goal || '-';
                         }
-
-                        if (data.water) {
-                            if (vcPatientWater) vcPatientWater.textContent = `${data.water.consumed} / ${data.water.target} ml`;
-                        } else {
-                            if (vcPatientWater) vcPatientWater.textContent = '0 / 2500 ml';
-                        }
-
-                        if (vcDiaryContainer) {
-                            vcDiaryContainer.innerHTML = '';
-                            if (!data.meals || data.meals.length === 0) {
-                                vcDiaryContainer.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5; font-size:13px;">Nenhuma refeição registrada nos últimos dias.</div>';
-                            } else {
-                                // Agrupar refeições por data
-                                const mealsByDay = {};
-                                data.meals.forEach(m => {
-                                    const dateVal = m.date.split('T')[0];
-                                    if (!mealsByDay[dateVal]) mealsByDay[dateVal] = [];
-                                    mealsByDay[dateVal].push(m);
-                                });
-
-                                // Ordenar as datas decrescentemente
-                                const sortedDates = Object.keys(mealsByDay).sort().reverse();
-
-                                sortedDates.forEach((dateStr, idx) => {
-                                    const dayMeals = mealsByDay[dateStr];
-                                    
-                                    // Somar macros e calorias do dia
-                                    let dayCal = 0, dayCarbs = 0, dayProtein = 0, dayFat = 0;
-                                    dayMeals.forEach(m => {
-                                        const tot = m.total && typeof m.total === 'object' ? m.total : {};
-                                        dayCal += tot.calories || 0;
-                                        dayCarbs += tot.carbs || 0;
-                                        dayProtein += tot.protein || 0;
-                                        dayFat += tot.fat || 0;
-                                    });
-
-                                    // Formatar a data para exibição (ex: "27/05/2026")
-                                    const dateParts = dateStr.split('-');
-                                    const displayDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-
-                                    // Determinar se é "Hoje" ou "Ontem"
-                                    const todayStr = new Date().toISOString().split('T')[0];
-                                    const yesterday = new Date();
-                                    yesterday.setDate(yesterday.getDate() - 1);
-                                    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-                                    let dayLabel = displayDate;
-                                    if (dateStr === todayStr) {
-                                        dayLabel = `Hoje (${displayDate})`;
-                                    } else if (dateStr === yesterdayStr) {
-                                        dayLabel = `Ontem (${displayDate})`;
-                                    }
-
-                                    // Criar acordeão
-                                    const dayGroup = document.createElement('div');
-                                    dayGroup.className = `vc-diary-day-group${idx === 0 ? ' expanded' : ''}`;
-
-                                    dayGroup.innerHTML = `
-                                        <div class="vc-diary-day-header">
-                                            <div class="vc-diary-day-title">
-                                                <i data-lucide="calendar" style="width:16px; height:16px; color:var(--color-primary);"></i>
-                                                <span>${dayLabel}</span>
-                                            </div>
-                                            <div style="display:flex; align-items:center; gap:12px;">
-                                                <span class="vc-diary-day-summary">${dayCal} kcal | C:${dayCarbs}g P:${dayProtein}g F:${dayFat}g</span>
-                                                <i class="vc-diary-day-icon" data-lucide="chevron-down" style="width:16px; height:16px;"></i>
-                                            </div>
-                                        </div>
-                                        <div class="vc-diary-day-details">
-                                            <table style="width:100%; border-collapse:collapse;">
-                                                <thead>
-                                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05); text-align:left; font-size:10px; opacity:0.5;">
-                                                        <th style="padding:6px 4px;">Hora</th>
-                                                        <th style="padding:6px 4px;">Refeição</th>
-                                                        <th style="padding:6px 4px;">Tipo</th>
-                                                        <th style="padding:6px 4px; text-align:right;">Calorias</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    `;
-
-                                    const tbody = dayGroup.querySelector('tbody');
-                                    dayMeals.forEach(m => {
-                                        const tr = document.createElement('tr');
-                                        tr.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
-                                        tr.style.fontSize = '12px';
-                                        tr.style.cursor = 'pointer';
-                                        const formattedTime = m.time.substring(0, 5);
-                                        const typeLabel = getMealTypeLabel(m);
-                                        const tot = m.total && typeof m.total === 'object' ? m.total : {};
-                                        const calVal = tot.calories !== undefined ? `${tot.calories} kcal` : '-';
-                                        
-                                        tr.innerHTML = `
-                                            <td style="padding:8px 4px; opacity:0.7;">${formattedTime}</td>
-                                            <td style="padding:8px 4px;"><strong>${m.name}</strong></td>
-                                            <td style="padding:8px 4px;"><span style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px;">${typeLabel}</span></td>
-                                            <td style="padding:8px 4px; text-align:right; font-weight:600;">${calVal}</td>
-                                        `;
-                                        
-                                        tr.addEventListener('click', () => {
-                                            openAdminMealDetailsModal(m);
-                                        });
-                                        tbody.appendChild(tr);
-                                    });
-
-                                    // Listener de expansão/recolhimento
-                                    dayGroup.querySelector('.vc-diary-day-header').addEventListener('click', () => {
-                                        dayGroup.classList.toggle('expanded');
-                                    });
-
-                                    vcDiaryContainer.appendChild(dayGroup);
-                                });
-
-                                if (window.lucide) window.lucide.createIcons();
-                            }
-                        }
+                        if (vcPatientCalories) vcPatientCalories.textContent = diaryData.profile.target_calories ? `${diaryData.profile.target_calories} kcal` : '-';
                     } else {
-                        throw new Error();
+                        if (vcPatientWeight) vcPatientWeight.textContent = '-';
+                        if (vcPatientHeight) vcPatientHeight.textContent = '-';
+                        if (vcPatientGoal) vcPatientGoal.textContent = '-';
+                        if (vcPatientCalories) vcPatientCalories.textContent = '-';
                     }
-                } catch(err) {
-                    if (vcPatientWeight) vcPatientWeight.textContent = '-';
-                    if (vcPatientHeight) vcPatientHeight.textContent = '-';
-                    if (vcPatientGoal) vcPatientGoal.textContent = '-';
-                    if (vcPatientCalories) vcPatientCalories.textContent = '-';
-                    if (vcPatientWater) vcPatientWater.textContent = '-';
-                    if (vcDiaryContainer) vcDiaryContainer.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5; font-size:13px; color:var(--color-danger);">Erro ao carregar prontuário.</div>';
+
+                    if (diaryData.water) {
+                        if (vcPatientWater) vcPatientWater.textContent = `${diaryData.water.consumed} / ${diaryData.water.target} ml`;
+                    } else {
+                        if (vcPatientWater) vcPatientWater.textContent = '0 / 2500 ml';
+                    }
+                }
+
+                // Preencher nova aba "Evolução de Peso"
+                const vcWInitial = document.getElementById('vc-w-initial');
+                const vcWCurrent = document.getElementById('vc-w-current');
+                const vcWTarget = document.getElementById('vc-w-target');
+                const vcWAchievementCard = document.getElementById('vc-w-achievement-card');
+                const vcWAchievementText = document.getElementById('vc-w-achievement-text');
+
+                let goalWeight = null;
+                let goalType = 'maintain';
+                if (diaryData && diaryData.profile) {
+                    goalWeight = parseFloat(diaryData.profile.goal_weight);
+                    goalType = diaryData.profile.goal || 'maintain';
+                }
+
+                if (weights && weights.length > 0) {
+                    const initialWeight = parseFloat(weights[0].weight);
+                    const currentWeight = parseFloat(weights[weights.length - 1].weight);
+
+                    if (vcWInitial) vcWInitial.textContent = `${initialWeight.toFixed(1)} kg`;
+                    if (vcWCurrent) vcWCurrent.textContent = `${currentWeight.toFixed(1)} kg`;
+                    if (vcWTarget) vcWTarget.textContent = goalWeight ? `${goalWeight.toFixed(1)} kg` : '-';
+
+                    // Calcular conquista/resultado
+                    if (vcWAchievementCard && vcWAchievementText) {
+                        vcWAchievementCard.style.display = 'flex';
+                        if (goalType === 'lose') {
+                            const diff = initialWeight - currentWeight;
+                            if (diff > 0) {
+                                vcWAchievementText.innerHTML = `O paciente já reduziu <strong style="color:var(--color-primary);">${diff.toFixed(1)} kg</strong>. Meta: atingir <strong>${goalWeight ? goalWeight.toFixed(1) : '-'} kg</strong>.`;
+                            } else if (diff < 0) {
+                                vcWAchievementText.innerHTML = `O paciente aumentou <strong>${Math.abs(diff).toFixed(1)} kg</strong> do peso inicial. Meta: reduzir para <strong>${goalWeight ? goalWeight.toFixed(1) : '-'} kg</strong>.`;
+                            } else {
+                                vcWAchievementText.innerHTML = `Peso estável em relação ao início. Meta: reduzir para <strong>${goalWeight ? goalWeight.toFixed(1) : '-'} kg</strong>.`;
+                            }
+                        } else if (goalType === 'gain') {
+                            const diff = currentWeight - initialWeight;
+                            if (diff > 0) {
+                                vcWAchievementText.innerHTML = `O paciente já aumentou <strong style="color:#22c55e;">${diff.toFixed(1)} kg</strong>. Meta: atingir <strong>${goalWeight ? goalWeight.toFixed(1) : '-'} kg</strong>.`;
+                            } else if (diff < 0) {
+                                vcWAchievementText.innerHTML = `O paciente reduziu <strong>${Math.abs(diff).toFixed(1)} kg</strong> do peso inicial. Meta: aumentar para <strong>${goalWeight ? goalWeight.toFixed(1) : '-'} kg</strong>.`;
+                            } else {
+                                vcWAchievementText.innerHTML = `Peso estável em relação ao início. Meta: aumentar para <strong>${goalWeight ? goalWeight.toFixed(1) : '-'} kg</strong>.`;
+                            }
+                        } else {
+                            vcWAchievementText.innerHTML = `Manutenção ativa de peso. Meta: manter em <strong>${goalWeight ? goalWeight.toFixed(1) : '-'} kg</strong>.`;
+                        }
+                    }
+
+                    // Preencher tabela de medições da aba
+                    if (vcTabWeightHistoryBody) {
+                        vcTabWeightHistoryBody.innerHTML = '';
+                        const sortedWeightsDesc = [...weights].reverse();
+                        sortedWeightsDesc.forEach((w, i) => {
+                            const tr = document.createElement('tr');
+                            const [year, month, day] = w.date.split('-');
+                            const formattedDate = `${day}/${month}/${year}`;
+                            
+                            // Calcula diferença em relação à medição anterior
+                            let diffStr = '-';
+                            const indexInAsc = weights.findIndex(x => x.id === w.id);
+                            if (indexInAsc > 0) {
+                                const prevWeight = parseFloat(weights[indexInAsc - 1].weight);
+                                const currentWVal = parseFloat(w.weight);
+                                const diffVal = currentWVal - prevWeight;
+                                if (diffVal > 0) {
+                                    diffStr = `<span style="color:#ef4444; font-weight:600;">+${diffVal.toFixed(1)} kg</span>`;
+                                } else if (diffVal < 0) {
+                                    diffStr = `<span style="color:#22c55e; font-weight:600;">${diffVal.toFixed(1)} kg</span>`;
+                                } else {
+                                    diffStr = '<span style="opacity:0.5;">0.0 kg</span>';
+                                }
+                            }
+
+                            tr.innerHTML = `
+                                <td style="padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03);">${formattedDate}</td>
+                                <td style="padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); font-weight:600;">${parseFloat(w.weight).toFixed(1)} kg</td>
+                                <td style="padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); text-align:right;">${diffStr}</td>
+                            `;
+                            vcTabWeightHistoryBody.appendChild(tr);
+                        });
+                    }
+
+                    // Renderizar Gráfico
+                    const chartCanvas = document.getElementById('vc-weight-chart');
+                    if (chartCanvas) {
+                        if (vcWeightChartInstance) {
+                            try {
+                                vcWeightChartInstance.destroy();
+                            } catch(e) {}
+                        }
+                        
+                        const labels = weights.map(w => {
+                            const [y, m, d] = w.date.split('-');
+                            return `${d}/${m}`;
+                        });
+                        const dataPoints = weights.map(w => parseFloat(w.weight));
+                        const goalPoints = goalWeight ? weights.map(w => goalWeight) : [];
+
+                        const ctx = chartCanvas.getContext('2d');
+                        
+                        const datasets = [{
+                            label: 'Peso Atual',
+                            data: dataPoints,
+                            borderColor: '#fee440',
+                            backgroundColor: 'rgba(254, 228, 64, 0.03)',
+                            borderWidth: 2.5,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#fee440',
+                            fill: true
+                        }];
+
+                        if (goalWeight) {
+                            datasets.push({
+                                label: 'Meta de Peso',
+                                data: goalPoints,
+                                borderColor: '#22c55e',
+                                borderDash: [6, 6],
+                                borderWidth: 1.5,
+                                pointRadius: 0,
+                                fill: false
+                            });
+                        }
+
+                        vcWeightChartInstance = new Chart(ctx, {
+                            type: 'line',
+                            data: { labels, datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'top',
+                                        labels: {
+                                            color: '#fff',
+                                            font: { size: 10, family: 'Geist' }
+                                        }
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                return ` ${context.dataset.label}: ${context.raw} kg`;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        grid: { color: 'rgba(255,255,255,0.05)' },
+                                        ticks: { color: 'rgba(255,255,255,0.6)', font: { size: 9, family: 'Geist' } }
+                                    },
+                                    y: {
+                                        grid: { color: 'rgba(255,255,255,0.05)' },
+                                        ticks: { color: 'rgba(255,255,255,0.6)', font: { size: 9, family: 'Geist' } }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    if (vcWInitial) vcWInitial.textContent = '-';
+                    if (vcWCurrent) vcWCurrent.textContent = '-';
+                    if (vcWTarget) vcWTarget.textContent = goalWeight ? `${goalWeight.toFixed(1)} kg` : '-';
+                    if (vcWAchievementCard) vcWAchievementCard.style.display = 'none';
+                    if (vcTabWeightHistoryBody) {
+                        vcTabWeightHistoryBody.innerHTML = '<tr><td colspan="3" style="text-align:center; opacity:0.5; padding:12px;">Nenhum peso registrado.</td></tr>';
+                    }
+                    if (vcWeightChartInstance) {
+                        try {
+                            vcWeightChartInstance.destroy();
+                        } catch(e) {}
+                        vcWeightChartInstance = null;
+                    }
+                }
+
+                // Renderizar o diário alimentar (refeições)
+                const vcDiaryContainer = document.getElementById('vc-diary-container');
+                if (diaryData && vcDiaryContainer) {
+                    vcDiaryContainer.innerHTML = '';
+                    if (!diaryData.meals || diaryData.meals.length === 0) {
+                        vcDiaryContainer.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5; font-size:13px;">Nenhuma refeição registrada nos últimos dias.</div>';
+                    } else {
+                        // Agrupar refeições por data
+                        const mealsByDay = {};
+                        diaryData.meals.forEach(m => {
+                            const dateVal = m.date.split('T')[0];
+                            if (!mealsByDay[dateVal]) mealsByDay[dateVal] = [];
+                            mealsByDay[dateVal].push(m);
+                        });
+
+                        // Ordenar as datas decrescentemente
+                        const sortedDates = Object.keys(mealsByDay).sort().reverse();
+
+                        sortedDates.forEach((dateStr, idx) => {
+                            const dayMeals = mealsByDay[dateStr];
+                            
+                            // Somar macros e calorias do dia
+                            let dayCal = 0, dayCarbs = 0, dayProtein = 0, dayFat = 0;
+                            dayMeals.forEach(m => {
+                                const tot = m.total && typeof m.total === 'object' ? m.total : {};
+                                dayCal += tot.calories || 0;
+                                dayCarbs += tot.carbs || 0;
+                                dayProtein += tot.protein || 0;
+                                dayFat += tot.fat || 0;
+                            });
+
+                            // Formatar a data para exibição (ex: "27/05/2026")
+                            const dateParts = dateStr.split('-');
+                            const displayDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+
+                            // Determinar se é "Hoje" ou "Ontem"
+                            const todayStr = new Date().toISOString().split('T')[0];
+                            const yesterday = new Date();
+                            yesterday.setDate(yesterday.getDate() - 1);
+                            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+                            let dayLabel = displayDate;
+                            if (dateStr === todayStr) {
+                                dayLabel = `Hoje (${displayDate})`;
+                            } else if (dateStr === yesterdayStr) {
+                                dayLabel = `Ontem (${displayDate})`;
+                            }
+
+                            // Criar acordeão
+                            const dayGroup = document.createElement('div');
+                            dayGroup.className = `vc-diary-day-group${idx === 0 ? ' expanded' : ''}`;
+
+                            dayGroup.innerHTML = `
+                                <div class="vc-diary-day-header">
+                                    <div class="vc-diary-day-title">
+                                        <i data-lucide="calendar" style="width:16px; height:16px; color:var(--color-primary);"></i>
+                                        <span>${dayLabel}</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <span class="vc-diary-day-summary">${dayCal} kcal | C:${dayCarbs}g P:${dayProtein}g F:${dayFat}g</span>
+                                        <i class="vc-diary-day-icon" data-lucide="chevron-down" style="width:16px; height:16px;"></i>
+                                    </div>
+                                </div>
+                                <div class="vc-diary-day-details">
+                                    <table style="width:100%; border-collapse:collapse;">
+                                        <thead>
+                                            <tr style="border-bottom:1px solid rgba(255,255,255,0.05); text-align:left; font-size:10px; opacity:0.5;">
+                                                <th style="padding:6px 4px;">Hora</th>
+                                                <th style="padding:6px 4px;">Refeição</th>
+                                                <th style="padding:6px 4px;">Tipo</th>
+                                                <th style="padding:6px 4px; text-align:right;">Calorias</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            `;
+
+                            const tbody = dayGroup.querySelector('tbody');
+                            dayMeals.forEach(m => {
+                                const tr = document.createElement('tr');
+                                tr.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+                                tr.style.fontSize = '12px';
+                                tr.style.cursor = 'pointer';
+                                const formattedTime = m.time.substring(0, 5);
+                                const typeLabel = getMealTypeLabel(m);
+                                const tot = m.total && typeof m.total === 'object' ? m.total : {};
+                                const calVal = tot.calories !== undefined ? `${tot.calories} kcal` : '-';
+                                
+                                tr.innerHTML = `
+                                    <td style="padding:8px 4px; opacity:0.7;">${formattedTime}</td>
+                                    <td style="padding:8px 4px;"><strong>${m.name}</strong></td>
+                                    <td style="padding:8px 4px;"><span style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px;">${typeLabel}</span></td>
+                                    <td style="padding:8px 4px; text-align:right; font-weight:600;">${calVal}</td>
+                                `;
+                                
+                                tr.addEventListener('click', () => {
+                                    openAdminMealDetailsModal(m);
+                                });
+                                tbody.appendChild(tr);
+                            });
+
+                            // Listener de expansão/recolhimento
+                            dayGroup.querySelector('.vc-diary-day-header').addEventListener('click', () => {
+                                dayGroup.classList.toggle('expanded');
+                            });
+
+                            vcDiaryContainer.appendChild(dayGroup);
+                        });
+
+                        if (window.lucide) window.lucide.createIcons();
+                    }
                 }
             })();
 
@@ -2484,9 +2673,14 @@ document.addEventListener('DOMContentLoaded', () => {
             vcFeedbackContent.disabled = false;
         }
 
-        remoteCandidatesQueue = [];
-        const screenVideoCall = document.getElementById('screen-video-call');
-        if (screenVideoCall) screenVideoCall.style.display = 'none';
+        if (vcWeightChartInstance) {
+            try {
+                vcWeightChartInstance.destroy();
+            } catch(e) {
+                console.error("Erro ao destruir gráfico:", e);
+            }
+            vcWeightChartInstance = null;
+        }
 
         const vcWeightHistoryContent = document.getElementById('vc-weight-history-content');
         const vcWeightHistoryArrow = document.getElementById('vc-weight-history-arrow');
@@ -2496,6 +2690,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vcWeightHistoryBody) {
             vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; opacity:0.5; padding: 12px;">Nenhum peso registrado.</td></tr>';
         }
+
+        // Limpar aba de evolução de peso
+        const vcWInitial = document.getElementById('vc-w-initial');
+        const vcWCurrent = document.getElementById('vc-w-current');
+        const vcWTarget = document.getElementById('vc-w-target');
+        const vcWAchievementCard = document.getElementById('vc-w-achievement-card');
+        const vcWAchievementText = document.getElementById('vc-w-achievement-text');
+        const vcTabWeightHistoryBody = document.getElementById('vc-tab-weight-history-body');
+
+        if (vcWInitial) vcWInitial.textContent = '-';
+        if (vcWCurrent) vcWCurrent.textContent = '-';
+        if (vcWTarget) vcWTarget.textContent = '-';
+        if (vcWAchievementCard) vcWAchievementCard.style.display = 'none';
+        if (vcWAchievementText) vcWAchievementText.textContent = 'Carregando evolução...';
+        if (vcTabWeightHistoryBody) {
+            vcTabWeightHistoryBody.innerHTML = '<tr><td colspan="3" style="text-align:center; opacity:0.5; padding:12px;">Nenhum peso registrado.</td></tr>';
+        }
+
+        remoteCandidatesQueue = [];
+        const screenVideoCall = document.getElementById('screen-video-call');
+        if (screenVideoCall) screenVideoCall.style.display = 'none';
 
         loadAppointmentsData();
     }
