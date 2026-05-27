@@ -286,13 +286,24 @@ router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']),
 
     if (hasAI) {
       try {
-        const translationPrompt = `Traduza o seguinte termo de busca de alimentos ou prato de português para o inglês de forma concisa. Retorne APENAS o termo em inglês, sem pontuação, sem aspas e sem nenhuma explicação extra. Termo: "${query}"`;
+        const translationPrompt = `Você é um tradutor especialista em nutrição. Traduza o seguinte termo de busca de alimentos ou prato de português para o inglês de forma concisa.
+Responda obrigatoriamente em formato JSON puro, sem markdown, contendo exatamente a chave "translation":
+{"translation": "termo traduzido em inglês"}
+
+Termo a traduzir: "${query}"`;
+
         const translationRes = await aiRoutes.callLLM(cfg, translationPrompt);
         if (translationRes && translationRes.text) {
-          const cleanedText = translationRes.text.replace(/["'`.?!]/g, "").trim();
-          if (cleanedText) {
-            searchUrlQuery = cleanedText;
-            console.log(`Traduzido para busca: "${query}" -> "${searchUrlQuery}"`);
+          const rawText = translationRes.text.trim();
+          const match = rawText.match(/\{[\s\S]*\}/);
+          const jsonText = match ? match[0] : rawText;
+          const parsed = JSON.parse(jsonText);
+          if (parsed && parsed.translation) {
+            const cleanedText = parsed.translation.replace(/["'`.?!]/g, "").trim();
+            if (cleanedText) {
+              searchUrlQuery = cleanedText;
+              console.log(`Traduzido para busca: "${query}" -> "${searchUrlQuery}"`);
+            }
           }
         }
       } catch(e) {
@@ -334,20 +345,22 @@ router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']),
         const titlesPrompt = `Você é um tradutor de cardápios especialista em culinária e nutrição. Traduza a seguinte lista de títulos de receitas do inglês para nomes de pratos apetitosos e naturais em português (Brasil).
 Lista original em inglês: ${JSON.stringify(originalTitles)}
 
+Responda obrigatoriamente em formato JSON contendo a chave "translations" com o array das traduções na mesma ordem:
+{"translations": ["Tradução 1", "Tradução 2", ...]}
+
 Regras de saída:
-1. Retorne APENAS um array JSON de strings contendo exatamente as traduções dos títulos no mesmo formato e ordem, exemplo: ["Salmão com Brócolis", "Frango Grelhado"].
-2. Proibido adicionar explicações, markdown ou blocos de código. A resposta deve ser apenas o array JSON válido parseável.`;
+1. Retorne APENAS o objeto JSON acima, sem markdown, sem explicações ou blocos de código.`;
 
         const titlesRes = await aiRoutes.callLLM(cfg, titlesPrompt);
         if (titlesRes && titlesRes.text) {
           const rawText = titlesRes.text.trim();
-          const match = rawText.match(/\[[\s\S]*\]/);
+          const match = rawText.match(/\{[\s\S]*\}/);
           const jsonText = match ? match[0] : rawText;
-          const translatedTitles = JSON.parse(jsonText);
-          if (Array.isArray(translatedTitles)) {
+          const parsed = JSON.parse(jsonText);
+          if (parsed && Array.isArray(parsed.translations)) {
             items.forEach((item, idx) => {
-              if (translatedTitles[idx]) {
-                item.name = translatedTitles[idx].trim();
+              if (parsed.translations[idx]) {
+                item.name = parsed.translations[idx].trim();
               }
             });
             console.log("Títulos das receitas traduzidos para português com sucesso!");
