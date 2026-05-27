@@ -40,9 +40,17 @@ O app gerencia o acompanhamento de calorias, macronutrientes, hidratação e jej
 ```
 dieta/
 ├── admin/                   # Painel Administrativo Independente
-│   ├── index.html           # Estrutura HTML do Painel Admin
+│   ├── index.html           # Estrutura HTML do Painel Admin (carrega admin.js como module)
 │   ├── admin.css            # Estilo Obsidian do Painel Admin
-│   └── admin.js             # Lógica e controle de APIs do Painel Admin
+│   ├── admin.js             # Entrypoint principal que orquestra as dependências e roteia abas
+│   └── modules/             # Submódulos JavaScript (ES6 Modules nativos)
+│       ├── state.js         # Estado global compartilhado e configurações de API
+│       ├── auth.js          # Controle de autenticação, login e validação de sessão
+│       ├── admin-features.js# Painel geral: usuários, profissionais, planos, faturamento e LLM keys
+│       ├── pro-schedule.js  # Controle da grade visual de disponibilidade semanal
+│       ├── pro-patients.js  # Prontuário em tempo real, evolução de peso e WebRTC
+│       ├── pro-appointments.js# Listagem e cancelamento de consultas
+│       └── pro-meals.js     # Construtor de cardápios semanais e receitas via IA
 ├── deploy.js                # Script Node.js de deploy automático via SSH para a VPS
 ├── Dockerfile.frontend      # Dockerfile do Nginx que serve a SPA estática (inclui favicon.svg)
 ├── docker-compose.yml       # Orquestração (db, backend, frontend, nginx)
@@ -197,7 +205,7 @@ GET /api/user/weekly-plan
 Retorna o plano mais recente (`is_active = true`) do profissional vinculado via JOIN em `professional_links`.
 
 ### F. Painel de Administração (`/admin/`)
-Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais:
+Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais. O painel foi modularizado utilizando ES6 Modules nativos (`type="module"`), dividindo a antiga base monolítica `admin.js` de ~3.6k linhas em componentes específicos focados (armazenados em `admin/modules/`), o que facilita a manutenção e a escalabilidade do código sem a necessidade de build steps complexos (como Webpack/Vite).
 
 **Administradores**:
 - Controle de usuários (promoção de cargo, plano, trial).
