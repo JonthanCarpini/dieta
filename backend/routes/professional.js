@@ -294,4 +294,117 @@ router.delete('/weekly-plans/:id', async (req, res) => {
   }
 });
 
+// ==========================================
+// 5. GESTÃO CLÍNICA DE PACIENTES & EXAMES
+// ==========================================
+const fs = require('fs');
+const path = require('path');
+
+router.get('/patients/:id/clinical', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  try {
+    const result = await db.query(
+      'SELECT comorbidities, intolerances, dietary_restrictions, notes FROM profiles WHERE user_id = $1',
+      [patientId]
+    );
+    res.json(result.rows[0] || { comorbidities: '', intolerances: '', dietary_restrictions: '', notes: '' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar dados clínicos do paciente.' });
+  }
+});
+
+router.post('/patients/:id/clinical', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  const { comorbidities, intolerances, dietary_restrictions, notes } = req.body;
+  try {
+    await db.query(`
+      INSERT INTO profiles (user_id, comorbidities, intolerances, dietary_restrictions, notes, updated_at)
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        comorbidities = EXCLUDED.comorbidities,
+        intolerances = EXCLUDED.intolerances,
+        dietary_restrictions = EXCLUDED.dietary_restrictions,
+        notes = EXCLUDED.notes,
+        updated_at = NOW()
+    `, [patientId, comorbidities, intolerances, dietary_restrictions, notes]);
+    res.json({ message: 'Ficha clínica do paciente salva com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar ficha clínica do paciente.' });
+  }
+});
+
+router.get('/patients/:id/exams', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  try {
+    const result = await db.query(
+      'SELECT id, file_name, file_path, mime_type, notes, created_at FROM patient_exams WHERE patient_id = $1 ORDER BY created_at DESC',
+      [patientId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar exames do paciente.' });
+  }
+});
+
+router.get('/exams/download/:filename', async (req, res) => {
+  const { filename } = req.params;
+  const absolutePath = path.join(__dirname, '..', 'uploads', 'exams', filename);
+  try {
+    const examRes = await db.query(
+      'SELECT id, patient_id FROM patient_exams WHERE file_path LIKE $1',
+      [`%${filename}`]
+    );
+    if (examRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Exame não encontrado.' });
+    }
+    const patientId = examRes.rows[0].patient_id;
+
+    const linkCheck = await db.query(
+      'SELECT id FROM professional_links WHERE user_id = $1 AND professional_id = $2 AND type = $3',
+      [patientId, req.user.id, req.user.role]
+    );
+    if (linkCheck.rows.length === 0 && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado. Você não possui vínculo com o paciente deste exame.' });
+    }
+
+    if (fs.existsSync(absolutePath)) {
+      res.download(absolutePath);
+    } else {
+      res.status(404).json({ error: 'Arquivo físico não encontrado no servidor.' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao baixar exame.' });
+  }
+});
+
+router.post('/exams/:examId/notes', async (req, res) => {
+  const examId = parseInt(req.params.examId);
+  const { notes } = req.body;
+  try {
+    const examRes = await db.query('SELECT patient_id FROM patient_exams WHERE id = $1', [examId]);
+    if (examRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Exame não encontrado.' });
+    }
+    const patientId = examRes.rows[0].patient_id;
+
+    const linkCheck = await db.query(
+      'SELECT id FROM professional_links WHERE user_id = $1 AND professional_id = $2 AND type = $3',
+      [patientId, req.user.id, req.user.role]
+    );
+    if (linkCheck.rows.length === 0 && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    await db.query('UPDATE patient_exams SET notes = $1 WHERE id = $2', [notes, examId]);
+    res.json({ message: 'Observações do exame atualizadas com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar notes do exame.' });
+  }
+});
+
 module.exports = router;

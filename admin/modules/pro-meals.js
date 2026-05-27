@@ -108,6 +108,7 @@ export async function openMealPlanBuilder(planId) {
             adminState._editingPlanActive = plan.is_active !== false;
             document.getElementById('plan-name-input').value = plan.name;
             document.getElementById('plan-patient-select').value = plan.patient_id || '';
+            updateBuilderClinicalBanner(plan.patient_id);
             const togBtn = document.getElementById('btn-toggle-active-plan');
             if (togBtn) {
                 togBtn.textContent = adminState._editingPlanActive ? 'Desativar' : 'Ativar';
@@ -123,6 +124,7 @@ export async function openMealPlanBuilder(planId) {
         adminState._editingPlanActive = true;
         document.getElementById('plan-name-input').value = '';
         document.getElementById('plan-patient-select').value = '';
+        updateBuilderClinicalBanner(null);
         const togBtn = document.getElementById('btn-toggle-active-plan');
         if (togBtn) { togBtn.textContent = 'Desativar'; togBtn.className = 'btn-secondary btn-sm'; }
     }
@@ -143,6 +145,7 @@ export async function openMealPlanBuilder(planId) {
             const res2 = await fetch(`${API_URL}/professional/weekly-plans/${planId}`, { headers: { 'Authorization': `Bearer ${adminState.token}` } });
             const plan2 = await res2.json();
             document.getElementById('plan-patient-select').value = plan2.patient_id || '';
+            updateBuilderClinicalBanner(plan2.patient_id);
         } catch {}
     }
     if (window.lucide) window.lucide.createIcons();
@@ -410,13 +413,47 @@ export async function generateAIRecipe(spoonacularItem) {
     footerDiv.style.display = 'none';
 
     try {
+        const patientId = document.getElementById('plan-patient-select')?.value || null;
+        let profile = null;
+
+        if (patientId) {
+            try {
+                const clinicalRes = await fetch(`${API_URL}/professional/patients/${patientId}/clinical`, {
+                    headers: { 'Authorization': `Bearer ${adminState.token}` }
+                });
+                if (clinicalRes.ok) {
+                    const clinical = await clinicalRes.json();
+                    profile = {
+                        goal: 'maintain',
+                        comorbidities: clinical.comorbidities,
+                        intolerances: clinical.intolerances,
+                        dietary_restrictions: clinical.dietary_restrictions,
+                        notes: clinical.notes
+                    };
+
+                    const patientObj = (adminState.allPatients || []).find(p => p.id == patientId);
+                    if (patientObj) {
+                        profile.goal = patientObj.goal || 'maintain';
+                        profile.weight = patientObj.weight;
+                        profile.height = patientObj.height;
+                        profile.targetCalories = patientObj.target_calories;
+                        profile.age = patientObj.age;
+                        profile.gender = patientObj.gender;
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao buscar dados clínicos do paciente para IA:', e);
+            }
+        }
+
         const payload = {
             mealType: adminState._targetMealType || 'all',
             cal: Math.round(spoonacularItem.calories),
             protein: Math.round(spoonacularItem.protein_g),
             carbs: Math.round(spoonacularItem.carbohydrates_total_g),
             fat: Math.round(spoonacularItem.fat_total_g),
-            recipeName: spoonacularItem.name
+            recipeName: spoonacularItem.name,
+            profile: profile
         };
 
         const res = await fetch(`${API_URL}/ai/generate-recipe`, {
@@ -510,6 +547,14 @@ export function initProMeals() {
         });
     });
 
+    const patientSelect = document.getElementById('plan-patient-select');
+    if (patientSelect) {
+        patientSelect.addEventListener('change', (e) => {
+            const patientId = e.target.value;
+            updateBuilderClinicalBanner(patientId);
+        });
+    }
+
     // Configura listeners do modal de receita
     document.getElementById('btn-close-recipe-generator')?.addEventListener('click', () => {
         document.getElementById('admin-recipe-generator-modal').style.display = 'none';
@@ -554,4 +599,38 @@ export function initProMeals() {
         // 4. Re-renderiza o dia
         renderPlanDayEditor(targetDow);
     });
+}
+
+export async function updateBuilderClinicalBanner(patientId) {
+    const banner = document.getElementById('builder-clinical-banner');
+    const info = document.getElementById('builder-clinical-info');
+    if (!banner || !info) return;
+
+    if (!patientId) {
+        banner.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/professional/patients/${patientId}/clinical`, {
+            headers: { 'Authorization': `Bearer ${adminState.token}` }
+        });
+        if (!res.ok) throw new Error('Não foi possível carregar a ficha clínica para o banner.');
+        const clinical = await res.json();
+
+        let textParts = [];
+        if (clinical.comorbidities) textParts.push(`<strong>Comorbidades:</strong> ${clinical.comorbidities}`);
+        if (clinical.intolerances) textParts.push(`<strong>Intolerâncias/Alergias:</strong> ${clinical.intolerances}`);
+        if (clinical.dietary_restrictions) textParts.push(`<strong>Restrições:</strong> ${clinical.dietary_restrictions}`);
+        
+        if (textParts.length > 0) {
+            info.innerHTML = textParts.join(' | ');
+            banner.classList.remove('hidden');
+        } else {
+            banner.classList.add('hidden');
+        }
+    } catch (err) {
+        console.error(err);
+        banner.classList.add('hidden');
+    }
 }

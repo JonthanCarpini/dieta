@@ -192,7 +192,144 @@ export async function viewPatientDetails(patient) {
         alert(err.message);
     }
     await loadFeedbackHistory(patient.id);
+
+    // Resetar abas de paciente para a aba "Diário" por padrão ao abrir detalhes
+    const defaultTabBtn = document.querySelector('.patient-tab-btn[data-patient-tab="diary"]');
+    if (defaultTabBtn) {
+        document.querySelectorAll('.patient-tab-btn').forEach(b => {
+            b.classList.remove('active');
+            b.style.borderBottomColor = 'transparent';
+            b.style.color = 'var(--color-text-muted)';
+        });
+        defaultTabBtn.classList.add('active');
+        defaultTabBtn.style.borderBottomColor = 'var(--color-primary)';
+        defaultTabBtn.style.color = '#fff';
+        
+        document.querySelectorAll('.patient-tab-content-panel').forEach(panel => {
+            panel.classList.add('hidden');
+            panel.classList.remove('active');
+        });
+        const activePanel = document.getElementById('patient-tab-content-diary');
+        if (activePanel) {
+            activePanel.classList.remove('hidden');
+            activePanel.classList.add('active');
+        }
+    }
+
+    loadPatientClinicalData(patient.id);
+    loadPatientExamsData(patient.id);
+
     if (window.lucide) window.lucide.createIcons();
+}
+
+export async function loadPatientClinicalData(patientId) {
+    try {
+        const res = await fetch(`${API_URL}/professional/patients/${patientId}/clinical`, {
+            headers: { 'Authorization': `Bearer ${adminState.token}` }
+        });
+        if (!res.ok) throw new Error('Não foi possível carregar a ficha clínica.');
+        const clinical = await res.json();
+
+        const inputComorbidities = document.getElementById('pro-clinical-comorbidities');
+        const inputIntolerances = document.getElementById('pro-clinical-intolerances');
+        const inputRestrictions = document.getElementById('pro-clinical-restrictions');
+        const inputNotes = document.getElementById('pro-clinical-notes');
+
+        if (inputComorbidities) inputComorbidities.value = clinical.comorbidities || '';
+        if (inputIntolerances) inputIntolerances.value = clinical.intolerances || '';
+        if (inputRestrictions) inputRestrictions.value = clinical.dietary_restrictions || '';
+        if (inputNotes) inputNotes.value = clinical.notes || '';
+    } catch (err) {
+        console.error('Erro ao carregar dados clínicos:', err);
+    }
+}
+
+export async function loadPatientExamsData(patientId) {
+    const tbody = document.getElementById('pro-patient-exams-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Carregando exames...</td></tr>';
+
+    try {
+        const res = await fetch(`${API_URL}/professional/patients/${patientId}/exams`, {
+            headers: { 'Authorization': `Bearer ${adminState.token}` }
+        });
+        if (!res.ok) throw new Error('Não foi possível carregar exames.');
+        const exams = await res.json();
+
+        tbody.innerHTML = '';
+        if (exams.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--color-text-muted); padding: 20px;">Nenhum exame enviado por este paciente.</td></tr>';
+            return;
+        }
+
+        exams.forEach(exam => {
+            const tr = document.createElement('tr');
+            
+            const dateStr = new Date(exam.created_at).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // Extrair o nome do arquivo da rota de download segura
+            const filename = exam.file_path.substring(exam.file_path.lastIndexOf('/') + 1);
+            const downloadUrl = `${API_URL}/professional/exams/download/${filename}`;
+
+            tr.innerHTML = `
+                <td>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <i data-lucide="file-text" style="color:var(--color-primary); width:16px; height:16px;"></i>
+                        <strong>${exam.file_name}</strong>
+                    </div>
+                </td>
+                <td>${dateStr}</td>
+                <td>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" class="pro-exam-note-input" data-exam-id="${exam.id}" value="${exam.notes || ''}" placeholder="Adicionar notas..." style="flex:1; font-size:12px; padding:4px 8px; height:auto;">
+                        <button class="btn-primary btn-save-exam-note" data-exam-id="${exam.id}" style="font-size:10px; padding:4px 8px;">Salvar</button>
+                    </div>
+                </td>
+                <td>
+                    <a href="${downloadUrl}" download="${exam.file_name}" class="btn-secondary" style="font-size:11px; padding:4px 8px; text-decoration:none; display:inline-block;">
+                        <i data-lucide="download" style="width:12px; height:12px; vertical-align:middle; margin-right:4px;"></i> Baixar
+                    </a>
+                </td>
+            `;
+
+            // Listener para salvar nota do exame
+            tr.querySelector('.btn-save-exam-note').addEventListener('click', async (e) => {
+                const examId = e.currentTarget.dataset.examId;
+                const input = tr.querySelector(`.pro-exam-note-input[data-exam-id="${examId}"]`);
+                const notes = input ? input.value : '';
+
+                try {
+                    const saveRes = await fetch(`${API_URL}/professional/exams/${examId}/notes`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${adminState.token}`
+                        },
+                        body: JSON.stringify({ notes })
+                    });
+                    const data = await saveRes.json();
+                    if (!saveRes.ok) throw new Error(data.error || 'Erro ao salvar anotação.');
+
+                    alert('Observação do exame salva com sucesso!');
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+
+            tbody.appendChild(tr);
+        });
+
+        if (window.lucide) window.lucide.createIcons();
+    } catch (err) {
+        console.error('Erro ao carregar exames:', err);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--color-danger);">Erro ao carregar exames.</td></tr>';
+    }
 }
 
 export function applyMealFilter(days) {
@@ -1331,4 +1468,74 @@ export function initProPatients() {
     const patientGoal   = document.getElementById('patient-goal-filter');
     if (patientSearch) patientSearch.addEventListener('input', applyPatientFilters);
     if (patientGoal)   patientGoal.addEventListener('change', applyPatientFilters);
+
+    // Abas de navegação interna do paciente
+    const patientTabButtons = document.querySelectorAll('.patient-tab-btn');
+    patientTabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            patientTabButtons.forEach(b => {
+                b.classList.remove('active');
+                b.style.borderBottomColor = 'transparent';
+                b.style.color = 'var(--color-text-muted)';
+            });
+            btn.classList.add('active');
+            btn.style.borderBottomColor = 'var(--color-primary)';
+            btn.style.color = '#fff';
+
+            const tabId = btn.dataset.patientTab;
+            document.querySelectorAll('.patient-tab-content-panel').forEach(panel => {
+                panel.classList.add('hidden');
+                panel.classList.remove('active');
+            });
+            const activePanel = document.getElementById(`patient-tab-content-${tabId}`);
+            if (activePanel) {
+                activePanel.classList.remove('hidden');
+                activePanel.classList.add('active');
+            }
+        });
+    });
+
+    // Formulário de Ficha Clínica do Paciente
+    const clinicalForm = document.getElementById('pro-patient-clinical-form');
+    if (clinicalForm) {
+        clinicalForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const patientId = document.getElementById('feedback-patient-id').value;
+            if (!patientId) return;
+
+            const comorbidities = document.getElementById('pro-clinical-comorbidities').value;
+            const intolerances = document.getElementById('pro-clinical-intolerances').value;
+            const dietary_restrictions = document.getElementById('pro-clinical-restrictions').value;
+            const notes = document.getElementById('pro-clinical-notes').value;
+
+            try {
+                const res = await fetch(`${API_URL}/professional/patients/${patientId}/clinical`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminState.token}`
+                    },
+                    body: JSON.stringify({ comorbidities, intolerances, dietary_restrictions, notes })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro ao salvar ficha clínica.');
+
+                const successMsg = document.getElementById('clinical-success-msg');
+                if (successMsg) {
+                    successMsg.classList.remove('hidden');
+                    setTimeout(() => successMsg.classList.add('hidden'), 3000);
+                }
+
+                const patientObj = (adminState.allPatients || []).find(p => p.id == patientId);
+                if (patientObj) {
+                    patientObj.comorbidities = comorbidities;
+                    patientObj.intolerances = intolerances;
+                    patientObj.dietary_restrictions = dietary_restrictions;
+                    patientObj.notes = notes;
+                }
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
 }

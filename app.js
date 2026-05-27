@@ -241,6 +241,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     targetProtein: data.profile.target_protein,
                     targetCarbs: data.profile.target_carbs,
                     targetFat: data.profile.target_fat,
+                    comorbidities: data.profile.comorbidities || '',
+                    intolerances: data.profile.intolerances || '',
+                    dietary_restrictions: data.profile.dietary_restrictions || '',
+                    notes: data.profile.notes || '',
                     dateCalculated: data.profile.updated_at ? data.profile.updated_at.split('T')[0] : getTodayDateString()
                 };
             } else {
@@ -1362,9 +1366,98 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
+            // 5.5 Carrega e renderiza exames
+            await loadMyExamsList();
+
             lucide.createIcons();
         } catch (err) {
             console.error('Erro ao renderizar tela de Meus Profissionais:', err);
+        }
+    }
+
+    async function loadMyExamsList() {
+        const container = document.getElementById('my-exams-list');
+        if (!container) return;
+        
+        container.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.4); font-size: 12px; margin: 12px 0;">Carregando...</p>';
+
+        try {
+            const res = await fetch(`${API_URL}/user/exams`, {
+                headers: { 'Authorization': `Bearer ${state.token}` }
+            });
+            if (!res.ok) throw new Error();
+            const exams = await res.json();
+
+            container.innerHTML = '';
+            if (exams.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.4); font-size: 12px; margin: 12px 0;">Nenhum exame enviado.</p>';
+                return;
+            }
+
+            exams.forEach(exam => {
+                const card = document.createElement('div');
+                card.className = 'history-day-card';
+                card.style.padding = '12px';
+                card.style.display = 'flex';
+                card.style.flexDirection = 'column';
+                card.style.gap = '6px';
+
+                const dateStr = new Date(exam.created_at).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const filename = exam.file_path.substring(exam.file_path.lastIndexOf('/') + 1);
+                const downloadUrl = `${API_URL}/user/exams/download/${filename}`;
+
+                let noteHtml = '';
+                if (exam.notes) {
+                    noteHtml = `<div style="font-size:11px; color:var(--color-primary); background:rgba(245,193,77,0.05); padding:6px 8px; border-radius:6px; border:1px solid rgba(245,193,77,0.1); margin-top:4px;"><strong>Nota do Nutri:</strong> ${exam.notes}</div>`;
+                }
+
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="flex:1; min-width:0; margin-right:8px;">
+                            <strong style="font-size:13px; color:#fff; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${exam.file_name}">${exam.file_name}</strong>
+                            <span style="font-size:10px; opacity:0.5;">Enviado em: ${dateStr}</span>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-shrink:0;">
+                            <a href="${downloadUrl}" download="${exam.file_name}" class="btn-secondary" style="font-size:10px; padding:6px 8px; text-decoration:none; display:inline-block; border-radius:6px; height:auto; line-height:1;">
+                                <i data-lucide="download" style="width:10px; height:10px; vertical-align:middle;"></i>
+                            </a>
+                            <button class="btn-danger btn-delete-exam" data-exam-id="${exam.id}" style="font-size:10px; padding:6px; border-radius:6px; height:auto; line-height:1;">
+                                <i data-lucide="trash-2" style="width:10px; height:10px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                    ${noteHtml}
+                `;
+
+                card.querySelector('.btn-delete-exam').addEventListener('click', async (e) => {
+                    if (confirm('Deseja realmente excluir este exame?')) {
+                        const examId = e.currentTarget.dataset.examId;
+                        try {
+                            const delRes = await fetch(`${API_URL}/user/exams/${examId}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${state.token}` }
+                            });
+                            if (!delRes.ok) throw new Error();
+                            await loadMyExamsList();
+                        } catch {
+                            alert('Erro ao excluir exame.');
+                        }
+                    }
+                });
+
+                container.appendChild(card);
+            });
+
+            if (window.lucide) window.lucide.createIcons();
+        } catch (err) {
+            container.innerHTML = '<p style="text-align: center; color: var(--color-danger); font-size: 12px; margin: 12px 0;">Erro ao carregar exames.</p>';
         }
     }
 
@@ -4059,6 +4152,15 @@ document.addEventListener('DOMContentLoaded', () => {
             adminCard.style.display = (state.user && state.user.role === 'admin') ? 'block' : 'none';
         }
 
+        // Preencher perfil clínico se existir
+        const inputComorbidities = document.getElementById('input-settings-comorbidities');
+        const inputIntolerances = document.getElementById('input-settings-intolerances');
+        const inputRestrictions = document.getElementById('input-settings-restrictions');
+
+        if (inputComorbidities) inputComorbidities.value = profile.comorbidities || '';
+        if (inputIntolerances) inputIntolerances.value = profile.intolerances || '';
+        if (inputRestrictions) inputRestrictions.value = profile.dietary_restrictions || '';
+
         // Renderiza o histórico de peso na Área Evolutiva
         renderWeightHistory();
      }
@@ -4477,6 +4579,110 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (confirm('Deseja realmente encerrar a videochamada?')) {
                     closeVideoCall();
                 }
+            });
+        }
+
+        // Ouvintes de ficha clínica nas configurações do paciente
+        const settingsClinicalForm = document.getElementById('settings-clinical-form');
+        if (settingsClinicalForm) {
+            settingsClinicalForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const comorbidities = document.getElementById('input-settings-comorbidities').value;
+                const intolerances = document.getElementById('input-settings-intolerances').value;
+                const dietary_restrictions = document.getElementById('input-settings-restrictions').value;
+
+                try {
+                    const res = await fetch(`${API_URL}/user/clinical`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${state.token}`
+                        },
+                        body: JSON.stringify({ comorbidities, intolerances, dietary_restrictions })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Erro ao salvar ficha clínica.');
+
+                    const successMsg = document.getElementById('clinical-settings-success-msg');
+                    if (successMsg) {
+                        successMsg.classList.remove('hidden');
+                        setTimeout(() => successMsg.classList.add('hidden'), 3000);
+                    }
+
+                    if (state.userProfile) {
+                        state.userProfile.comorbidities = comorbidities;
+                        state.userProfile.intolerances = intolerances;
+                        state.userProfile.dietary_restrictions = dietary_restrictions;
+                    }
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        }
+
+        // Ouvinte de upload de exames laboratoriais do paciente
+        const myExamsUploadForm = document.getElementById('my-exams-upload-form');
+        if (myExamsUploadForm) {
+            myExamsUploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const fileInput = document.getElementById('input-exam-file');
+                if (!fileInput || fileInput.files.length === 0) {
+                    alert('Selecione um arquivo primeiro.');
+                    return;
+                }
+
+                const file = fileInput.files[0];
+                const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    alert('Formato de arquivo não suportado. Envie apenas PDF ou imagens.');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    const fileBase64 = reader.result;
+                    const payload = {
+                        fileName: file.name,
+                        mimeType: file.type,
+                        fileBase64: fileBase64,
+                        notes: ''
+                    };
+
+                    const btnSubmit = document.getElementById('btn-submit-exam');
+                    if (btnSubmit) {
+                        btnSubmit.disabled = true;
+                        btnSubmit.innerHTML = 'Enviando...';
+                    }
+
+                    try {
+                        const res = await fetch(`${API_URL}/user/exams`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${state.token}`
+                            },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Erro ao enviar exame.');
+
+                        alert('Exame enviado com sucesso!');
+                        fileInput.value = '';
+                        await loadMyExamsList();
+                    } catch (err) {
+                        alert(err.message);
+                    } finally {
+                        if (btnSubmit) {
+                            btnSubmit.disabled = false;
+                            btnSubmit.innerHTML = `<i data-lucide="upload" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> Enviar Exame`;
+                            if (window.lucide) window.lucide.createIcons();
+                        }
+                    }
+                };
+                reader.onerror = () => {
+                    alert('Erro ao ler arquivo.');
+                };
+                reader.readAsDataURL(file);
             });
         }
     }

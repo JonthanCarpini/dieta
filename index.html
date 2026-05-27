@@ -738,6 +738,34 @@
                     </button>
                 </div>
 
+                </div>
+
+                <!-- Perfil Clínico (Comorbidades e Intolerâncias) -->
+                <div class="settings-card">
+                    <div class="card-header-icon border-profile">
+                        <i data-lucide="activity" class="text-profile"></i>
+                        <h3>Perfil Clínico</h3>
+                    </div>
+                    <p class="settings-description">Informe suas particularidades de saúde e restrições alimentares. Essas informações serão compartilhadas com os profissionais de saúde vinculados e serão rigorosamente respeitadas pela nossa Inteligência Artificial ao sugerir receitas.</p>
+                    
+                    <form id="settings-clinical-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                        <div class="form-group">
+                            <label for="input-settings-comorbidities" style="font-size: 11px;">Comorbidades / Condições de Saúde</label>
+                            <input type="text" id="input-settings-comorbidities" placeholder="Ex: Diabetes Tipo 2, Hipertensão, Gastrite..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
+                        </div>
+                        <div class="form-group">
+                            <label for="input-settings-intolerances" style="font-size: 11px;">Intolerâncias e Alergias Alimentares</label>
+                            <input type="text" id="input-settings-intolerances" placeholder="Ex: Lactose, Glúten, Amendoim, Ovos..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
+                        </div>
+                        <div class="form-group">
+                            <label for="input-settings-restrictions" style="font-size: 11px;">Restrições Alimentares Adicionais</label>
+                            <input type="text" id="input-settings-restrictions" placeholder="Ex: Vegano, Vegetariano, Sem carne vermelha..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
+                        </div>
+                        <button type="submit" class="btn-primary w-full" style="padding: 12px; font-size: 14px;">Salvar Dados Clínicos</button>
+                    </form>
+                    <div id="clinical-settings-success-msg" class="success-banner hidden" style="margin-top: 10px;">Perfil clínico atualizado com sucesso!</div>
+                </div>
+
                 <!-- Área Evolutiva (Histórico de Peso) -->
                 <div class="settings-card">
                     <div class="card-header-icon border-profile">
@@ -865,6 +893,34 @@
                         
                         <div id="my-pros-appointments-list" style="display:flex; flex-direction:column; gap:10px; margin-top:12px;">
                             <!-- Lista de consultas agendadas (JS) -->
+                        </div>
+                    </div>
+
+                    <!-- 4. MEUS EXAMES LABORATORIAIS -->
+                    <div class="settings-card">
+                        <div class="card-header-icon border-profile">
+                            <i data-lucide="file-text" class="text-profile"></i>
+                            <h3>Meus Exames Laboratoriais</h3>
+                        </div>
+                        <p class="settings-description">Envie arquivos de exames (PDF ou imagens) para que seus profissionais possam analisar e acompanhar.</p>
+                        
+                        <form id="my-exams-upload-form" style="display:flex; flex-direction:column; gap:12px; margin-top:12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 16px;">
+                            <div class="form-group">
+                                <label for="input-exam-file">Selecionar Arquivo (PDF, Imagem)</label>
+                                <input type="file" id="input-exam-file" accept="application/pdf, image/jpeg, image/png, image/webp" required style="padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; width:100%;">
+                            </div>
+                            <button type="submit" class="btn-primary w-full" id="btn-submit-exam">
+                                <i data-lucide="upload" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+                                Enviar Exame
+                            </button>
+                        </form>
+                        
+                        <div class="my-exams-list-section" style="margin-top:16px;">
+                            <h4 style="margin-bottom:8px; font-size:13px; font-weight:600;">Exames Enviados</h4>
+                            <div id="my-exams-list" style="display:flex; flex-direction:column; gap:10px;">
+                                <!-- Lista de exames preenchida via JS -->
+                                <p style="text-align: center; color: rgba(255,255,255,0.4); font-size: 12px; margin: 12px 0;">Nenhum exame enviado.</p>
+                            </div>
                         </div>
                     </div>
 

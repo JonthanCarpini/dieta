@@ -702,4 +702,143 @@ router.get('/weekly-plan', async (req, res) => {
   }
 });
 
+// ==========================================
+// 9. FICHA CLÍNICA & EXAMES LABORATORIAIS
+// ==========================================
+const fs = require('fs');
+const path = require('path');
+
+router.get('/clinical', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT comorbidities, intolerances, dietary_restrictions, notes FROM profiles WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json(result.rows[0] || { comorbidities: '', intolerances: '', dietary_restrictions: '', notes: '' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar dados clínicos.' });
+  }
+});
+
+router.post('/clinical', async (req, res) => {
+  const { comorbidities, intolerances, dietary_restrictions } = req.body;
+  try {
+    await db.query(`
+      INSERT INTO profiles (user_id, comorbidities, intolerances, dietary_restrictions, updated_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        comorbidities = EXCLUDED.comorbidities,
+        intolerances = EXCLUDED.intolerances,
+        dietary_restrictions = EXCLUDED.dietary_restrictions,
+        updated_at = NOW()
+    `, [req.user.id, comorbidities, intolerances, dietary_restrictions]);
+    res.json({ message: 'Perfil clínico atualizado com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar perfil clínico.' });
+  }
+});
+
+router.post('/exams', async (req, res) => {
+  const { fileName, mimeType, fileBase64, notes } = req.body;
+  if (!fileName || !mimeType || !fileBase64) {
+    return res.status(400).json({ error: 'Arquivo ou metadados ausentes.' });
+  }
+
+  try {
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(mimeType)) {
+      return res.status(400).json({ error: 'Tipo de arquivo não suportado. Envie apenas PDF ou Imagens (JPEG/PNG/WEBP).' });
+    }
+
+    const base64Data = fileBase64.replace(/^data:.*?;base64,/, "");
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const fileExt = fileName.substring(fileName.lastIndexOf('.'));
+    const uniqueName = `exam_${req.user.id}_${Date.now()}${fileExt}`;
+    const relativePath = `uploads/exams/${uniqueName}`;
+    const absolutePath = path.join(__dirname, '..', relativePath);
+
+    fs.writeFileSync(absolutePath, buffer);
+
+    const result = await db.query(`
+      INSERT INTO patient_exams (patient_id, file_name, file_path, mime_type, notes)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [req.user.id, fileName, relativePath, mimeType, notes || '']);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao fazer upload do exame.' });
+  }
+});
+
+router.get('/exams', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT id, file_name, file_path, mime_type, notes, created_at FROM patient_exams WHERE patient_id = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar exames.' });
+  }
+});
+
+router.delete('/exams/:id', async (req, res) => {
+  const examId = parseInt(req.params.id);
+  try {
+    const checkRes = await db.query('SELECT file_path, patient_id FROM patient_exams WHERE id = $1', [examId]);
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Exame não encontrado.' });
+    }
+    if (checkRes.rows[0].patient_id !== req.user.id) {
+      return res.status(403).json({ error: 'Não autorizado.' });
+    }
+
+    const relativePath = checkRes.rows[0].file_path;
+    const absolutePath = path.join(__dirname, '..', relativePath);
+
+    await db.query('DELETE FROM patient_exams WHERE id = $1', [examId]);
+
+    if (fs.existsSync(absolutePath)) {
+      fs.unlinkSync(absolutePath);
+    }
+
+    res.json({ message: 'Exame excluído com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir exame.' });
+  }
+});
+
+router.get('/exams/download/:filename', async (req, res) => {
+  const { filename } = req.params;
+  const absolutePath = path.join(__dirname, '..', 'uploads', 'exams', filename);
+  try {
+    const fileCheck = await db.query(
+      'SELECT patient_id FROM patient_exams WHERE file_path LIKE $1',
+      [`%${filename}`]
+    );
+    if (fileCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Exame não encontrado.' });
+    }
+    if (fileCheck.rows[0].patient_id !== req.user.id) {
+      return res.status(403).json({ error: 'Não autorizado.' });
+    }
+
+    if (fs.existsSync(absolutePath)) {
+      res.download(absolutePath);
+    } else {
+      res.status(404).json({ error: 'Arquivo físico não encontrado no servidor.' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao baixar exame.' });
+  }
+});
+
 module.exports = router;

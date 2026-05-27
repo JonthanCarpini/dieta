@@ -684,57 +684,130 @@
                             </div>
                         </div>
 
-                        <!-- Diário do Paciente (Refeições, Água, Jejum) -->
-                        <div class="dashboard-card col-8">
-                            <h3>Diário Recente do Paciente</h3>
-                            <p class="description">Histórico de refeições, consumo de água e jejum intermitente</p>
-
-                            <!-- Mini grid de status diários -->
-                            <div class="stats-grid margin-top-md" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 24px;">
-                                <div class="stat-card" style="padding: 14px;">
-                                    <div class="stat-icon bg-blue" style="width:36px; height:36px; font-size:16px;"><i data-lucide="droplet"></i></div>
-                                    <div class="stat-details">
-                                        <span class="stat-label">Água Consumida (Hoje)</span>
-                                        <h4 id="detail-water-status" style="font-size:16px; font-weight:600;">0 / 2500 ml</h4>
-                                    </div>
-                                </div>
-                                <div class="stat-card" style="padding: 14px;">
-                                    <div class="stat-icon bg-purple" style="width:36px; height:36px; font-size:16px;"><i data-lucide="timer"></i></div>
-                                    <div class="stat-details">
-                                        <span class="stat-label">Jejum Ativo</span>
-                                        <h4 id="detail-fasting-status" style="font-size:16px; font-weight:600;">Não ativo</h4>
-                                    </div>
-                                </div>
+                        <!-- Detalhes Expandidos (Diário, Ficha Clínica, Exames) -->
+                        <div class="dashboard-card col-8" style="display: flex; flex-direction: column;">
+                            <!-- Barra de Abas do Paciente -->
+                            <div class="patient-tabs-bar" style="display: flex; gap: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 20px; padding-bottom: 8px;">
+                                <button class="patient-tab-btn active" data-patient-tab="diary" style="background: transparent; border: none; color: #fff; font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid var(--color-primary); transition: all 0.2s;">
+                                    <i data-lucide="book-open" style="width: 14px; height: 14px;"></i> Diário Alimentar
+                                </button>
+                                <button class="patient-tab-btn" data-patient-tab="clinical" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
+                                    <i data-lucide="activity" style="width: 14px; height: 14px;"></i> Ficha Clínica
+                                </button>
+                                <button class="patient-tab-btn" data-patient-tab="exams" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
+                                    <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> Exames
+                                </button>
                             </div>
 
-                            <div class="diary-filter-bar margin-top-md">
-                                <span class="diary-filter-label">Período:</span>
-                                <div class="diary-filter-btns">
-                                    <button class="diary-filter-btn active" data-days="7">7 dias</button>
-                                    <button class="diary-filter-btn" data-days="30">30 dias</button>
-                                    <button class="diary-filter-btn" data-days="0">Tudo</button>
+                            <!-- CONTEÚDO DE ABAS -->
+                            <div class="patient-tabs-content" style="flex: 1;">
+                                
+                                <!-- ABA 1: DIÁRIO ALIMENTAR -->
+                                <div class="patient-tab-content-panel active" id="patient-tab-content-diary">
+                                    <h3>Diário Recente do Paciente</h3>
+                                    <p class="description">Histórico de refeições, consumo de água e jejum intermitente</p>
+
+                                    <!-- Mini grid de status diários -->
+                                    <div class="stats-grid margin-top-md" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 24px;">
+                                        <div class="stat-card" style="padding: 14px;">
+                                            <div class="stat-icon bg-blue" style="width:36px; height:36px; font-size:16px;"><i data-lucide="droplet"></i></div>
+                                            <div class="stat-details">
+                                                <span class="stat-label">Água Consumida (Hoje)</span>
+                                                <h4 id="detail-water-status" style="font-size:16px; font-weight:600;">0 / 2500 ml</h4>
+                                            </div>
+                                        </div>
+                                        <div class="stat-card" style="padding: 14px;">
+                                            <div class="stat-icon bg-purple" style="width:36px; height:36px; font-size:16px;"><i data-lucide="timer"></i></div>
+                                            <div class="stat-details">
+                                                <span class="stat-label">Jejum Ativo</span>
+                                                <h4 id="detail-fasting-status" style="font-size:16px; font-weight:600;">Não ativo</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="diary-filter-bar margin-top-md">
+                                        <span class="diary-filter-label">Período:</span>
+                                        <div class="diary-filter-btns">
+                                            <button class="diary-filter-btn active" data-days="7">7 dias</button>
+                                            <button class="diary-filter-btn" data-days="30">30 dias</button>
+                                            <button class="diary-filter-btn" data-days="0">Tudo</button>
+                                        </div>
+                                        <div class="diary-adherence-info" id="diary-adherence-info" style="display:none;">
+                                            <span>Aderência calórica:</span>
+                                            <strong id="detail-caloric-adherence">-</strong>
+                                        </div>
+                                    </div>
+                                    <h3 class="margin-top-md">Refeições Registradas</h3>
+                                    <div class="table-responsive margin-top-md" style="max-height: 400px; overflow-y: auto;">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Data / Hora</th>
+                                                    <th>Refeição</th>
+                                                    <th>Tipo</th>
+                                                    <th>Calorias</th>
+                                                    <th>Macros (C/P/G)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="detail-meals-table-body">
+                                                <!-- Injetado via JS -->
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                                <div class="diary-adherence-info" id="diary-adherence-info" style="display:none;">
-                                    <span>Aderência calórica:</span>
-                                    <strong id="detail-caloric-adherence">-</strong>
+
+                                <!-- ABA 2: FICHA CLÍNICA -->
+                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-clinical">
+                                    <h3>Ficha Clínica do Paciente</h3>
+                                    <p class="description">Histórico de comorbidades, intolerâncias alimentares e anotações médicas relevantes.</p>
+                                    
+                                    <form id="pro-patient-clinical-form" class="margin-top-md" style="display:flex; flex-direction:column; gap:16px;">
+                                        <div class="form-group">
+                                            <label for="pro-clinical-comorbidities">Comorbidades / Condições de Saúde</label>
+                                            <input type="text" id="pro-clinical-comorbidities" placeholder="Ex: Diabetes Tipo 2, Hipertensão, Gastrite..." style="width: 100%;">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pro-clinical-intolerances">Intolerâncias e Alergias Alimentares</label>
+                                            <input type="text" id="pro-clinical-intolerances" placeholder="Ex: Lactose, Glúten, Amendoim, Frutos do mar..." style="width: 100%;">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pro-clinical-restrictions">Restrições Alimentares / Preferências</label>
+                                            <input type="text" id="pro-clinical-restrictions" placeholder="Ex: Vegano, Vegetariano, Sem carne vermelha..." style="width: 100%;">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pro-clinical-notes">Observações Clínicas e Anotações Gerais</label>
+                                            <textarea id="pro-clinical-notes" placeholder="Digite anotações adicionais e observações gerais sobre o estado de saúde do paciente..." style="height: 120px; resize: vertical;"></textarea>
+                                        </div>
+                                        <button type="submit" class="btn-primary w-full">
+                                            <i data-lucide="save" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+                                            Salvar Ficha Clínica
+                                        </button>
+                                    </form>
+                                    <div id="clinical-success-msg" class="success-banner hidden" style="margin-top: 10px;">Ficha clínica salva com sucesso!</div>
                                 </div>
-                            </div>
-                            <h3 class="margin-top-md">Refeições Registradas</h3>
-                            <div class="table-responsive margin-top-md" style="max-height: 400px; overflow-y: auto;">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Data / Hora</th>
-                                            <th>Refeição</th>
-                                            <th>Tipo</th>
-                                            <th>Calorias</th>
-                                            <th>Macros (C/P/G)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="detail-meals-table-body">
-                                        <!-- Injetado via JS -->
-                                    </tbody>
-                                </table>
+
+                                <!-- ABA 3: EXAMES -->
+                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-exams">
+                                    <h3>Exames Laboratoriais</h3>
+                                    <p class="description">Visualize exames em formato PDF ou imagens enviados pelo paciente e adicione notas clínicas específicas.</p>
+                                    
+                                    <div class="table-responsive margin-top-md" style="max-height: 400px; overflow-y: auto;">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Arquivo</th>
+                                                    <th>Data de Envio</th>
+                                                    <th>Anotações do Nutricionista</th>
+                                                    <th>Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="pro-patient-exams-table-body">
+                                                <tr><td colspan="4" style="text-align: center; color: var(--color-text-muted); padding: 20px;">Nenhum exame enviado por este paciente.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -837,6 +910,15 @@
                             <button class="btn-primary btn-sm" id="btn-save-meal-plan">
                                 <i data-lucide="save"></i> Salvar
                             </button>
+                        </div>
+                    </div>
+ 
+                    <!-- Banner de Alertas Clínicos (Particularidades) -->
+                    <div id="builder-clinical-banner" class="clinical-alert-banner hidden" style="background: rgba(245, 193, 77, 0.08); border: 1px solid rgba(245, 193, 77, 0.2); border-radius: 8px; padding: 12px; margin: 12px 0; font-size: 13px; display: flex; align-items: flex-start; gap: 10px;">
+                        <i data-lucide="alert-triangle" style="color: var(--color-primary); width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;"></i>
+                        <div>
+                            <strong style="color: var(--color-primary); display: block; margin-bottom: 2px;">Particularidades Clínicas do Paciente:</strong>
+                            <span id="builder-clinical-info" style="color: var(--color-text-main);">Nenhuma particularidade clínica informada.</span>
                         </div>
                     </div>
 

@@ -156,13 +156,19 @@ const GENDER_LABELS = { male: 'masculino', female: 'feminino' };
 
 function profileContext(p) {
   if (!p || !p.goal) return '';
+  let clinical = '';
+  if (p.comorbidities) clinical += `- Comorbidades: ${p.comorbidities}\n`;
+  if (p.intolerances) clinical += `- Intolerâncias/Alergias Alimentares: ${p.intolerances}\n`;
+  if (p.dietary_restrictions) clinical += `- Restrições Alimentares Adicionais: ${p.dietary_restrictions}\n`;
+  if (p.notes) clinical += `- Notas Clínicas importantes: ${p.notes}\n`;
+
   return `
 PERFIL DO CLIENTE:
 - Objetivo: ${GOAL_LABELS[p.goal] || p.goal}
 - Peso atual: ${p.weight || '?'}kg | Meta: ${p.goalWeight || '?'}kg
 - Gênero: ${GENDER_LABELS[p.gender] || p.gender || '?'} | Idade: ${p.age || '?'} anos
 - Meta diária: ${p.targetCalories || '?'} kcal | P ${p.targetProtein || '?'}g | C ${p.targetCarbs || '?'}g | G ${p.targetFat || '?'}g
-`;
+${clinical}`;
 }
 
 function promptAnalyzeFood() {
@@ -201,6 +207,7 @@ REGRAS — SIGA TODAS:
 6. Modo de preparo em passos extremamente diretos e curtos (máximo 3 a 4 passos simples. Proibido processos demorados como forno convencional prolongado, panela de pressão ou marinadas complexas).
 7. Nome criativo, apetitoso e direto em português (pode ser baseado em "${recipeName || 'Nome da receita'}").
 8. PROIBIDO: receitas de maromba/culturismo para objetivos de perda de peso.
+9. IMPORTANTE: Se o Perfil do Cliente contiver comorbidades, intolerâncias/alergias ou restrições alimentares listadas, você DEVE EXCLUIR COMPLETAMENTE ingredientes incompatíveis ou nocivos para essas condições (ex: intolerância à lactose = sem leite e derivados convencionais; diabetes = sem açúcar/mel/doces; alergia a amendoim = sem amendoim, etc.).
 
 Responda APENAS com JSON puro sem markdown. Exemplo de formato:
 {"name":"Nome da receita","time_min":10,"calories":${cal},"protein":${protein},"carbs":${carbs},"fat":${fat},"ingredients":[{"name":"Peito de frango","amount":150,"unit":"g"},{"name":"Brócolis","amount":100,"unit":"g"}],"directions":"1. Tempere o frango com sal e alho.\\n2. Grelhe em frigideira quente por 6 minutos de cada lado.\\n3. Cozinhe o brócolis no microondas por 3 minutos com um pouco de água."}`;
@@ -234,6 +241,7 @@ REGRAS — SIGA TODAS:
 6. As quantidades dos ingredientes DEVEM resultar em ${calPerMeal} kcal — calcule com precisão
 7. Modo de preparo em passos numerados (mínimo 3 passos)
 8. Nomes criativos e apetitosos em português
+9. IMPORTANTE: Se o Perfil do Cliente contiver comorbidades, intolerâncias/alergias ou restrições alimentares listadas, você DEVE EXCLUIR COMPLETAMENTE ingredientes incompatíveis ou nocivos para essas condições (ex: intolerância à lactose = sem leite e derivados convencionais; diabetes = sem açúcar/mel/doces, etc.).
 
 Responda APENAS com JSON puro sem markdown — array com exatamente 7 objetos:
 [{"day":1,"name":"Nome criativo","time_min":20,"calories":${calPerMeal},"protein":${protPerMeal},"carbs":${carbPerMeal},"fat":${fatPerMeal},"ingredients":[{"name":"Ingrediente","amount":150,"unit":"g"}],"directions":"1. Passo um.\\n2. Passo dois.\\n3. Passo três."}]`;

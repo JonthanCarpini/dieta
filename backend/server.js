@@ -199,6 +199,27 @@ async function runMigrations() {
   await db.query(`
     CREATE INDEX IF NOT EXISTS idx_weight_log_user_date ON weight_log(user_id, date)
   `);
+  // Migrações adicionais: Ficha Clínica e Exames
+  await db.query(`
+    ALTER TABLE profiles ADD COLUMN IF NOT EXISTS comorbidities TEXT,
+    ADD COLUMN IF NOT EXISTS intolerances TEXT,
+    ADD COLUMN IF NOT EXISTS dietary_restrictions TEXT,
+    ADD COLUMN IF NOT EXISTS notes TEXT
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS patient_exams (
+      id SERIAL PRIMARY KEY,
+      patient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      file_name VARCHAR(255) NOT NULL,
+      file_path VARCHAR(255) NOT NULL,
+      mime_type VARCHAR(100) NOT NULL,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_patient_exams_patient ON patient_exams(patient_id)
+  `);
   console.log('Migrações executadas com sucesso.');
 }
 
@@ -325,5 +346,14 @@ server.on('upgrade', (request, socket, head) => {
 
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Servidor rodando com sucesso em http://0.0.0.0:${PORT}`);
+  
+  // Garante a existência do diretório de uploads de exames
+  const fs = require('fs');
+  const path = require('path');
+  const uploadsDir = path.join(__dirname, 'uploads', 'exams');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
   await runMigrations();
 });
