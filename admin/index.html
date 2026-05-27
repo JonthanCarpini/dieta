@@ -778,32 +778,44 @@
                 </div>
             </div>
             
-            <div style="display:flex; gap:20px; flex:1; min-height:0;">
-                <!-- Diário de Alimentação -->
-                <div style="flex:1.2; display:flex; flex-direction:column; background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; box-sizing:border-box;">
-                    <h3 style="margin:0 0 12px 0; font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px;"><i data-lucide="utensils" style="width:16px; height:16px; color:var(--color-primary);"></i> Diário Alimentar Recente</h3>
-                    <div style="flex:1; overflow-y:auto;">
-                        <table style="width:100%; border-collapse:collapse;">
-                            <thead>
-                                <tr style="border-bottom:1px solid rgba(255,255,255,0.05); text-align:left; font-size:10px; opacity:0.5;">
-                                    <th style="padding:6px 4px;">Hora</th>
-                                    <th style="padding:6px 4px;">Refeição</th>
-                                    <th style="padding:6px 4px;">Tipo</th>
-                                    <th style="padding:6px 4px; text-align:right;">Calorias</th>
-                                </tr>
-                            </thead>
-                            <tbody id="vc-meals-list">
-                                <tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Selecione uma consulta ativa.</td></tr>
-                            </tbody>
-                        </table>
+            <!-- Barra de Abas -->
+            <div class="vc-tabs-bar">
+                <button class="vc-tab-btn active" id="vc-tab-btn-diary" data-vc-tab="diary">
+                    <i data-lucide="utensils" style="width:14px; height:14px;"></i> Diário Alimentar
+                </button>
+                <button class="vc-tab-btn" id="vc-tab-btn-feedback" data-vc-tab="feedback">
+                    <i data-lucide="file-text" style="width:14px; height:14px;"></i> Prescrições e Orientações
+                </button>
+            </div>
+
+            <!-- Contêiner de Abas -->
+            <div style="flex:1; display:flex; flex-direction:column; min-height:0; position:relative;">
+                <!-- ABA 1: Diário Alimentar -->
+                <div class="vc-tab-content active" id="vc-tab-content-diary" style="overflow-y:auto;">
+                    <div id="vc-diary-container">
+                        <!-- Acordeões de dias serão injetados via JS -->
+                        <div style="text-align:center; padding:40px; opacity:0.5; font-size:13px;">Selecione uma consulta ativa.</div>
                     </div>
                 </div>
-                
-                <!-- Nova Orientação / Feedback -->
-                <div style="flex:1; display:flex; flex-direction:column; background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; box-sizing:border-box;">
-                    <h3 style="margin:0 0 12px 0; font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px;"><i data-lucide="file-text" style="width:16px; height:16px; color:var(--color-primary);"></i> Prescrição e Orientações</h3>
-                    <textarea id="vc-feedback-content" placeholder="Digite aqui as orientações, plano de treino ou dieta acordados com o paciente..." style="flex:1; width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; color:#fff; font-size:12px; line-height:1.5; resize:none; outline:none; box-sizing:border-box; margin-bottom:12px;"></textarea>
-                    <button id="vc-btn-save-feedback" class="btn-primary" style="width:100%; font-size:12px; padding:10px; font-weight:600; border-radius:8px;">Enviar Orientação</button>
+
+                <!-- ABA 2: Prescrições e Orientações -->
+                <div class="vc-tab-content" id="vc-tab-content-feedback">
+                    <div style="display:flex; flex-direction:column; flex:1; min-height:0;">
+                        <!-- Enviar nova orientação -->
+                        <div style="background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; box-sizing:border-box; margin-bottom:16px;">
+                            <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:600;">Nova Prescrição / Orientação</h4>
+                            <textarea id="vc-feedback-content" placeholder="Digite aqui as orientações, plano de treino ou dieta acordados com o paciente..." style="height:100px; width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; color:#fff; font-size:12.5px; line-height:1.5; resize:none; outline:none; box-sizing:border-box; margin-bottom:10px;"></textarea>
+                            <button id="vc-btn-save-feedback" class="btn-primary" style="width:100%; font-size:12px; padding:10px; font-weight:600; border-radius:8px;">Enviar Orientação</button>
+                        </div>
+
+                        <!-- Histórico de Prescrições -->
+                        <div class="vc-feedback-history-container">
+                            <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px;"><i data-lucide="history" style="width:16px; height:16px; color:var(--color-primary);"></i> Histórico de Orientações Enviadas</h4>
+                            <div class="vc-feedback-history-list" id="vc-feedback-history-list">
+                                <div style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Carregando histórico...</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

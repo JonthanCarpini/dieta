@@ -117,6 +117,27 @@ router.post('/patients/:id/feedback', verifyPatientAccess, async (req, res) => {
 });
 
 // ==========================================
+// 3.5 HISTÓRICO DE FEEDBACKS ENVIADOS AO PACIENTE
+// ==========================================
+router.get('/patients/:id/feedbacks', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  try {
+    const feedbacks = await db.query(
+      `SELECT m.*, u.name as professional_name 
+       FROM professional_messages m
+       JOIN users u ON m.professional_id = u.id
+       WHERE m.user_id = $1
+       ORDER BY m.created_at DESC`,
+      [patientId]
+    );
+    res.json(feedbacks.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico de feedbacks do paciente.' });
+  }
+});
+
+// ==========================================
 // 4. CONSULTAS E AGENDAMENTOS DO PROFISSIONAL
 // ==========================================
 

@@ -1448,6 +1448,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function getMealTypeLabel(meal) {
+        if (meal.meal_type) {
+            const mealTypes = { breakfast: 'Café da Manhã', lunch: 'Almoço', dinner: 'Jantar', snack: 'Lanche', pre_workout: 'Pré-Treino', post_workout: 'Pós-Treino' };
+            return mealTypes[meal.meal_type] || meal.meal_type;
+        }
+        if (!meal.time) return 'Refeição';
+        const hour = parseInt(meal.time.split(':')[0]);
+        if (hour >= 5 && hour < 11) return 'Café da Manhã';
+        if (hour >= 11 && hour < 15) return 'Almoço';
+        if (hour >= 15 && hour < 19) return 'Lanche';
+        if (hour >= 19 && hour < 23) return 'Jantar';
+        return 'Lanche Noturno';
+    }
+
     async function viewPatientDetails(patient) {
         // Mostra a tela de detalhes
         const listLayout = document.getElementById('patients-list-view');
@@ -1527,19 +1541,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         const mealDate = new Date(m.date + 'T' + m.time);
                         const formattedDateTime = `${mealDate.toLocaleDateString('pt-BR')} ${m.time.substring(0, 5)}`;
                         
-                        const mealTypes = { breakfast: 'Café da Manhã', lunch: 'Almoço', dinner: 'Jantar', snack: 'Lanche', pre_workout: 'Pré-Treino', post_workout: 'Pós-Treino' };
-                        const typeLabel = mealTypes[m.meal_type] || m.meal_type;
+                        const typeLabel = getMealTypeLabel(m);
 
-                        const carbs = m.carbs ? `${m.carbs}g` : '-';
-                        const protein = m.protein ? `${m.protein}g` : '-';
-                        const fat = m.fat ? `${m.fat}g` : '-';
+                        const totalObj = m.total && typeof m.total === 'object' ? m.total : {};
+                        const carbs = totalObj.carbs !== undefined ? `${totalObj.carbs}g` : (m.carbs ? `${m.carbs}g` : '-');
+                        const protein = totalObj.protein !== undefined ? `${totalObj.protein}g` : (m.protein ? `${m.protein}g` : '-');
+                        const fat = totalObj.fat !== undefined ? `${totalObj.fat}g` : (m.fat ? `${m.fat}g` : '-');
+                        const caloriesVal = totalObj.calories !== undefined ? `${totalObj.calories} kcal` : (m.calories ? `${m.calories} kcal` : '-');
                         const macros = `C:${carbs} | P:${protein} | F:${fat}`;
 
                         tr.innerHTML = `
                             <td>${formattedDateTime}</td>
                             <td><strong>${m.name}</strong><br><small>${m.description || ''}</small></td>
                             <td><span class="badge-role user" style="background-color: rgba(255,255,255,0.05); color: var(--color-text);">${typeLabel}</span></td>
-                            <td>${m.calories ? `${m.calories} kcal` : '-'}</td>
+                            <td>${caloriesVal}</td>
                             <td><small>${macros}</small></td>
                         `;
                         mealsBody.appendChild(tr);
@@ -1739,6 +1754,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const vcFeedbackContent = document.getElementById('vc-feedback-content');
         const vcBtnSaveFeedback = document.getElementById('vc-btn-save-feedback');
 
+        // Configurar navegação de abas na vídeo chamada
+        const tabBtns = document.querySelectorAll('.vc-tab-btn');
+        const tabContents = document.querySelectorAll('.vc-tab-content');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                
+                btn.classList.add('active');
+                const targetTab = btn.dataset.vcTab;
+                const activeContent = document.getElementById(`vc-tab-content-${targetTab}`);
+                if (activeContent) activeContent.classList.add('active');
+            });
+        });
+
+        // Garantir que a primeira aba esteja ativa por padrão
+        const btnDiary = document.getElementById('vc-tab-btn-diary');
+        const btnFeedback = document.getElementById('vc-tab-btn-feedback');
+        if (btnDiary) btnDiary.classList.add('active');
+        if (btnFeedback) btnFeedback.classList.remove('active');
+        const contentDiary = document.getElementById('vc-tab-content-diary');
+        const contentFeedback = document.getElementById('vc-tab-content-feedback');
+        if (contentDiary) contentDiary.classList.add('active');
+        if (contentFeedback) contentFeedback.classList.remove('active');
+
         if (patient) {
             if (vcPatientName) vcPatientName.textContent = patient.name;
             if (vcPatientEmail) vcPatientEmail.textContent = patient.email;
@@ -1747,7 +1787,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (vcPatientGoal) vcPatientGoal.textContent = 'Carregando...';
             if (vcPatientCalories) vcPatientCalories.textContent = 'Carregando...';
             if (vcPatientWater) vcPatientWater.textContent = 'Carregando...';
-            if (vcMealsList) vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Carregando diário...</td></tr>';
+            
+            const vcDiaryContainer = document.getElementById('vc-diary-container');
+            if (vcDiaryContainer) vcDiaryContainer.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5; font-size:13px;">Carregando diário...</div>';
+            
             if (vcFeedbackContent) {
                 vcFeedbackContent.value = '';
                 vcFeedbackContent.disabled = false;
@@ -1781,28 +1824,106 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (vcPatientWater) vcPatientWater.textContent = '0 / 2500 ml';
                         }
 
-                        if (vcMealsList) {
-                            vcMealsList.innerHTML = '';
+                        if (vcDiaryContainer) {
+                            vcDiaryContainer.innerHTML = '';
                             if (!data.meals || data.meals.length === 0) {
-                                vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Nenhuma refeição registrada hoje.</td></tr>';
+                                vcDiaryContainer.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5; font-size:13px;">Nenhuma refeição registrada nos últimos dias.</div>';
                             } else {
+                                // Agrupar refeições por data
+                                const mealsByDay = {};
                                 data.meals.forEach(m => {
-                                    const tr = document.createElement('tr');
-                                    tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-                                    tr.style.fontSize = '12px';
-                                    
-                                    const formattedTime = m.time.substring(0, 5);
-                                    const mealTypes = { breakfast: 'Café da Manhã', lunch: 'Almoço', dinner: 'Jantar', snack: 'Lanche', pre_workout: 'Pré-Treino', post_workout: 'Pós-Treino' };
-                                    const typeLabel = mealTypes[m.meal_type] || m.meal_type;
-
-                                    tr.innerHTML = `
-                                        <td style="padding:8px 4px; opacity:0.7;">${formattedTime}</td>
-                                        <td style="padding:8px 4px;"><strong>${m.name}</strong>${m.description ? `<br><small style="opacity:0.6;">${m.description}</small>` : ''}</td>
-                                        <td style="padding:8px 4px;"><span style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px;">${typeLabel}</span></td>
-                                        <td style="padding:8px 4px; text-align:right; font-weight:600;">${m.calories ? `${m.calories} kcal` : '-'}</td>
-                                    `;
-                                    vcMealsList.appendChild(tr);
+                                    const dateVal = m.date.split('T')[0];
+                                    if (!mealsByDay[dateVal]) mealsByDay[dateVal] = [];
+                                    mealsByDay[dateVal].push(m);
                                 });
+
+                                // Ordenar as datas decrescentemente
+                                const sortedDates = Object.keys(mealsByDay).sort().reverse();
+
+                                sortedDates.forEach((dateStr, idx) => {
+                                    const dayMeals = mealsByDay[dateStr];
+                                    
+                                    // Somar macros e calorias do dia
+                                    let dayCal = 0, dayCarbs = 0, dayProtein = 0, dayFat = 0;
+                                    dayMeals.forEach(m => {
+                                        const tot = m.total && typeof m.total === 'object' ? m.total : {};
+                                        dayCal += tot.calories || 0;
+                                        dayCarbs += tot.carbs || 0;
+                                        dayProtein += tot.protein || 0;
+                                        dayFat += tot.fat || 0;
+                                    });
+
+                                    // Formatar a data para exibição (ex: "27/05/2026")
+                                    const dateParts = dateStr.split('-');
+                                    const displayDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+
+                                    // Determinar se é "Hoje" ou "Ontem"
+                                    const todayStr = new Date().toISOString().split('T')[0];
+                                    const yesterday = new Date();
+                                    yesterday.setDate(yesterday.getDate() - 1);
+                                    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+                                    let dayLabel = displayDate;
+                                    if (dateStr === todayStr) {
+                                        dayLabel = `Hoje (${displayDate})`;
+                                    } else if (dateStr === yesterdayStr) {
+                                        dayLabel = `Ontem (${displayDate})`;
+                                    }
+
+                                    // Criar acordeão
+                                    const dayGroup = document.createElement('div');
+                                    dayGroup.className = `vc-diary-day-group${idx === 0 ? ' expanded' : ''}`;
+
+                                    dayGroup.innerHTML = `
+                                        <div class="vc-diary-day-header">
+                                            <div class="vc-diary-day-title">
+                                                <i data-lucide="calendar" style="width:16px; height:16px; color:var(--color-primary);"></i>
+                                                <span>${dayLabel}</span>
+                                            </div>
+                                            <div style="display:flex; align-items:center; gap:12px;">
+                                                <span class="vc-diary-day-summary">${dayCal} kcal | C:${dayCarbs}g P:${dayProtein}g F:${dayFat}g</span>
+                                                <i class="vc-diary-day-icon" data-lucide="chevron-down" style="width:16px; height:16px;"></i>
+                                            </div>
+                                        </div>
+                                        <div class="vc-diary-day-details">
+                                            <table style="width:100%; border-collapse:collapse;">
+                                                <thead>
+                                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05); text-align:left; font-size:10px; opacity:0.5;">
+                                                        <th style="padding:6px 4px;">Hora</th>
+                                                        <th style="padding:6px 4px;">Refeição</th>
+                                                        <th style="padding:6px 4px;">Tipo</th>
+                                                        <th style="padding:6px 4px; text-align:right;">Calorias</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    ${dayMeals.map(m => {
+                                                        const formattedTime = m.time.substring(0, 5);
+                                                        const typeLabel = getMealTypeLabel(m);
+                                                        const tot = m.total && typeof m.total === 'object' ? m.total : {};
+                                                        const calVal = tot.calories !== undefined ? `${tot.calories} kcal` : '-';
+                                                        return `
+                                                            <tr style="border-bottom:1px solid rgba(255,255,255,0.03); font-size:12px;">
+                                                                <td style="padding:8px 4px; opacity:0.7;">${formattedTime}</td>
+                                                                <td style="padding:8px 4px;"><strong>${m.name}</strong></td>
+                                                                <td style="padding:8px 4px;"><span style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px;">${typeLabel}</span></td>
+                                                                <td style="padding:8px 4px; text-align:right; font-weight:600;">${calVal}</td>
+                                                            </tr>
+                                                        `;
+                                                    }).join('')}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    `;
+
+                                    // Listener de expansão/recolhimento
+                                    dayGroup.querySelector('.vc-diary-day-header').addEventListener('click', () => {
+                                        dayGroup.classList.toggle('expanded');
+                                    });
+
+                                    vcDiaryContainer.appendChild(dayGroup);
+                                });
+
+                                if (window.lucide) window.lucide.createIcons();
                             }
                         }
                     } else {
@@ -1814,9 +1935,52 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (vcPatientGoal) vcPatientGoal.textContent = '-';
                     if (vcPatientCalories) vcPatientCalories.textContent = '-';
                     if (vcPatientWater) vcPatientWater.textContent = '-';
-                    if (vcMealsList) vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px; color:var(--color-danger);">Erro ao carregar prontuário.</td></tr>';
+                    if (vcDiaryContainer) vcDiaryContainer.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5; font-size:13px; color:var(--color-danger);">Erro ao carregar prontuário.</div>';
                 }
             })();
+
+            // Função para buscar e renderizar o histórico de feedbacks
+            const loadFeedbackHistory = async (patientId) => {
+                const historyList = document.getElementById('vc-feedback-history-list');
+                if (!historyList) return;
+                try {
+                    const hRes = await fetch(`${API_URL}/professional/patients/${patientId}/feedbacks`, {
+                        headers: { 'Authorization': `Bearer ${adminState.token}` }
+                    });
+                    if (hRes.ok) {
+                        const feedbacks = await hRes.json();
+                        historyList.innerHTML = '';
+                        if (feedbacks.length === 0) {
+                            historyList.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Nenhuma orientação enviada ainda.</div>';
+                        } else {
+                            feedbacks.forEach(f => {
+                                const fItem = document.createElement('div');
+                                fItem.className = 'vc-feedback-item';
+                                const fDate = new Date(f.created_at);
+                                const formattedDate = `${fDate.toLocaleDateString('pt-BR')} às ${fDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
+                                
+                                const roleLabel = f.type === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+                                fItem.innerHTML = `
+                                    <div class="vc-feedback-item-header">
+                                        <strong>${f.professional_name} (${roleLabel})</strong>
+                                        <span>${formattedDate}</span>
+                                    </div>
+                                    <div class="vc-feedback-item-content">${f.content}</div>
+                                `;
+                                historyList.appendChild(fItem);
+                            });
+                        }
+                    } else {
+                        historyList.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.5; font-size:12px; color:var(--color-danger);">Erro ao carregar histórico.</div>';
+                    }
+                } catch(err) {
+                    console.error("Erro ao carregar feedbacks:", err);
+                    historyList.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.5; font-size:12px; color:var(--color-danger);">Erro ao conectar ao servidor.</div>';
+                }
+            };
+
+            // Carrega o histórico pela primeira vez
+            loadFeedbackHistory(patient.id);
 
             // Configurar listener para salvar feedback
             if (vcBtnSaveFeedback) {
@@ -1843,6 +2007,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!feedbackRes.ok) throw new Error(feedbackData.error || 'Erro ao enviar feedback.');
                         alert('Orientação enviada com sucesso para o paciente!');
                         if (vcFeedbackContent) vcFeedbackContent.value = '';
+                        // Recarrega o histórico de feedbacks após salvar
+                        await loadFeedbackHistory(patient.id);
                     } catch(err) {
                         alert(err.message);
                     } finally {
@@ -1860,7 +2026,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (vcPatientGoal) vcPatientGoal.textContent = '-';
             if (vcPatientCalories) vcPatientCalories.textContent = '-';
             if (vcPatientWater) vcPatientWater.textContent = '-';
-            if (vcMealsList) vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Chamada avulsa sem paciente associado.</td></tr>';
+            
+            const vcDiaryContainer = document.getElementById('vc-diary-container');
+            if (vcDiaryContainer) vcDiaryContainer.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5; font-size:13px;">Chamada avulsa sem paciente associado.</div>';
+            
             if (vcFeedbackContent) {
                 vcFeedbackContent.value = '';
                 vcFeedbackContent.disabled = true;
@@ -2175,7 +2344,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const vcPatientGoal = document.getElementById('vc-patient-goal');
         const vcPatientCalories = document.getElementById('vc-patient-calories');
         const vcPatientWater = document.getElementById('vc-patient-water');
-        const vcMealsList = document.getElementById('vc-meals-list');
+        const vcDiaryContainer = document.getElementById('vc-diary-container');
+        const vcFeedbackHistoryList = document.getElementById('vc-feedback-history-list');
         const vcFeedbackContent = document.getElementById('vc-feedback-content');
 
         if (vcPatientName) vcPatientName.textContent = 'Paciente';
@@ -2185,7 +2355,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vcPatientGoal) vcPatientGoal.textContent = '-';
         if (vcPatientCalories) vcPatientCalories.textContent = '-';
         if (vcPatientWater) vcPatientWater.textContent = '-';
-        if (vcMealsList) vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Selecione uma consulta ativa.</td></tr>';
+        if (vcDiaryContainer) vcDiaryContainer.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5; font-size:13px;">Selecione uma consulta ativa.</div>';
+        if (vcFeedbackHistoryList) vcFeedbackHistoryList.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Carregando histórico...</div>';
         if (vcFeedbackContent) {
             vcFeedbackContent.value = '';
             vcFeedbackContent.disabled = false;
