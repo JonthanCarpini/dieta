@@ -426,3 +426,49 @@ O projeto `mobile-android/` é um **WebView wrapper** que carrega `https://nutri
   4. **Atualizar o PROJECT_GUIDE.md**: Após o deploy, revisar e atualizar este documento para refletir o estado atual em produção.
 
   > **Nunca** entregue uma tarefa como concluída sem executar este fluxo completo.
+
+---
+
+## 13. Arquitetura Modular do Painel Admin (ES6 Modules)
+
+Com o crescimento do painel de administração, o arquivo monolítico `admin/admin.js` original foi reestruturado para utilizar **ES6 Modules nativos** (`type="module"`), dividindo as responsabilidades em arquivos menores e focados sem necessidade de ferramentas de empacotamento adicionais (como Vite, Webpack ou Babel).
+
+### Princípios da Arquitetura:
+1. **Sem Build Step**: Todos os submódulos são scripts JavaScript padrão carregados diretamente pelo browser via declaração `<script type="module" src="admin.js"></script>` no [index.html](file:///c:/Users/admin/Desktop/Dieta/admin/index.html).
+2. **Estado Centralizado**: Para evitar problemas de acoplamento e compartilhamento de variáveis globais, todo o estado mutável do painel é armazenado e exportado pelo arquivo [state.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/state.js).
+3. **Escopo Limpo**: Funções e variáveis internas de cada submódulo ficam protegidas sob o escopo do próprio módulo, expondo apenas o estritamente necessário através de `export`.
+
+### Descrição dos Submódulos (`admin/modules/`):
+
+- **[state.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/state.js)**:
+  - Centraliza a definição de `API_URL` (chaveamento local/produção).
+  - Centraliza o objeto `adminState` (tokens, chaves temporárias de edição, cache).
+
+- **[auth.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/auth.js)**:
+  - Lida com exibição do formulário de login e do dashboard principal de acordo com as permissões do usuário.
+  - Funções principais: `initAuth()`, `checkSession()`, `handleLogin()`.
+
+- **[admin-features.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/admin-features.js)**:
+  - Responsabilidades específicas do perfil `admin` (Administrador Geral).
+  - Inclui gerenciamento de usuários, listagem/comissões de profissionais, CRUD de planos comerciais, aba de credenciais de IA/Spoonacular/MercadoPago/Asaas, teste de latência de IA e estatísticas financeiras/faturamento geral do sistema.
+
+- **[pro-schedule.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/pro-schedule.js)**:
+  - Lógica do calendário e agenda interativa dos profissionais de saúde (slots de 30 min, 07h–20h30).
+  - Converte as seleções visuais na grade para os intervalos persistidos no banco.
+
+- **[pro-appointments.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/pro-appointments.js)**:
+  - Exibe e gerencia consultas agendadas, permitindo o cancelamento de agendamentos e inicialização de chamadas de vídeo.
+
+- **[pro-patients.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/pro-patients.js)**:
+  - Centraliza o prontuário de pacientes em tempo real durante teleconsultas.
+  - Renderiza gráficos físicos de evolução de peso usando **Chart.js** e calcula o card de conquistas dinâmico.
+  - Implementa a lógica cliente de sinalização WebSocket e canais WebRTC para videoconferências.
+
+- **[pro-meals.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/pro-meals.js)**:
+  - Construtor visual de cardápios semanais atribuídos a pacientes.
+  - Busca integrada com o proxy traduzido do Spoonacular e fluxo interativo de receitas personalizadas com IA.
+
+### Diretrizes para Novas Implementações no Painel Admin:
+- **Importações**: Sempre utilize caminhos relativos completos com a extensão do arquivo (ex: `import { adminState } from './state.js';` em vez de `./state`).
+- **Registros Estáticos de Listeners**: Registre listeners para botões globais ou modais estáticos dentro das funções de inicialização dos submódulos (ex: `initProMeals()`) chamadas no `DOMContentLoaded` do entrypoint `admin.js`.
+- **Modais e Elementos DOM Dinâmicos**: Se um elemento é criado em tempo de execução (ex: botões de ações em linhas de tabelas), associe os listeners diretamente no momento da sua renderização.
