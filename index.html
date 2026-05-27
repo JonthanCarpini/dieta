@@ -199,6 +199,9 @@
         <!-- ========================================== -->
         <section id="screen-dashboard" class="screen">
             <header class="dashboard-header">
+                <button class="icon-btn btn-drawer-trigger" data-drawer-open title="Menu">
+                    <i data-lucide="menu"></i>
+                </button>
                 <div class="user-greeting">
                     <span class="date-today" id="dashboard-date">Terça, 26 de Maio</span>
                     <h2>Olá! Pronto para focar?</h2>
@@ -480,6 +483,9 @@
         <!-- ========================================== -->
         <section id="screen-recipes" class="screen">
             <header class="scanner-header">
+                <button class="icon-btn btn-drawer-trigger" data-drawer-open title="Menu">
+                    <i data-lucide="menu"></i>
+                </button>
                 <h3>Receitas & Planejamento</h3>
                 <div style="width: 40px;"></div>
             </header>
@@ -582,6 +588,9 @@
         <!-- ========================================== -->
         <section id="screen-fasting" class="screen">
             <header class="scanner-header">
+                <button class="icon-btn btn-drawer-trigger" data-drawer-open title="Menu">
+                    <i data-lucide="menu"></i>
+                </button>
                 <h3>Jejum Intermitente</h3>
                 <div style="width: 40px;"></div>
             </header>
@@ -641,6 +650,9 @@
         <!-- ========================================== -->
         <section id="screen-history" class="screen">
             <header class="history-header">
+                <button class="icon-btn btn-drawer-trigger" data-drawer-open title="Menu">
+                    <i data-lucide="menu"></i>
+                </button>
                 <h3>Evolução & Histórico</h3>
                 <div style="width: 40px;"></div>
             </header>
@@ -693,6 +705,9 @@
         <!-- ========================================== -->
         <section id="screen-settings" class="screen">
             <header class="settings-header">
+                <button class="icon-btn btn-drawer-trigger" data-drawer-open title="Menu">
+                    <i data-lucide="menu"></i>
+                </button>
                 <h3>Perfil</h3>
                 <div style="width: 40px;"></div>
             </header>
@@ -797,7 +812,9 @@
         <!-- ========================================== -->
         <section id="screen-clinical-profile" class="screen">
             <header class="scanner-header">
-                <div style="width: 40px;"></div>
+                <button class="icon-btn btn-drawer-trigger" data-drawer-open title="Menu">
+                    <i data-lucide="menu"></i>
+                </button>
                 <h3>Perfil Clínico</h3>
                 <div style="width: 40px;"></div>
             </header>
@@ -844,8 +861,8 @@
         <!-- ========================================== -->
         <section id="screen-my-professionals" class="screen">
             <header class="scanner-header">
-                <button class="icon-btn btn-back" id="btn-back-my-professionals" style="visibility: hidden; pointer-events: none;">
-                    <i data-lucide="chevron-left"></i>
+                <button class="icon-btn btn-drawer-trigger" data-drawer-open title="Menu">
+                    <i data-lucide="menu"></i>
                 </button>
                 <h3>Meu Acompanhamento</h3>
                 <div style="width: 40px;"></div>
@@ -1102,14 +1119,6 @@
                 <i data-lucide="salad"></i>
                 <span>Receitas</span>
             </button>
-            <button class="nav-item" data-target="screen-fasting">
-                <i data-lucide="timer"></i>
-                <span>Jejum</span>
-            </button>
-            <button class="nav-item" data-target="screen-history">
-                <i data-lucide="calendar"></i>
-                <span>Histórico</span>
-            </button>
             <button class="nav-item" data-target="screen-my-professionals">
                 <i data-lucide="users"></i>
                 <span>Profissional</span>
@@ -1118,11 +1127,54 @@
                 <i data-lucide="activity"></i>
                 <span>Clínico</span>
             </button>
-            <button class="nav-item" data-target="screen-settings">
-                <i data-lucide="user"></i>
-                <span>Perfil</span>
-            </button>
         </nav>
+
+        <!-- ========================================== -->
+        <!-- DRAWER LATERAL (MENU SECUNDÁRIO)           -->
+        <!-- ========================================== -->
+        <div class="drawer-backdrop" id="drawer-backdrop"></div>
+        <aside class="side-drawer" id="side-drawer">
+            <div class="drawer-header">
+                <div class="drawer-user">
+                    <div class="profile-avatar-ring drawer-avatar">
+                        <span class="profile-avatar-initials" id="drawer-avatar-initials">?</span>
+                    </div>
+                    <div class="drawer-user-info">
+                        <span class="drawer-user-name" id="drawer-user-name">Usuário</span>
+                        <span class="drawer-user-plan" id="drawer-user-plan">Plano Trial</span>
+                    </div>
+                </div>
+                <button class="icon-btn drawer-close-btn" data-drawer-close title="Fechar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <nav class="drawer-nav">
+                <button class="drawer-item" data-target="screen-settings">
+                    <i data-lucide="user"></i>
+                    <span>Perfil</span>
+                </button>
+                <button class="drawer-item" data-target="screen-history">
+                    <i data-lucide="calendar"></i>
+                    <span>Histórico</span>
+                </button>
+                <button class="drawer-item" data-target="screen-fasting">
+                    <i data-lucide="timer"></i>
+                    <span>Jejum</span>
+                </button>
+                <button class="drawer-item hidden" id="drawer-item-admin" data-target="screen-admin">
+                    <i data-lucide="shield"></i>
+                    <span>Painel Admin</span>
+                </button>
+            </nav>
+
+            <div class="drawer-footer">
+                <button class="drawer-logout-btn" id="btn-drawer-logout">
+                    <i data-lucide="log-out"></i>
+                    <span>Sair da conta</span>
+                </button>
+            </div>
+        </aside>
 
     </div>
 

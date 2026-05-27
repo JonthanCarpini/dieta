@@ -156,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         settings: document.getElementById('screen-settings'),
         'food-search': document.getElementById('screen-food-search'),
         'my-professionals': document.getElementById('screen-my-professionals'),
+        'clinical-profile': document.getElementById('screen-clinical-profile'),
         'video-call': document.getElementById('screen-video-call')
     };
 
@@ -4410,6 +4411,75 @@ document.addEventListener('DOMContentLoaded', () => {
         navItems.forEach(item => {
             item.addEventListener('click', () => showScreen(item.dataset.target));
         });
+
+        // Drawer lateral (menu secundário)
+        const sideDrawer = document.getElementById('side-drawer');
+        const drawerBackdrop = document.getElementById('drawer-backdrop');
+
+        function openDrawer() {
+            if (!sideDrawer || !drawerBackdrop) return;
+            // Atualiza dados do usuário no drawer
+            const drawerName = document.getElementById('drawer-user-name');
+            const drawerInitials = document.getElementById('drawer-avatar-initials');
+            const drawerPlan = document.getElementById('drawer-user-plan');
+            const drawerItemAdmin = document.getElementById('drawer-item-admin');
+            if (state.user) {
+                const name = state.user.name || state.user.email || 'Usuário';
+                if (drawerName) drawerName.textContent = name;
+                if (drawerInitials) drawerInitials.textContent = name.charAt(0).toUpperCase();
+                if (drawerPlan) {
+                    const planLabels = { trial: 'Plano Trial', premium: 'Plano Premium' };
+                    drawerPlan.textContent = planLabels[state.user.plan] || 'Plano Trial';
+                }
+                if (drawerItemAdmin) {
+                    drawerItemAdmin.classList.toggle('hidden', state.user.role !== 'admin');
+                }
+            }
+            sideDrawer.classList.add('active');
+            drawerBackdrop.classList.add('active');
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        function closeDrawer() {
+            if (!sideDrawer || !drawerBackdrop) return;
+            sideDrawer.classList.remove('active');
+            drawerBackdrop.classList.remove('active');
+        }
+
+        document.querySelectorAll('[data-drawer-open]').forEach(btn => {
+            btn.addEventListener('click', openDrawer);
+        });
+        document.querySelectorAll('[data-drawer-close]').forEach(btn => {
+            btn.addEventListener('click', closeDrawer);
+        });
+        if (drawerBackdrop) drawerBackdrop.addEventListener('click', closeDrawer);
+
+        // Itens do drawer navegam pelas telas e fecham o drawer
+        document.querySelectorAll('.drawer-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const target = item.dataset.target;
+                if (target) {
+                    showScreen(target);
+                    closeDrawer();
+                }
+            });
+        });
+
+        // Logout pelo drawer
+        const btnDrawerLogout = document.getElementById('btn-drawer-logout');
+        if (btnDrawerLogout) {
+            btnDrawerLogout.addEventListener('click', () => {
+                if (confirm('Deseja sair da sua conta?')) {
+                    if (appointmentAlertInterval) {
+                        clearInterval(appointmentAlertInterval);
+                        appointmentAlertInterval = null;
+                    }
+                    localStorage.removeItem('nutrir_token');
+                    closeDrawer();
+                    showScreen('screen-login');
+                }
+            });
+        }
 
         // Ouvinte para registro de novo peso
         const weightLogForm = document.getElementById('weight-log-form');
