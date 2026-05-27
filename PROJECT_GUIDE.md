@@ -26,7 +26,7 @@ O app gerencia o acompanhamento de calorias, macronutrientes, hidratação e jej
 2. **PostgreSQL**: Persistência relacional de dados.
 3. **jsonwebtoken (JWT) & bcryptjs**: Geração de tokens de sessão seguros e hashing de senhas.
 4. **google-auth-library**: Validação oficial das credenciais do Google Login no backend.
-5. **Native fetch (Node 18)**: Usado nas chamadas HTTP para as APIs de IA — sem dependências extras.
+5. **Native fetch (Node 18)**: Usado nas chamadas HTTP para as APIs de IA e USDA — sem dependências extras.
 
 ### Infraestrutura & Deploy:
 1. **Docker & Docker Compose**: Contêineres isolados para banco, API, frontend e proxy.
@@ -51,6 +51,8 @@ dieta/
 ├── index.html               # Estrutura HTML da SPA (todas as telas e modais)
 ├── style.css                # Design system Obsidian — tokens, glassmorphism, grain
 ├── app.js                   # Lógica da aplicação frontend e integração com API
+├── mobile-android/          # Projeto Android (WebView wrapper de https://nutrir.online)
+│   └── app/build/outputs/apk/debug/app-debug.apk  # APK de debug (forçado no git)
 ├── backend/
 │   ├── Dockerfile           # Dockerfile para o container do Node.js
 │   ├── package.json         # Dependências da API Express
@@ -62,9 +64,9 @@ dieta/
 │   └── routes/
 │       ├── auth.js          # Cadastro, login tradicional e login Google
 │       ├── ai.js            # Proxy de IA: Gemini/OpenAI/Mistral — receitas, scanner, plano semanal
-│       ├── user.js          # Sincronização do diário do paciente e orientações
-│       ├── professional.js  # Gestão de diários e feedbacks por nutricionistas/personals
-│       └── admin.js         # Controle de planos, roles, chaves, agenda e faturamento
+│       ├── user.js          # Sincronização do diário do paciente, orientações e cardápio semanal
+│       ├── professional.js  # Gestão de diários, feedbacks e cardápios semanais por profissionais
+│       └── admin.js         # Controle de planos, roles, chaves, agenda, faturamento e busca USDA
 ```
 
 ---
@@ -87,10 +89,31 @@ Os dados do usuário são sincronizados com o PostgreSQL por meio de requisiçõ
    - `active_llm_provider` → `'gemini'` | `'openai'` | `'mistral'`
    - `google_client_id` (deve terminar em `.apps.googleusercontent.com`)
    - `mercadopago_token`, `asaas_api_key`
+   - `usda_api_key` → chave opcional para a USDA FoodData Central API (funciona sem chave com `DEMO_KEY`, limite de 50 req/dia; chave gratuita em fdc.nal.usda.gov)
 10. **`plans`**: Planos comerciais configuráveis (identificador, preço, duração, benefícios).
 11. **`payments`**: Histórico de transações com cálculo de comissões por profissional vinculado.
 12. **`professional_availability`**: Horários de disponibilidade semanal dos profissionais.
 13. **`appointments`**: Agendamentos de consultas por vídeo com patient_id, professional_id, data, hora_inicio, hora_fim, link do Jitsi e status.
+14. **`weekly_plans`**: Cardápios nutricionais semanais criados pelos profissionais e atribuídos a pacientes. Estrutura:
+    ```sql
+    CREATE TABLE weekly_plans (
+        id SERIAL PRIMARY KEY,
+        professional_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        name VARCHAR(255) NOT NULL DEFAULT 'Cardápio Semanal',
+        plan_data JSONB NOT NULL DEFAULT '{"days":[]}',
+        notes TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ```
+    O campo `plan_data` é JSONB com estrutura `{ days: [ { dow: 0..6, meals: { breakfast, morning_snack, lunch, afternoon_snack, dinner, supper } } ] }`. Cada refeição contém `{ items: [{name, qty, calories, protein, carbs, fat}], instructions }`.
+
+    > **Atenção — Migração Manual**: O `schema.sql` só é executado na criação inicial do volume Docker. Para aplicar em VPS existente, use:
+    > ```bash
+    > docker exec nutrir_db psql -U postgres -d slimo -c "CREATE TABLE IF NOT EXISTS weekly_plans (...)"
+    > ```
 
 ---
 
@@ -144,14 +167,34 @@ O frontend calcula a fração calórica adequada por tipo de refeição a partir
 - **Videoconferências Gratuitas (Jitsi Meet)**: Agendamentos geram automaticamente um link único e gratuito hospedado no Jitsi Meet no formato `https://meet.jit.si/nutrir-consultation-<patient_id>-<professional_id>-<timestamp>`, permitindo chamadas diretas pela plataforma por meio de um botão "Iniciar Chamada".
 - **Cancelamento**: Tanto o paciente quanto o profissional podem cancelar consultas diretamente na interface, mudando o status para `cancelled`.
 
-### E. Painel de Administração (`/admin/`)
+### E. Aba "Receitas do Nutricionista" (App do Paciente)
+
+A aba **Receitas do Nutricionista** (anteriormente "Receitas Fit") exibe o cardápio semanal prescrito pelo profissional vinculado ao paciente. É acessada via `btn-tab-recipes-pro` / `section-recipes-pro` no `index.html`.
+
+**Fluxo de dados**:
+1. `loadStateFromAPI()` em `app.js` chama `GET /api/user/weekly-plan` — retorna o plano mais recente e ativo atribuído pelo profissional vinculado.
+2. O resultado é armazenado em `state.proWeeklyPlan`.
+3. `renderProRecipesTab()` renderiza abas por dia da semana (Seg–Dom) com `renderProPlanDay(dow)` para cada dia.
+
+**Estados de exibição**:
+- `#pro-plan-loading`: spinner enquanto carrega.
+- `#pro-plan-empty`: mensagem de "nenhum cardápio prescrito" quando não há plano ativo.
+- `#pro-plan-content`: conteúdo do plano com abas `.pro-day-tab` e `.pro-meal-card` para cada refeição.
+
+**Rota backend** (`backend/routes/user.js`):
+```
+GET /api/user/weekly-plan
+```
+Retorna o plano mais recente (`is_active = true`) do profissional vinculado via JOIN em `professional_links`.
+
+### F. Painel de Administração (`/admin/`)
 Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais:
 
 **Administradores**:
 - Controle de usuários (promoção de cargo, plano, trial).
 - Cadastro de profissionais com comissão de vendas e inline editing.
 - Criação e gestão de planos comerciais.
-- **Aba Credenciais**: Seleção visual do provedor de IA ativo (cards clicáveis para Gemini/OpenAI/Mistral), cadastro individual de chaves por provedor, botão "Testar provedor ativo" que chama `/api/ai/test` e exibe provedor, modelo, latência e nome da receita de exemplo.
+- **Aba Credenciais**: Seleção visual do provedor de IA ativo (cards clicáveis para Gemini/OpenAI/Mistral), cadastro individual de chaves por provedor, botão "Testar provedor ativo" que chama `/api/ai/test` e exibe provedor, modelo, latência e nome da receita de exemplo. Campo de chave USDA FoodData Central API (`usda_api_key`) com descrição de uso gratuito.
 - **Aba Faturamento**: Montante bruto, total de comissões e lucro líquido.
 - **Aba Consultas (Global)**: Visualização de todas as consultas agendadas na plataforma e permissão para cancelá-las.
 
@@ -161,8 +204,45 @@ Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais:
 - **Faturamento**: Comissões acumuladas e pacientes ativos.
 - **Agenda**: Grade visual interativa de disponibilidade semanal (ver seção abaixo).
 - **Aba Consultas**: Acompanhamento de todas as videochamadas agendadas por seus pacientes vinculados e opção de cancelamento.
+- **Aba Cardápios**: Construtor visual de planos nutricionais semanais (ver seção G abaixo).
 
-### F. Agenda de Disponibilidade (Profissional) — Grade Visual
+### G. Aba Cardápios — Construtor de Planos Semanais (Profissional)
+
+A aba **Cardápios** (`#tab-meal-plans`, botão `#nav-meal-plans`) permite ao profissional criar, editar e atribuir cardápios nutricionais semanais completos aos pacientes.
+
+#### Visão de lista:
+- Tabela com nome do plano, paciente atribuído, status (Ativo/Inativo) e ações (editar/excluir).
+- Botão "Novo Cardápio" abre o construtor.
+- Dados via `GET /api/professional/weekly-plans`.
+
+#### Construtor visual:
+- **Barra superior** (`#builder-topbar`): campo de nome do plano, seletor de paciente (`#builder-patient-select`) e botão Salvar.
+- **Abas por dia** (`.plan-day-tabs`): Segunda a Domingo, cada dia com 6 tipos de refeição (Café da Manhã, Lanche da Manhã, Almoço, Lanche da Tarde, Jantar, Ceia).
+- **Cards de refeição** (`.plan-meal-card`): campo de instruções gerais + lista de itens + totais de macros calculados automaticamente.
+- **Busca USDA**: campo de texto + botão buscar chamam `GET /api/admin/calorie-search?q=<termo>`. Resultados exibem nome, macros por 100g e campo de quantidade em gramas para escalar proporcionalmente antes de adicionar ao plano.
+
+#### Rotas backend (`backend/routes/professional.js`):
+| Rota | Método | Descrição |
+|------|--------|-----------|
+| `/api/professional/weekly-plans` | GET | Lista todos os planos do profissional logado |
+| `/api/professional/weekly-plans` | POST | Cria novo plano |
+| `/api/professional/weekly-plans/:id` | GET | Retorna plano completo por ID |
+| `/api/professional/weekly-plans/:id` | PUT | Atualiza plano (nome, paciente, dados, notas) |
+| `/api/professional/weekly-plans/:id` | DELETE | Remove plano |
+
+Todas as rotas requerem `authenticateToken` + `requireRole(['nutritionist','trainer'])`.
+
+#### Proxy USDA (`backend/routes/admin.js`):
+```
+GET /api/admin/calorie-search?q=<termo>
+```
+- Posicionada **antes** do middleware `requireRole(['admin'])` para que profissionais também possam acessar.
+- Lê `usda_api_key` de `system_settings`; usa `'DEMO_KEY'` como fallback (50 req/dia grátis).
+- Chama `https://api.nal.usda.gov/fdc/v1/foods/search?query=...&api_key=...&pageSize=10`.
+- **Importante**: o parâmetro `dataType` causa erro 400 na API USDA — nunca incluir.
+- Normaliza a resposta para `{ items: [{name, calories, protein_g, carbohydrates_total_g, fat_total_g, serving_size_g: 100}] }`.
+
+### H. Agenda de Disponibilidade (Profissional) — Grade Visual
 
 A aba **Minha Agenda** do painel profissional usa uma grade clicável 7×28 (dias × slots de 30 min, 07h–20h30):
 
@@ -173,7 +253,7 @@ A aba **Minha Agenda** do painel profissional usa uma grade clicável 7×28 (dia
 - **Motivo**: cada linha no banco representa exatamente 1 vaga de consulta de 30 minutos, permitindo que o frontend de agendamento exiba slots individuais diretamente.
 - **Validação de agendamento**: ao criar uma consulta, o backend normaliza os horários para `HH:MM` (`.substring(0,5)`) antes de comparar com os slots do banco — necessário porque o PostgreSQL retorna colunas `time` no formato `HH:MM:SS`.
 
-### G. Dashboard do Profissional — `GET /api/admin/pro-overview`
+### I. Dashboard do Profissional — `GET /api/admin/pro-overview`
 
 Endpoint exclusivo para nutricionistas e personal trainers (`requireRole(['nutritionist','trainer'])`). Executa 4 queries em paralelo via `Promise.all`:
 
@@ -190,21 +270,21 @@ Retorna: `{ totalPatients, consultationsToday, slotsToday, commissionsMonth, nex
 - Tabela de próximas consultas com badge de status.
 - Filtros de pacientes: `#patient-search-input` (nome/e-mail) + `#patient-goal-filter` (objetivo) com `applyPatientFilters()` em tempo real.
 - Gráfico de peso: `renderPatientWeightChart(weights)` destrói instância anterior (`adminState._patientWeightChart`) e cria Chart.js `line` com tema escuro/âmbar.
-- Aderência calórica: `applyMealFilter(days)` calcula média de `% meta atingida por dia` e exibe em `#detail-caloric-adherence`.
+- Aderência calórica: `applyMealFilter(days)` calcula média de `% meta atingida por dia` e exibe em `#detail-caloric-adherence`. Os listeners dos botões de filtro (7 dias / 30 dias / Tudo) são registrados em `setupEventListeners()` — não dentro de callbacks async — para garantir funcionamento independente de falhas de carregamento.
 - Histórico de feedback: `loadFeedbackHistory(patientId)` chama `GET /professional/patients/:id/feedbacks` e renderiza lista `.fhi-item`.
 
-### H. Tela de Análise Nutricional (Scanner)
+### J. Tela de Análise Nutricional (Scanner)
 A tela `screen-results` exibe após análise de imagem:
 - **Card de calorias**: Total em âmbar + barra de progresso vs meta diária (fica vermelha acima de 90%).
 - **Card de macros**: Barras horizontais para Proteína (verde), Carboidratos (azul) e Gordura (laranja) mostrando valor atual vs meta diária com percentual.
 - **Cards de alimentos**: Nome + kcal em âmbar no topo; badge de peso + tags coloridas (P/C/G/Fibra) embaixo. Clicável para edição.
 - **Compressão de imagem**: Frontend redimensiona para max 900px e comprime em JPEG 0.80 antes de enviar — câmera e upload de arquivo. Botão "Analisar" fica bloqueado com "Processando..." durante o resize (evita race condition).
 
-### I. Tela Diário (Dashboard)
+### K. Tela Diário (Dashboard)
 - **Painel de macros**: substituiu o grid de 3 colunas por um card único com 3 linhas horizontais — nome + barra de progresso + `consumido/meta g`. Todos os valores arredondados (`Math.round`).
 - **Refeições expandíveis**: clicar no cabeçalho ou no botão chevron revela a lista de alimentos individuais com peso e calorias. Tags coloridas P/C/G em cada refeição.
 
-### J. Tela Histórico
+### L. Tela Histórico
 - **Card de meta**: badge com o objetivo do usuário (`Emagrecer` / `Ganhar Massa` / `Manutenção`); macros com cores por tipo.
 - **Cards de dia**: nome do dia + data, calorias com cor semântica (verde = 85–105% da meta, azul = abaixo, vermelho = acima), barra de progresso, tags P/C/G e botão expandir para ver refeições individuais do dia com horário e macros.
 
@@ -239,9 +319,25 @@ Todo o layout segue o design system Obsidian definido em `style.css` e `admin/ad
 - **Banco de dados**: Volume Docker persistente com nome `slimo`. A variável `POSTGRES_DB` só se aplica na primeira criação do volume — não alterar o nome do banco.
 - **SSH Key**: `C:/Users/admin/.ssh/disparo_vps`
 
+### Migrações de Schema
+O `schema.sql` **só é executado na criação inicial do volume**. Para tabelas adicionadas após o primeiro deploy, aplicar manualmente via SSH:
+```bash
+docker exec nutrir_db psql -U postgres -d slimo -c "SQL_AQUI"
+```
+
 ---
 
-## 8. Como Executar o Projeto Localmente
+## 8. APK Android
+
+O projeto `mobile-android/` é um **WebView wrapper** que carrega `https://nutrir.online`. Não contém lógica nativa — todas as funcionalidades estão no frontend web.
+
+- Alterações de frontend/backend **não requerem rebuild do APK**.
+- Para gerar novo APK: `./gradlew clean assembleDebug` dentro de `mobile-android/`.
+- O APK de debug está em `mobile-android/app/build/outputs/apk/debug/app-debug.apk` (forçado no git com `git add -f`).
+
+---
+
+## 9. Como Executar o Projeto Localmente
 
 ### Pré-requisitos:
 - Docker e Docker Compose instalados.
@@ -256,7 +352,7 @@ Todo o layout segue o design system Obsidian definido em `style.css` e `admin/ad
 
 ---
 
-## 9. Limites e Configurações Críticas
+## 10. Limites e Configurações Críticas
 
 | Camada | Parâmetro | Valor atual | Observação |
 |--------|-----------|-------------|------------|
@@ -265,24 +361,30 @@ Todo o layout segue o design system Obsidian definido em `style.css` e `admin/ad
 | Express | `express.urlencoded({ limit })` | `15mb` | `backend/server.js` |
 | Frontend | Resize de imagem scanner | max 900px, JPEG 0.80 | `resizeImageToBase64()` em `app.js` |
 | Gemini | Modelos disponíveis para a chave atual | `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-2.0-flash-001`, `gemini-2.0-flash-lite`, `gemini-2.0-flash-lite-001`, `gemini-flash-latest`, `gemini-2.5-flash-lite`, `gemini-pro-latest` | Verificado via ListModels — **não** inclui `gemini-1.5-*` |
+| USDA API | `dataType` parameter | **Nunca usar** | Causa HTTP 400 independente do valor ou formato de encoding. Omitir — API retorna todos os tipos por padrão |
+| USDA API | `DEMO_KEY` (sem cadastro) | 30 req/hora, 50/dia | Chave gratuita completa em fdc.nal.usda.gov |
 
 ---
 
-## 10. Próximos Passos e Sugestões de Melhorias
+## 11. Próximos Passos e Sugestões de Melhorias
 
 1. **Gateways Reais de Produção**: Substituir webhooks simulados de pagamento por integrações reais com Mercado Pago / Asaas.
 2. **Google OAuth Configurado**: Cadastrar um Client ID real (formato `xxxx.apps.googleusercontent.com`) no painel admin para habilitar o login social.
 3. **Upload de Fotos**: Criar serviço de storage (S3 ou pasta estática no Express) para arquivar fotos dos pratos analisados.
 4. **Edição do Diário**: Permitir que usuários cliquem nas refeições registradas no Dashboard para editar e salvar no banco.
 5. **Notificações de Fallback de IA visíveis ao usuário**: Exibir um aviso discreto quando o sistema usou fallback automático de provedor de IA.
+6. **Notificação de novo cardápio**: Alertar o paciente via badge ou push notification quando o profissional atribuir ou atualizar o cardápio semanal.
+7. **Impressão / PDF do Cardápio**: Botão "Exportar PDF" no construtor para que o profissional possa imprimir e entregar ao paciente.
 
 ---
 
-## 11. Diretrizes de Desenvolvimento (Padrões do Projeto)
+## 12. Diretrizes de Desenvolvimento (Padrões do Projeto)
 
 - **Idioma Obrigatório**: Todas as documentações (`.md`), comentários no código, mensagens de erro, logs do terminal e **mensagens de commits do Git DEVEM obrigatoriamente ser escritas em português (Brasil)**. Commits em outros idiomas não serão aceitos.
 
 - **Sistema de Design — Obsidian**: Seguir os tokens definidos na seção 6. Não alterar nomes de classe existentes no HTML.
+
+- **Listeners de eventos**: Registrar sempre em `setupEventListeners()` — nunca dentro de callbacks `async` ou funções de carregamento de dados. Isso garante que os handlers funcionem mesmo que chamadas à API falhem.
 
 - **Fluxo Obrigatório Pós-Alteração**: Ao finalizar qualquer conjunto de alterações, executar obrigatoriamente:
 
