@@ -258,6 +258,27 @@ router.post('/appointments/:id/cancel', async (req, res) => {
   }
 });
 
+// ==========================================
+// PROXY CALORIE NINJAS — usado pelo painel do profissional
+// ==========================================
+router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']), async (req, res) => {
+  const query = req.query.q || '';
+  if (!query.trim()) return res.status(400).json({ error: 'Query obrigatória.' });
+  try {
+    const settingsRes = await db.query("SELECT value FROM system_settings WHERE key = 'calorie_ninjas_key'");
+    const apiKey = settingsRes.rows[0]?.value || '';
+    if (!apiKey) return res.status(400).json({ error: 'Chave da API CalorieNinjas não configurada. Configure em Credenciais.' });
+    const url = `https://api.calorieninjas.com/v1/nutrition?query=${encodeURIComponent(query)}`;
+    const response = await fetch(url, { headers: { 'X-Api-Key': apiKey } });
+    if (!response.ok) return res.status(response.status).json({ error: 'Erro na API CalorieNinjas.' });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao consultar CalorieNinjas.' });
+  }
+});
+
 // Exige cargo de administrador para todas as rotas abaixo
 router.use(requireRole(['admin']));
 

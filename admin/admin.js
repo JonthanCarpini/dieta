@@ -149,6 +149,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        const navMealPlans = document.getElementById('nav-meal-plans');
+
         if (role === 'admin') {
             if (navOverview) navOverview.classList.remove('hidden');
             if (navUsers) navUsers.classList.remove('hidden');
@@ -159,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (navSchedule) navSchedule.classList.add('hidden');
             if (navAppointments) navAppointments.classList.remove('hidden');
             if (navSettings) navSettings.classList.remove('hidden');
+            if (navMealPlans) navMealPlans.classList.add('hidden');
         } else {
             // profissional (nutritionist ou trainer)
             if (navOverview) navOverview.classList.remove('hidden');
@@ -170,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (navSchedule) navSchedule.classList.remove('hidden');
             if (navAppointments) navAppointments.classList.remove('hidden');
             if (navSettings) navSettings.classList.add('hidden');
+            if (navMealPlans) navMealPlans.classList.remove('hidden');
         }
     }
 
@@ -331,6 +335,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const patientGoal   = document.getElementById('patient-goal-filter');
         if (patientSearch) patientSearch.addEventListener('input', applyPatientFilters);
         if (patientGoal)   patientGoal.addEventListener('change', applyPatientFilters);
+
+        // Cardápios: botão Novo Plano
+        const btnNewPlan = document.getElementById('btn-new-meal-plan');
+        if (btnNewPlan) btnNewPlan.addEventListener('click', () => openMealPlanBuilder(null));
+
+        // Cardápios: Voltar à lista
+        const btnBackToPlans = document.getElementById('btn-back-to-plans');
+        if (btnBackToPlans) btnBackToPlans.addEventListener('click', () => {
+            document.getElementById('meal-plans-builder-view').classList.add('hidden');
+            document.getElementById('meal-plans-list-view').classList.remove('hidden');
+        });
+
+        // Cardápios: Salvar plano
+        const btnSavePlan = document.getElementById('btn-save-meal-plan');
+        if (btnSavePlan) btnSavePlan.addEventListener('click', saveMealPlan);
+
+        // Cardápios: Busca CalorieNinjas
+        const btnCalSearch = document.getElementById('btn-calorie-search');
+        const calInput = document.getElementById('calorie-search-input');
+        if (btnCalSearch) btnCalSearch.addEventListener('click', runCalorieSearch);
+        if (calInput) {
+            calInput.addEventListener('keydown', e => { if (e.key === 'Enter') runCalorieSearch(); });
+        }
+
+        // Cardápios: Toggle ativo/inativo
+        const btnToggleActive = document.getElementById('btn-toggle-active-plan');
+        if (btnToggleActive) btnToggleActive.addEventListener('click', () => {
+            adminState._editingPlanActive = !adminState._editingPlanActive;
+            btnToggleActive.textContent = adminState._editingPlanActive ? 'Desativar' : 'Ativar';
+            btnToggleActive.className = adminState._editingPlanActive ? 'btn-secondary btn-sm' : 'btn-danger btn-sm';
+        });
+
+        // Cardápios: day tabs
+        document.querySelectorAll('.plan-day-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.plan-day-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                renderPlanDayEditor(parseInt(tab.dataset.dow));
+            });
+        });
     }
 
     // Roteia o conteúdo de cada aba
@@ -385,6 +429,8 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadScheduleData();
         } else if (tabId === 'appointments') {
             await loadAppointmentsData();
+        } else if (tabId === 'meal-plans') {
+            await loadMealPlansData();
         }
 
         // Garante que os ícones Lucide sejam atualizados
@@ -1090,6 +1136,11 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('setting-mp-token').value    = adminState.settings.mercadopago_token || '';
             document.getElementById('setting-asaas-key').value   = adminState.settings.asaas_key || '';
 
+            const cnKeyInput = document.getElementById('calorie-ninjas-key-input');
+            if (cnKeyInput && adminState.settings.calorie_ninjas_key !== undefined) {
+                cnKeyInput.value = adminState.settings.calorie_ninjas_key || '';
+            }
+
             setActiveLLMCard(adminState.settings.active_llm_provider || 'gemini');
             setupLLMProviderCards();
         } catch (err) {
@@ -1106,7 +1157,8 @@ document.addEventListener('DOMContentLoaded', () => {
             mistral_api_key:      document.getElementById('setting-mistral-key').value.trim(),
             google_client_id:     document.getElementById('setting-google-id').value.trim(),
             mercadopago_token:    document.getElementById('setting-mp-token').value.trim(),
-            asaas_key:            document.getElementById('setting-asaas-key').value.trim()
+            asaas_key:            document.getElementById('setting-asaas-key').value.trim(),
+            calorie_ninjas_key:   document.getElementById('calorie-ninjas-key-input')?.value?.trim() || ''
         };
         const res = await fetch(`${API_URL}/admin/settings`, {
             method: 'POST',
@@ -3018,5 +3070,366 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         modal.style.display = 'flex';
+    }
+
+    // ==========================================
+    // CARDÁPIOS SEMANAIS — GESTÃO DE PLANOS
+    // ==========================================
+
+    const MEAL_TYPES = [
+        { type: 'cafe_da_manha',  label: 'Café da Manhã',    time: '07:00', icon: '☀️' },
+        { type: 'lanche_manha',   label: 'Lanche da Manhã',  time: '10:00', icon: '🍎' },
+        { type: 'almoco',         label: 'Almoço',            time: '12:00', icon: '🍽️' },
+        { type: 'lanche_tarde',   label: 'Lanche da Tarde',   time: '15:30', icon: '🍊' },
+        { type: 'jantar',         label: 'Jantar',             time: '19:00', icon: '🌙' },
+        { type: 'ceia',           label: 'Ceia',               time: '21:00', icon: '🌛' },
+    ];
+
+    const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const DAY_FULL  = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+    function getEmptyPlanData() {
+        return {
+            days: [1,2,3,4,5,6,0].map(dow => ({
+                dow,
+                meals: MEAL_TYPES.map(mt => ({
+                    type: mt.type, label: mt.label, time: mt.time,
+                    items: [], instructions: '',
+                    total: { calories: 0, protein: 0, carbs: 0, fat: 0 }
+                }))
+            }))
+        };
+    }
+
+    async function loadMealPlansData() {
+        const tbody = document.getElementById('meal-plans-table-body');
+        if (!tbody) return;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Carregando...</td></tr>`;
+        try {
+            const res = await fetch(`${API_URL}/professional/weekly-plans`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            if (!res.ok) throw new Error();
+            const plans = await res.json();
+            adminState._weeklyPlans = plans;
+            renderMealPlansTable(plans);
+            // Preencher select de pacientes no builder
+            await populatePlanPatientSelect();
+        } catch {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--color-danger);">Erro ao carregar.</td></tr>`;
+        }
+    }
+
+    function renderMealPlansTable(plans) {
+        const tbody = document.getElementById('meal-plans-table-body');
+        if (!tbody) return;
+        if (plans.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--color-text-muted);">Nenhum cardápio criado ainda. Clique em "Novo Cardápio" para começar.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = '';
+        plans.forEach(p => {
+            const tr = document.createElement('tr');
+            const dt = new Date(p.updated_at).toLocaleDateString('pt-BR');
+            tr.innerHTML = `
+                <td><strong>${p.name}</strong></td>
+                <td>${p.patient_name ? `<span class="badge-role user">${p.patient_name}</span>` : '<span style="color:var(--color-text-muted)">—</span>'}</td>
+                <td><small>${dt}</small></td>
+                <td><span class="badge-role ${p.is_active ? 'nutritionist' : ''}" style="${p.is_active ? '' : 'background:rgba(255,80,80,0.1);color:#ff5050;border-color:rgba(255,80,80,0.2);'}">${p.is_active ? 'Ativo' : 'Inativo'}</span></td>
+                <td style="display:flex;gap:6px;">
+                    <button class="btn-sm btn-primary btn-edit-plan" data-id="${p.id}">Editar</button>
+                    <button class="btn-sm btn-danger btn-delete-plan" data-id="${p.id}">Excluir</button>
+                </td>
+            `;
+            tr.querySelector('.btn-edit-plan').addEventListener('click', () => openMealPlanBuilder(p.id));
+            tr.querySelector('.btn-delete-plan').addEventListener('click', () => deleteMealPlan(p.id, p.name));
+            tbody.appendChild(tr);
+        });
+        lucide.createIcons();
+    }
+
+    async function populatePlanPatientSelect() {
+        const sel = document.getElementById('plan-patient-select');
+        if (!sel) return;
+        const patients = adminState.allPatients || [];
+        sel.innerHTML = '<option value="">Sem paciente (template)</option>';
+        patients.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            sel.appendChild(opt);
+        });
+    }
+
+    async function openMealPlanBuilder(planId) {
+        document.getElementById('meal-plans-list-view').classList.add('hidden');
+        document.getElementById('meal-plans-builder-view').classList.remove('hidden');
+
+        if (planId) {
+            try {
+                const res = await fetch(`${API_URL}/professional/weekly-plans/${planId}`, {
+                    headers: { 'Authorization': `Bearer ${adminState.token}` }
+                });
+                const plan = await res.json();
+                adminState._editingPlanId = plan.id;
+                adminState._editingPlanData = typeof plan.plan_data === 'string' ? JSON.parse(plan.plan_data) : plan.plan_data;
+                adminState._editingPlanActive = plan.is_active !== false;
+                document.getElementById('plan-name-input').value = plan.name;
+                document.getElementById('plan-patient-select').value = plan.patient_id || '';
+                const togBtn = document.getElementById('btn-toggle-active-plan');
+                if (togBtn) {
+                    togBtn.textContent = adminState._editingPlanActive ? 'Desativar' : 'Ativar';
+                    togBtn.className = adminState._editingPlanActive ? 'btn-secondary btn-sm' : 'btn-danger btn-sm';
+                }
+            } catch {
+                alert('Erro ao carregar cardápio.');
+                return;
+            }
+        } else {
+            adminState._editingPlanId = null;
+            adminState._editingPlanData = getEmptyPlanData();
+            adminState._editingPlanActive = true;
+            document.getElementById('plan-name-input').value = '';
+            document.getElementById('plan-patient-select').value = '';
+            const togBtn = document.getElementById('btn-toggle-active-plan');
+            if (togBtn) { togBtn.textContent = 'Desativar'; togBtn.className = 'btn-secondary btn-sm'; }
+        }
+
+        // Garantir que plan_data tem todos os 7 dias
+        if (!adminState._editingPlanData?.days || adminState._editingPlanData.days.length < 7) {
+            adminState._editingPlanData = getEmptyPlanData();
+        }
+
+        // Resetar para Seg
+        document.querySelectorAll('.plan-day-tab').forEach(t => t.classList.remove('active'));
+        const seg = document.querySelector('.plan-day-tab[data-dow="1"]');
+        if (seg) seg.classList.add('active');
+        renderPlanDayEditor(1);
+        await populatePlanPatientSelect();
+        if (planId) {
+            try {
+                const res2 = await fetch(`${API_URL}/professional/weekly-plans/${planId}`, { headers: { 'Authorization': `Bearer ${adminState.token}` } });
+                const plan2 = await res2.json();
+                document.getElementById('plan-patient-select').value = plan2.patient_id || '';
+            } catch {}
+        }
+        lucide.createIcons();
+    }
+
+    function renderPlanDayEditor(dow) {
+        const container = document.getElementById('plan-day-content');
+        if (!container || !adminState._editingPlanData) return;
+        const dayData = adminState._editingPlanData.days.find(d => d.dow === dow);
+        if (!dayData) return;
+
+        let dailyTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+        dayData.meals.forEach(m => {
+            dailyTotals.calories += m.total?.calories || 0;
+            dailyTotals.protein  += m.total?.protein  || 0;
+            dailyTotals.carbs    += m.total?.carbs    || 0;
+            dailyTotals.fat      += m.total?.fat      || 0;
+        });
+
+        container.innerHTML = `
+            <div class="plan-day-header">
+                <h3>${DAY_FULL[dow]}</h3>
+                <div class="plan-day-totals">
+                    <span>${Math.round(dailyTotals.calories)} kcal</span>
+                    <span>P: ${Math.round(dailyTotals.protein)}g</span>
+                    <span>C: ${Math.round(dailyTotals.carbs)}g</span>
+                    <span>G: ${Math.round(dailyTotals.fat)}g</span>
+                </div>
+            </div>
+            ${dayData.meals.map(meal => renderMealSection(dow, meal)).join('')}
+        `;
+
+        // Bind events
+        container.querySelectorAll('.btn-remove-plan-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const { dow: d, mealType, itemIdx } = btn.dataset;
+                removePlanItem(parseInt(d), mealType, parseInt(itemIdx));
+            });
+        });
+        container.querySelectorAll('.plan-meal-instructions').forEach(ta => {
+            ta.addEventListener('change', () => {
+                const { dow: d, mealType } = ta.dataset;
+                const dayIdx = adminState._editingPlanData.days.findIndex(day => day.dow === parseInt(d));
+                if (dayIdx === -1) return;
+                const mealIdx = adminState._editingPlanData.days[dayIdx].meals.findIndex(m => m.type === mealType);
+                if (mealIdx === -1) return;
+                adminState._editingPlanData.days[dayIdx].meals[mealIdx].instructions = ta.value;
+            });
+        });
+        container.querySelectorAll('.btn-add-food-to-meal').forEach(btn => {
+            btn.addEventListener('click', () => {
+                adminState._targetMealDow  = parseInt(btn.dataset.dow);
+                adminState._targetMealType = btn.dataset.mealType;
+                document.getElementById('calorie-search-input')?.focus();
+            });
+        });
+        lucide.createIcons();
+    }
+
+    function renderMealSection(dow, meal) {
+        const mt = MEAL_TYPES.find(m => m.type === meal.type) || {};
+        const hasItems = meal.items && meal.items.length > 0;
+        const totalCal = Math.round(meal.total?.calories || 0);
+        return `
+        <div class="plan-meal-card">
+            <div class="plan-meal-header">
+                <div class="plan-meal-title">
+                    <span class="plan-meal-icon">${mt.icon || '🍴'}</span>
+                    <strong>${meal.label}</strong>
+                    <span class="plan-meal-time">${meal.time}</span>
+                    ${totalCal > 0 ? `<span class="plan-meal-cal-badge">${totalCal} kcal</span>` : ''}
+                </div>
+                <button class="btn-sm btn-secondary btn-add-food-to-meal" data-dow="${dow}" data-meal-type="${meal.type}">
+                    <i data-lucide="plus"></i> Adicionar Alimento
+                </button>
+            </div>
+            <div class="plan-meal-items">
+                ${hasItems ? meal.items.map((item, idx) => `
+                    <div class="plan-item-row">
+                        <span class="plan-item-name">${item.name}${item.qty ? ` <small>(${item.qty})</small>` : ''}</span>
+                        <span class="plan-item-macros">${Math.round(item.calories)} kcal · P:${Math.round(item.protein)}g · C:${Math.round(item.carbs)}g · G:${Math.round(item.fat)}g</span>
+                        <button class="btn-remove-plan-item" data-dow="${dow}" data-meal-type="${meal.type}" data-item-idx="${idx}">×</button>
+                    </div>
+                `).join('') : `<p class="plan-meal-empty">Nenhum alimento adicionado.</p>`}
+            </div>
+            ${hasItems ? `<div class="plan-meal-total">Total: ${Math.round(meal.total?.calories||0)} kcal · P:${Math.round(meal.total?.protein||0)}g · C:${Math.round(meal.total?.carbs||0)}g · G:${Math.round(meal.total?.fat||0)}g</div>` : ''}
+            <textarea class="plan-meal-instructions" data-dow="${dow}" data-meal-type="${meal.type}" placeholder="Instruções de preparo (opcional)...">${meal.instructions || ''}</textarea>
+        </div>`;
+    }
+
+    function removePlanItem(dow, mealType, itemIdx) {
+        const dayIdx = adminState._editingPlanData.days.findIndex(d => d.dow === dow);
+        if (dayIdx === -1) return;
+        const mealIdx = adminState._editingPlanData.days[dayIdx].meals.findIndex(m => m.type === mealType);
+        if (mealIdx === -1) return;
+        adminState._editingPlanData.days[dayIdx].meals[mealIdx].items.splice(itemIdx, 1);
+        recalcMealTotal(dayIdx, mealIdx);
+        renderPlanDayEditor(dow);
+    }
+
+    function addItemToPlan(dow, mealType, item) {
+        const dayIdx = adminState._editingPlanData.days.findIndex(d => d.dow === dow);
+        if (dayIdx === -1) return;
+        const mealIdx = adminState._editingPlanData.days[dayIdx].meals.findIndex(m => m.type === mealType);
+        if (mealIdx === -1) return;
+        adminState._editingPlanData.days[dayIdx].meals[mealIdx].items.push(item);
+        recalcMealTotal(dayIdx, mealIdx);
+        renderPlanDayEditor(dow);
+    }
+
+    function recalcMealTotal(dayIdx, mealIdx) {
+        const items = adminState._editingPlanData.days[dayIdx].meals[mealIdx].items;
+        adminState._editingPlanData.days[dayIdx].meals[mealIdx].total = {
+            calories: items.reduce((s, i) => s + (i.calories || 0), 0),
+            protein:  items.reduce((s, i) => s + (i.protein  || 0), 0),
+            carbs:    items.reduce((s, i) => s + (i.carbs    || 0), 0),
+            fat:      items.reduce((s, i) => s + (i.fat      || 0), 0),
+        };
+    }
+
+    async function runCalorieSearch() {
+        const input = document.getElementById('calorie-search-input');
+        const resultsDiv = document.getElementById('calorie-search-results');
+        if (!input || !resultsDiv) return;
+        const q = input.value.trim();
+        if (!q) return;
+        resultsDiv.innerHTML = '<p style="padding:8px;color:var(--color-text-muted);">Buscando...</p>';
+        resultsDiv.classList.remove('hidden');
+        try {
+            const res = await fetch(`${API_URL}/admin/calorie-search?q=${encodeURIComponent(q)}`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro na busca');
+            if (!data.items || data.items.length === 0) {
+                resultsDiv.innerHTML = '<p style="padding:8px;color:var(--color-text-muted);">Nenhum resultado encontrado.</p>';
+                return;
+            }
+            resultsDiv.innerHTML = data.items.map((item, idx) => `
+                <div class="calorie-result-item" data-idx="${idx}">
+                    <div class="calorie-result-name">${item.name}</div>
+                    <div class="calorie-result-macros">
+                        ${Math.round(item.calories)} kcal ·
+                        P:${Math.round(item.protein_g)}g ·
+                        C:${Math.round(item.carbohydrates_total_g)}g ·
+                        G:${Math.round(item.fat_total_g)}g
+                        ${item.serving_size_g ? `· ${item.serving_size_g}g` : ''}
+                    </div>
+                    <button class="btn-sm btn-primary calorie-add-btn" data-idx="${idx}">+ Adicionar</button>
+                </div>
+            `).join('');
+            resultsDiv.querySelectorAll('.calorie-add-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const item = data.items[parseInt(btn.dataset.idx)];
+                    const targetDow  = adminState._targetMealDow  ?? 1;
+                    const targetType = adminState._targetMealType ?? 'cafe_da_manha';
+                    addItemToPlan(targetDow, targetType, {
+                        name:     item.name,
+                        qty:      item.serving_size_g ? `${item.serving_size_g}g` : '',
+                        calories: item.calories,
+                        protein:  item.protein_g,
+                        carbs:    item.carbohydrates_total_g,
+                        fat:      item.fat_total_g,
+                    });
+                    resultsDiv.classList.add('hidden');
+                    input.value = '';
+                });
+            });
+        } catch (err) {
+            resultsDiv.innerHTML = `<p style="padding:8px;color:var(--color-danger);">${err.message}</p>`;
+        }
+    }
+
+    async function saveMealPlan() {
+        const name = document.getElementById('plan-name-input')?.value?.trim();
+        if (!name) { alert('Dê um nome ao cardápio.'); return; }
+        const patientId = document.getElementById('plan-patient-select')?.value || null;
+        const payload = {
+            name,
+            patient_id: patientId ? parseInt(patientId) : null,
+            plan_data: adminState._editingPlanData,
+            is_active: adminState._editingPlanActive !== false,
+        };
+        try {
+            let res;
+            if (adminState._editingPlanId) {
+                res = await fetch(`${API_URL}/professional/weekly-plans/${adminState._editingPlanId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+                    body: JSON.stringify(payload),
+                });
+            } else {
+                res = await fetch(`${API_URL}/professional/weekly-plans`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+                    body: JSON.stringify(payload),
+                });
+            }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao salvar.');
+            adminState._editingPlanId = data.id;
+            alert('Cardápio salvo com sucesso!');
+            await loadMealPlansData();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    async function deleteMealPlan(id, name) {
+        if (!confirm(`Excluir o cardápio "${name}"? Esta ação não pode ser desfeita.`)) return;
+        try {
+            const res = await fetch(`${API_URL}/professional/weekly-plans/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${adminState.token}` },
+            });
+            if (!res.ok) throw new Error();
+            await loadMealPlansData();
+        } catch {
+            alert('Erro ao excluir cardápio.');
+        }
     }
 });

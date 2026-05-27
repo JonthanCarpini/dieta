@@ -77,6 +77,9 @@
                 <button class="nav-btn" data-tab="appointments" id="nav-appointments">
                     <i data-lucide="video"></i> Consultas
                 </button>
+                <button class="nav-btn" data-tab="meal-plans" id="nav-meal-plans">
+                    <i data-lucide="clipboard-list"></i> Cardápios
+                </button>
                 <button class="nav-btn" data-tab="settings" id="nav-settings">
                     <i data-lucide="key-round"></i> Credenciais
                 </button>
@@ -486,6 +489,20 @@
                             </div>
                         </div>
 
+                        <!-- Chave CalorieNinjas -->
+                        <div class="settings-field-group">
+                            <div class="field-info">
+                                <h4>CalorieNinjas API Key</h4>
+                                <p class="description">Para busca nutricional no construtor de cardápios. Obtenha em calorieninjas.com</p>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-password-wrapper">
+                                    <input type="password" id="calorie-ninjas-key-input" placeholder="Sua chave da API CalorieNinjas..." class="masked-input">
+                                    <button class="toggle-visibility-btn" type="button" data-target="calorie-ninjas-key-input"><i data-lucide="eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="margin-top-md" style="display:flex; justify-content:flex-end;">
                             <button type="submit" class="btn-primary" style="padding: 12px 24px; font-size:14px;">Salvar Todas as Credenciais</button>
                         </div>
@@ -766,6 +783,90 @@
                                 <!-- Injetado via JS -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================= -->
+            <!-- TAB: CARDÁPIOS SEMANAIS       -->
+            <!-- ============================= -->
+            <section id="tab-meal-plans" class="tab-content">
+                <!-- Lista de Planos -->
+                <div id="meal-plans-list-view">
+                    <div class="admin-section-header">
+                        <div>
+                            <h2 class="section-title">Cardápios Semanais</h2>
+                            <p class="section-subtitle">Crie e gerencie planos nutricionais completos para seus pacientes.</p>
+                        </div>
+                        <button class="btn-primary" id="btn-new-meal-plan">
+                            <i data-lucide="plus"></i> Novo Cardápio
+                        </button>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nome do Plano</th>
+                                    <th>Paciente Vinculado</th>
+                                    <th>Atualizado</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="meal-plans-table-body">
+                                <tr><td colspan="5" style="text-align:center; color:var(--color-text-muted);">Nenhum cardápio criado ainda.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Editor de Plano -->
+                <div id="meal-plans-builder-view" class="hidden">
+                    <div class="builder-topbar">
+                        <button class="btn-secondary btn-sm" id="btn-back-to-plans">
+                            <i data-lucide="arrow-left"></i> Voltar
+                        </button>
+                        <div class="builder-topbar-fields">
+                            <input type="text" id="plan-name-input" placeholder="Nome do cardápio..." class="input-inline">
+                            <select id="plan-patient-select" class="input-inline">
+                                <option value="">Sem paciente (template)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn-secondary btn-sm" id="btn-toggle-active-plan">Desativar</button>
+                            <button class="btn-primary btn-sm" id="btn-save-meal-plan">
+                                <i data-lucide="save"></i> Salvar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Busca CalorieNinjas -->
+                    <div class="calorie-search-bar">
+                        <div class="calorie-search-wrap">
+                            <i data-lucide="search" class="calorie-search-icon"></i>
+                            <input type="text" id="calorie-search-input" placeholder="Buscar alimento (ex: 100g frango grelhado, 1 xícara arroz)..." autocomplete="off">
+                            <button class="btn-primary btn-sm" id="btn-calorie-search">Buscar</button>
+                        </div>
+                        <div id="calorie-search-results" class="calorie-results-drop hidden"></div>
+                    </div>
+                    <p class="description" style="padding: 0 0 12px 0; font-size:11px;">
+                        Selecione um dia e uma refeição, depois busque alimentos para adicionar. A busca usa a API CalorieNinjas.
+                    </p>
+
+                    <!-- Seletor de dias -->
+                    <div class="plan-day-tabs">
+                        <button class="plan-day-tab active" data-dow="1">Seg</button>
+                        <button class="plan-day-tab" data-dow="2">Ter</button>
+                        <button class="plan-day-tab" data-dow="3">Qua</button>
+                        <button class="plan-day-tab" data-dow="4">Qui</button>
+                        <button class="plan-day-tab" data-dow="5">Sex</button>
+                        <button class="plan-day-tab" data-dow="6">Sáb</button>
+                        <button class="plan-day-tab" data-dow="0">Dom</button>
+                    </div>
+
+                    <!-- Conteúdo do dia -->
+                    <div id="plan-day-content">
+                        <!-- Gerado dinamicamente por renderPlanDayEditor() -->
                     </div>
                 </div>
             </section>

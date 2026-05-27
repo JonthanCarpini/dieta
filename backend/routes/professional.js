@@ -205,4 +205,93 @@ router.get('/patients/:id/weight-log', verifyPatientAccess, async (req, res) => 
   }
 });
 
+// ==========================================
+// 6. CARDÁPIOS SEMANAIS
+// ==========================================
+
+// Listar planos criados por este profissional
+router.get('/weekly-plans', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT wp.id, wp.name, wp.notes, wp.is_active, wp.created_at, wp.updated_at,
+              u.name as patient_name, u.id as patient_id
+       FROM weekly_plans wp
+       LEFT JOIN users u ON wp.patient_id = u.id
+       WHERE wp.professional_id = $1
+       ORDER BY wp.updated_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar cardápios.' });
+  }
+});
+
+// Criar novo plano
+router.post('/weekly-plans', async (req, res) => {
+  const { name, patient_id, plan_data, notes } = req.body;
+  if (!name) return res.status(400).json({ error: 'Nome do cardápio é obrigatório.' });
+  try {
+    const result = await db.query(
+      `INSERT INTO weekly_plans (professional_id, patient_id, name, plan_data, notes)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [req.user.id, patient_id || null, name, JSON.stringify(plan_data || { days: [] }), notes || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao criar cardápio.' });
+  }
+});
+
+// Buscar plano completo
+router.get('/weekly-plans/:id', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT wp.*, u.name as patient_name
+       FROM weekly_plans wp
+       LEFT JOIN users u ON wp.patient_id = u.id
+       WHERE wp.id = $1 AND wp.professional_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Cardápio não encontrado.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar cardápio.' });
+  }
+});
+
+// Atualizar plano
+router.put('/weekly-plans/:id', async (req, res) => {
+  const { name, patient_id, plan_data, notes, is_active } = req.body;
+  try {
+    const check = await db.query('SELECT id FROM weekly_plans WHERE id = $1 AND professional_id = $2', [req.params.id, req.user.id]);
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Cardápio não encontrado.' });
+    const result = await db.query(
+      `UPDATE weekly_plans SET name=$1, patient_id=$2, plan_data=$3, notes=$4, is_active=$5, updated_at=NOW()
+       WHERE id=$6 AND professional_id=$7 RETURNING *`,
+      [name, patient_id || null, JSON.stringify(plan_data), notes || null, is_active !== false, req.params.id, req.user.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar cardápio.' });
+  }
+});
+
+// Excluir plano
+router.delete('/weekly-plans/:id', async (req, res) => {
+  try {
+    const check = await db.query('SELECT id FROM weekly_plans WHERE id = $1 AND professional_id = $2', [req.params.id, req.user.id]);
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Cardápio não encontrado.' });
+    await db.query('DELETE FROM weekly_plans WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Cardápio excluído.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir cardápio.' });
+  }
+});
+
 module.exports = router;

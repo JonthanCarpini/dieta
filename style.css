@@ -2439,3 +2439,124 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); }
 }
 
 .orientation-card .text { font-size: 13px; line-height: 1.55; }
+
+/* ── Receitas do Nutricionista ── */
+.pro-plan-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255,250,240,0.08);
+}
+.pro-plan-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--color-text-main);
+}
+.pro-plan-day-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(255,250,240,0.03);
+    border: 1px solid rgba(255,250,240,0.07);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 16px;
+}
+.pro-day-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    padding: 7px 2px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    transition: all 0.15s;
+}
+.pro-day-tab:hover { color: var(--color-text-main); background: rgba(255,250,240,0.05); }
+.pro-day-tab.active { background: rgba(245,193,77,0.12); color: var(--color-primary); }
+.pro-plan-day-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    color: var(--color-text-main);
+}
+.pro-meal-card {
+    background: rgba(255,250,240,0.03);
+    border: 1px solid rgba(255,250,240,0.07);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+.pro-meal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.pro-meal-icon { font-size: 22px; }
+.pro-meal-label { font-size: 14px; font-weight: 700; display: block; }
+.pro-meal-time {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    background: rgba(255,250,240,0.06);
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+}
+.pro-meal-cal {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--color-primary);
+    font-weight: 700;
+    white-space: nowrap;
+}
+.pro-meal-item-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 8px;
+}
+.pro-meal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,250,240,0.04);
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.pro-meal-item:last-child { border-bottom: none; }
+.pro-item-name { font-size: 13px; }
+.pro-item-qty { color: var(--color-text-muted); font-size: 11px; }
+.pro-item-macros { font-size: 11px; color: var(--color-text-muted); font-family: var(--font-mono); white-space: nowrap; }
+.pro-meal-subtotal { font-size: 12px; color: var(--color-primary); font-family: var(--font-mono); font-weight: 600; padding: 6px 0 4px; }
+.pro-meal-instructions {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    background: rgba(255,250,240,0.03);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 8px;
+    line-height: 1.5;
+}
+.pro-day-total-card {
+    background: rgba(245,193,77,0.06);
+    border: 1px solid rgba(245,193,77,0.18);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-top: 16px;
+}
+.pro-day-total-title { font-size: 13px; font-weight: 700; color: var(--color-primary); margin-bottom: 10px; }
+.pro-day-total-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+.pro-total-bar-wrap { flex: 1; height: 6px; background: rgba(255,250,240,0.08); border-radius: 3px; overflow: hidden; }
+.pro-total-bar { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.pro-total-val { font-family: var(--font-mono); font-size: 12px; color: var(--color-primary); white-space: nowrap; }
+.pro-day-total-macros { display: flex; gap: 16px; font-size: 12px; color: var(--color-text-muted); font-family: var(--font-mono); }

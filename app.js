@@ -32,7 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fastingInterval: null,   // Intervalo do cronômetro de jejum
         savedAiRecipes: [],      // Receitas diárias geradas por IA salvas
         savedWeeklyPlans: [],    // Planos semanais gerados por IA salvos
-        weightHistory: []        // Histórico de pesos registrados
+        weightHistory: [],       // Histórico de pesos registrados
+        proWeeklyPlan: null      // Cardápio semanal do nutricionista
     };
 
     // 2. BANCO DE DADOS DE ALIMENTOS BRASILEIROS (NUTRIR BRAZIL DATABASE)
@@ -317,6 +318,16 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 state.weightHistory = [];
             }
+
+            // Buscar cardápio semanal do nutricionista
+            try {
+                const planRes = await fetch(`${API_URL}/user/weekly-plan`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (planRes.ok) {
+                    state.proWeeklyPlan = await planRes.json(); // null if none
+                }
+            } catch { state.proWeeklyPlan = null; }
 
             // Carrega api key global do banco de dados
             if (data.geminiApiKey && data.geminiApiKey.trim() !== '') {
@@ -1622,9 +1633,8 @@ document.addEventListener('DOMContentLoaded', () => {
             updateDashboard();
         }
         if (screenId === 'screen-recipes') {
-            renderRecipesGrid('all');
+            renderProRecipesTab();
             renderSavedAiRecipes();
-            renderSavedWeeklyPlans();
         }
         if (screenId === 'screen-fasting') {
             renderFastingScreen();
@@ -2024,42 +2034,119 @@ document.addEventListener('DOMContentLoaded', () => {
         showScreen('screen-dashboard');
     });
 
-    // 12. ABA DE RECEITAS E DETALHES COM SLIDER DE ESCALA
-    const recipesGrid = document.getElementById('recipes-list-container');
-    const filterBtns = document.querySelectorAll('.recipe-filter-btn');
+    // 12. ABA DE RECEITAS — NUTRICIONISTA E IA
 
-    filterBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            filterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            renderRecipesGrid(btn.dataset.category);
+    // ── RECEITAS DO NUTRICIONISTA ──
+    const PRO_MEAL_EMOJIS = {
+        cafe_da_manha: '☀️', lanche_manha: '🍎', almoco: '🍽️',
+        lanche_tarde: '🍊', jantar: '🌙', ceia: '🌛'
+    };
+
+    function renderProRecipesTab() {
+        const loading = document.getElementById('pro-plan-loading');
+        const empty   = document.getElementById('pro-plan-empty');
+        const content = document.getElementById('pro-plan-content');
+        if (!loading || !empty || !content) return;
+
+        if (!state.proWeeklyPlan) {
+            loading.classList.add('hidden');
+            empty.classList.remove('hidden');
+            content.classList.add('hidden');
+            lucide.createIcons();
+            return;
+        }
+
+        loading.classList.add('hidden');
+        empty.classList.add('hidden');
+        content.classList.remove('hidden');
+
+        document.getElementById('pro-plan-name').textContent = state.proWeeklyPlan.name || 'Cardápio Semanal';
+        const profLabel = document.getElementById('pro-plan-professional');
+        if (profLabel) {
+            const role = state.proWeeklyPlan.professional_role === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+            profLabel.textContent = `Por: ${state.proWeeklyPlan.professional_name || 'Profissional'} · ${role}`;
+        }
+
+        // Bind day tabs
+        document.querySelectorAll('.pro-day-tab').forEach(tab => {
+            tab.onclick = () => {
+                document.querySelectorAll('.pro-day-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                renderProPlanDay(parseInt(tab.dataset.dow));
+            };
         });
-    });
 
-    function renderRecipesGrid(category) {
-        recipesGrid.innerHTML = "";
-        const filtered = category === 'all' ? 
-            FIT_RECIPES_DATABASE : 
-            FIT_RECIPES_DATABASE.filter(r => r.category === category);
+        // Show today's dow by default
+        const todayDow = new Date().getDay();
+        document.querySelectorAll('.pro-day-tab').forEach(t => t.classList.remove('active'));
+        const todayTab = document.querySelector(`.pro-day-tab[data-dow="${todayDow}"]`);
+        if (todayTab) todayTab.classList.add('active');
+        renderProPlanDay(todayDow);
+        lucide.createIcons();
+    }
 
-        filtered.forEach(recipe => {
-            const card = document.createElement('div');
-            card.className = 'recipe-grid-card';
-            card.innerHTML = `
-                <div class="recipe-card-img" style="background-image: url('${recipe.image}')"></div>
-                <div class="recipe-card-info">
-                    <h4>${recipe.name}</h4>
-                    <div class="recipe-card-meta">
-                        <span><i data-lucide="clock" style="width: 12px; height: 12px; display:inline-block; vertical-align:middle; margin-top:-2px;"></i> ${recipe.time_min} min</span>
-                        <span class="cal">${recipe.calories_base} kcal</span>
+    function renderProPlanDay(dow) {
+        const container = document.getElementById('pro-plan-day-view');
+        if (!container || !state.proWeeklyPlan) return;
+        const planData = typeof state.proWeeklyPlan.plan_data === 'string'
+            ? JSON.parse(state.proWeeklyPlan.plan_data)
+            : state.proWeeklyPlan.plan_data;
+        const dayData = planData?.days?.find(d => d.dow === dow);
+        if (!dayData || !dayData.meals) {
+            container.innerHTML = '<p style="text-align:center;color:var(--color-text-muted);padding:24px;">Sem refeições para este dia.</p>';
+            return;
+        }
+
+        const dayNames = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+        let totalCal = 0, totalP = 0, totalC = 0, totalG = 0;
+        dayData.meals.forEach(m => {
+            totalCal += m.total?.calories || 0;
+            totalP   += m.total?.protein  || 0;
+            totalC   += m.total?.carbs    || 0;
+            totalG   += m.total?.fat      || 0;
+        });
+        const targetCal = state.userProfile?.targetCalories || 0;
+
+        container.innerHTML = `
+            <div class="pro-plan-day-title">${dayNames[dow]}</div>
+            ${dayData.meals.filter(m => m.items && m.items.length > 0).map(meal => `
+                <div class="pro-meal-card">
+                    <div class="pro-meal-header">
+                        <span class="pro-meal-icon">${PRO_MEAL_EMOJIS[meal.type] || '🍴'}</span>
+                        <div>
+                            <strong class="pro-meal-label">${meal.label}</strong>
+                            <span class="pro-meal-time">${meal.time}</span>
+                        </div>
+                        <span class="pro-meal-cal">${Math.round(meal.total?.calories || 0)} kcal</span>
                     </div>
+                    <ul class="pro-meal-item-list">
+                        ${meal.items.map(item => `
+                            <li class="pro-meal-item">
+                                <span class="pro-item-name">${item.name}${item.qty ? ` <span class="pro-item-qty">(${item.qty})</span>` : ''}</span>
+                                <span class="pro-item-macros">${Math.round(item.calories)} kcal · P:${Math.round(item.protein)}g · C:${Math.round(item.carbs)}g · G:${Math.round(item.fat)}g</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                    ${meal.total?.calories > 0 ? `<div class="pro-meal-subtotal">Subtotal: ${Math.round(meal.total.calories)} kcal · P:${Math.round(meal.total.protein)}g · C:${Math.round(meal.total.carbs)}g · G:${Math.round(meal.total.fat)}g</div>` : ''}
+                    ${meal.instructions ? `<div class="pro-meal-instructions"><i data-lucide="chef-hat" style="width:13px;height:13px;"></i> ${meal.instructions}</div>` : ''}
                 </div>
-            `;
-
-            card.addEventListener('click', () => openRecipeDetailModal(recipe));
-            recipesGrid.appendChild(card);
-        });
-
+            `).join('') || '<p style="text-align:center;color:var(--color-text-muted);padding:20px;">Sem refeições registradas para este dia.</p>'}
+            <div class="pro-day-total-card">
+                <div class="pro-day-total-title">Total do Dia</div>
+                <div class="pro-day-total-row">
+                    <span>Calorias</span>
+                    <div class="pro-total-bar-wrap">
+                        <div class="pro-total-bar" style="width:${targetCal > 0 ? Math.min(100, Math.round(totalCal/targetCal*100)) : 0}%;background:var(--color-primary);"></div>
+                    </div>
+                    <span class="pro-total-val">${Math.round(totalCal)} kcal</span>
+                </div>
+                <div class="pro-day-total-macros">
+                    <span>P: ${Math.round(totalP)}g</span>
+                    <span>C: ${Math.round(totalC)}g</span>
+                    <span>G: ${Math.round(totalG)}g</span>
+                </div>
+            </div>
+        `;
         lucide.createIcons();
     }
 
@@ -4242,10 +4329,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Alternância de abas de receitas (Padrão vs IA)
-        const tabDefaultBtn = document.getElementById('btn-tab-recipes-default');
+        // Alternância de abas de receitas (Nutricionista vs IA)
+        const tabDefaultBtn = document.getElementById('btn-tab-recipes-pro');
         const tabAiBtn = document.getElementById('btn-tab-recipes-ai');
-        const panelDefault = document.getElementById('section-recipes-default');
+        const panelDefault = document.getElementById('section-recipes-pro');
         const panelAi = document.getElementById('section-recipes-ai');
 
         if (tabDefaultBtn && tabAiBtn && panelDefault && panelAi) {
@@ -4254,6 +4341,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tabAiBtn.classList.remove('active');
                 panelDefault.classList.remove('hidden');
                 panelAi.classList.add('hidden');
+                renderProRecipesTab();
             });
 
             tabAiBtn.addEventListener('click', () => {
@@ -4261,7 +4349,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tabDefaultBtn.classList.remove('active');
                 panelAi.classList.remove('hidden');
                 panelDefault.classList.add('hidden');
-                
+
                 renderSavedAiRecipes();
                 renderSavedWeeklyPlans();
             });

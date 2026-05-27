@@ -199,3 +199,18 @@ CREATE TABLE IF NOT EXISTS weight_log (
 
 CREATE INDEX IF NOT EXISTS idx_weight_log_user_date ON weight_log(user_id, date);
 
+-- 15. CARDÁPIOS SEMANAIS (RECEITAS DO NUTRICIONISTA)
+CREATE TABLE IF NOT EXISTS weekly_plans (
+    id SERIAL PRIMARY KEY,
+    professional_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    patient_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    name VARCHAR(255) NOT NULL DEFAULT 'Cardápio Semanal',
+    plan_data JSONB NOT NULL DEFAULT '{"days":[]}',
+    notes TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_weekly_plans_professional ON weekly_plans(professional_id);
+CREATE INDEX IF NOT EXISTS idx_weekly_plans_patient ON weekly_plans(patient_id);
+

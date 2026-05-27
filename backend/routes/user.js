@@ -681,4 +681,25 @@ router.get('/weight-log', async (req, res) => {
   }
 });
 
+// Buscar cardápio semanal ativo atribuído ao usuário pelo profissional
+router.get('/weekly-plan', async (req, res) => {
+  try {
+    // Busca o plano mais recente (is_active=true) atribuído a este usuário
+    const result = await db.query(
+      `SELECT wp.*, u.name as professional_name, u.role as professional_role
+       FROM weekly_plans wp
+       JOIN users u ON wp.professional_id = u.id
+       WHERE wp.patient_id = $1 AND wp.is_active = TRUE
+       ORDER BY wp.updated_at DESC
+       LIMIT 1`,
+      [req.user.id]
+    );
+    if (result.rows.length === 0) return res.json(null);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar cardápio.' });
+  }
+});
+
 module.exports = router;

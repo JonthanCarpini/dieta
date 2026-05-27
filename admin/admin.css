@@ -1300,3 +1300,177 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     font-family: var(--font-mono);
     font-size: 14px;
 }
+
+/* ── Cardápios Semanais ── */
+.admin-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.section-title { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+.section-subtitle { font-size: 13px; color: var(--color-text-muted); margin: 0; }
+.table-wrap { overflow-x: auto; }
+.table-wrap table { width: 100%; border-collapse: collapse; }
+.table-wrap th, .table-wrap td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--color-border); font-size: 13px; }
+.table-wrap th { color: var(--color-text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.builder-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0 16px;
+    flex-wrap: wrap;
+}
+.builder-topbar-fields {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+.input-inline {
+    background: rgba(255,250,240,0.05);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text);
+    padding: 8px 12px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    flex: 1;
+    min-width: 140px;
+}
+.input-inline:focus { outline: none; border-color: var(--color-primary); }
+.calorie-search-bar {
+    position: relative;
+    margin-bottom: 4px;
+}
+.calorie-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,250,240,0.04);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+.calorie-search-icon { color: var(--color-text-muted); flex-shrink: 0; }
+.calorie-search-wrap input {
+    background: none;
+    border: none;
+    color: var(--color-text);
+    font-size: 13px;
+    flex: 1;
+    outline: none;
+    font-family: var(--font-sans);
+}
+.calorie-results-drop {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: #16161a;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    z-index: 200;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.calorie-result-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,250,240,0.05);
+    flex-wrap: wrap;
+}
+.calorie-result-item:last-child { border-bottom: none; }
+.calorie-result-name { font-weight: 600; font-size: 13px; flex: 1; min-width: 120px; text-transform: capitalize; }
+.calorie-result-macros { font-size: 11px; color: var(--color-text-muted); flex: 2; }
+.plan-day-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    background: rgba(255,250,240,0.03);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 4px;
+}
+.plan-day-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    padding: 7px 4px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    transition: all 0.15s;
+}
+.plan-day-tab:hover { color: var(--color-text); background: rgba(255,250,240,0.05); }
+.plan-day-tab.active { background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid rgba(245,193,77,0.3); }
+.plan-day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+.plan-day-header h3 { font-size: 16px; font-weight: 700; margin: 0; }
+.plan-day-totals { display: flex; gap: 12px; font-size: 12px; color: var(--color-primary); font-weight: 600; font-family: var(--font-mono); }
+.plan-meal-card {
+    background: rgba(255,250,240,0.03);
+    border: 1px solid rgba(255,250,240,0.07);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+.plan-meal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
+.plan-meal-title { display: flex; align-items: center; gap: 8px; }
+.plan-meal-icon { font-size: 18px; }
+.plan-meal-title strong { font-size: 14px; }
+.plan-meal-time { font-size: 11px; color: var(--color-text-muted); background: rgba(255,250,240,0.06); padding: 2px 8px; border-radius: 20px; }
+.plan-meal-cal-badge { font-size: 11px; color: var(--color-primary); background: var(--color-primary-dim); padding: 2px 8px; border-radius: 20px; font-family: var(--font-mono); }
+.plan-meal-items { margin-bottom: 8px; }
+.plan-item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,250,240,0.04);
+    flex-wrap: wrap;
+}
+.plan-item-row:last-child { border-bottom: none; }
+.plan-item-name { flex: 1; font-size: 13px; min-width: 100px; }
+.plan-item-name small { color: var(--color-text-muted); }
+.plan-item-macros { font-size: 11px; color: var(--color-text-muted); font-family: var(--font-mono); }
+.btn-remove-plan-item {
+    background: none; border: none; color: var(--color-danger, #ff5050);
+    cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.btn-remove-plan-item:hover { background: rgba(255,80,80,0.1); }
+.plan-meal-empty { font-size: 12px; color: var(--color-text-muted); margin: 4px 0 8px; font-style: italic; }
+.plan-meal-total { font-size: 12px; color: var(--color-primary); font-family: var(--font-mono); padding: 4px 0 8px; font-weight: 600; }
+.plan-meal-instructions {
+    width: 100%;
+    background: rgba(255,250,240,0.04);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text);
+    padding: 8px 12px;
+    font-size: 12px;
+    font-family: var(--font-sans);
+    resize: vertical;
+    min-height: 48px;
+    box-sizing: border-box;
+}
+.plan-meal-instructions:focus { outline: none; border-color: var(--color-primary); }
+
+/* ── Small button modifier ── */
+.btn-sm {
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+    line-height: 1.4;
+}

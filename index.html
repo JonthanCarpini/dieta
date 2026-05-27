@@ -476,18 +476,18 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- 5. TELA DE RECEITAS SAUDÁVEIS (EXPANDIDO)  -->
+        <!-- 5. TELA DE RECEITAS E PLANEJAMENTO       -->
         <!-- ========================================== -->
         <section id="screen-recipes" class="screen">
             <header class="scanner-header">
-                <h3>Receitas & Planejador IA</h3>
+                <h3>Receitas & Planejamento</h3>
                 <div style="width: 40px;"></div>
             </header>
 
-            <!-- Abas de Navegação Internas para Receitas -->
+            <!-- Abas de Navegação Internas -->
             <div class="recipe-top-nav-tabs">
-                <button class="recipe-tab-btn active" id="btn-tab-recipes-default">
-                    <i data-lucide="book-open"></i> Receitas Fit
+                <button class="recipe-tab-btn active" id="btn-tab-recipes-pro">
+                    <i data-lucide="clipboard-list"></i> Receitas do Nutricionista
                 </button>
                 <button class="recipe-tab-btn" id="btn-tab-recipes-ai">
                     <i data-lucide="sparkles" class="text-gemini"></i> Planejador IA
@@ -495,31 +495,47 @@
             </div>
 
             <div class="scrollable-content recipes-content-view">
-                
-                <!-- SEÇÃO 1: RECEITAS PADRÃO DO APP -->
-                <div id="section-recipes-default" class="recipe-section-panel">
-                    <!-- Filtros de categoria -->
-                    <div class="recipe-filters">
-                        <button class="recipe-filter-btn active" data-category="all">Todas</button>
-                        <button class="recipe-filter-btn" data-category="breakfast">Café</button>
-                        <button class="recipe-filter-btn" data-category="lunch">Almoço</button>
-                        <button class="recipe-filter-btn" data-category="snack">Lanches</button>
-                    </div>
 
-                    <!-- Grid de Receitas -->
-                    <div class="recipes-grid" id="recipes-list-container">
-                        <!-- Injetado dinamicamente -->
+                <!-- SEÇÃO 1: RECEITAS DO NUTRICIONISTA -->
+                <div id="section-recipes-pro" class="recipe-section-panel">
+                    <div id="pro-plan-loading" style="text-align:center;padding:40px 0;">
+                        <p style="color:var(--color-text-muted);">Carregando cardápio...</p>
+                    </div>
+                    <div id="pro-plan-empty" class="hidden" style="text-align:center;padding:48px 20px;">
+                        <i data-lucide="clipboard-x" style="width:48px;height:48px;color:var(--color-text-muted);margin-bottom:16px;"></i>
+                        <h4 style="margin-bottom:8px;">Nenhum cardápio disponível</h4>
+                        <p class="description">Seu nutricionista ainda não criou um plano alimentar para você.<br>Entre em contato pelo painel de consultas.</p>
+                    </div>
+                    <div id="pro-plan-content" class="hidden">
+                        <div class="pro-plan-header">
+                            <div>
+                                <h4 id="pro-plan-name" class="pro-plan-title">Cardápio Semanal</h4>
+                                <p id="pro-plan-professional" class="description" style="margin:0;"></p>
+                            </div>
+                        </div>
+                        <!-- Seletor de dias -->
+                        <div class="pro-plan-day-tabs">
+                            <button class="pro-day-tab active" data-dow="1">Seg</button>
+                            <button class="pro-day-tab" data-dow="2">Ter</button>
+                            <button class="pro-day-tab" data-dow="3">Qua</button>
+                            <button class="pro-day-tab" data-dow="4">Qui</button>
+                            <button class="pro-day-tab" data-dow="5">Sex</button>
+                            <button class="pro-day-tab" data-dow="6">Sáb</button>
+                            <button class="pro-day-tab" data-dow="0">Dom</button>
+                        </div>
+                        <!-- Conteúdo do dia -->
+                        <div id="pro-plan-day-view">
+                            <!-- Injetado dinamicamente -->
+                        </div>
                     </div>
                 </div>
 
-                <!-- SEÇÃO 2: GERADOR E PLANOS IA -->
+                <!-- SEÇÃO 2: GERADOR E PLANOS IA (mantido sem alteração) -->
                 <div id="section-recipes-ai" class="recipe-section-panel hidden">
-                    <!-- Painel do Gerador IA -->
                     <div class="ai-recipe-generator-card">
                         <div class="banner-badge"><i data-lucide="sparkles"></i> IA Nutrir</div>
                         <h4>Criar Plano de Receitas Sob Medida</h4>
                         <p class="description">Nossa inteligência gerará receitas deliciosas e detalhadas calibradas especificamente para bater suas calorias e macros diários.</p>
-                        
                         <div class="form-group margin-top-md">
                             <label for="select-ai-meal-type">Tipo de Refeição</label>
                             <select id="select-ai-meal-type">
@@ -530,7 +546,6 @@
                                 <option value="snack">Lanches / Snacks</option>
                             </select>
                         </div>
-
                         <div class="form-group">
                             <label for="select-ai-period">Período de Planejamento</label>
                             <select id="select-ai-period">
@@ -538,33 +553,24 @@
                                 <option value="weekly">Semanal (7 receitas completas, uma para cada dia)</option>
                             </select>
                         </div>
-
                         <button class="btn-primary w-full margin-top-md" id="btn-generate-ai-recipe-v2">
                             Gerar com Inteligência Artificial
                             <i data-lucide="sparkles"></i>
                         </button>
                     </div>
-
-                    <!-- Receitas Diárias IA Salvas -->
                     <div class="saved-ai-section margin-top-lg">
                         <div class="section-title-row">
                             <h3>Receitas Diárias Salvas</h3>
                             <span class="count-badge" id="ai-daily-count">0</span>
                         </div>
-                        <div class="recipes-grid" id="ai-saved-recipes-container">
-                            <!-- Injetado por JS -->
-                        </div>
+                        <div class="recipes-grid" id="ai-saved-recipes-container"></div>
                     </div>
-
-                    <!-- Planos Semanais Salvos -->
                     <div class="saved-ai-section margin-top-lg">
                         <div class="section-title-row">
                             <h3>Planos Semanais Salvos</h3>
                             <span class="count-badge" id="ai-weekly-count">0</span>
                         </div>
-                        <div class="weekly-plans-list" id="ai-weekly-plans-container">
-                            <!-- Injetado por JS -->
-                        </div>
+                        <div class="weekly-plans-list" id="ai-weekly-plans-container"></div>
                     </div>
                 </div>
 
