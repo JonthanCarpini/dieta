@@ -720,24 +720,92 @@
         </main>
     </div>
 
-    <!-- Tela: Videochamada Integrada (Nativa WebRTC) -->
-    <div class="app-screen" id="screen-video-call" style="background:#111; padding:0; display:none; flex-direction:column; height:450px; width:340px; position:fixed; bottom:20px; right:20px; z-index:9999; justify-content:center; align-items:center; border-radius:16px; border:2px solid var(--color-primary); box-shadow:0 12px 40px rgba(0,0,0,0.5); overflow:hidden;">
-        <div id="video-call-header" style="position:absolute; top:12px; left:12px; z-index:10000; display:flex; gap:8px; align-items:center; background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:20px; backdrop-filter:blur(6px);">
-            <button class="icon-btn" id="btn-close-video-call" style="background:rgba(255,255,255,0.1); color:#fff; border-radius:50%; width:26px; height:26px; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-                <i data-lucide="x" style="width:12px; height:12px;"></i>
-            </button>
-            <span style="color:#fff; font-size:11px; font-weight:600;">Consulta por Vídeo</span>
-        </div>
-        <div id="video-call-container" style="flex:1; width:100%; height:100%; position:relative; display:flex; justify-content:center; align-items:center;">
-            <video id="remote-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover; background:#111;"></video>
-            <video id="local-video" autoplay playsinline muted style="width:90px; height:120px; position:absolute; bottom:76px; right:12px; border-radius:8px; border:1px solid var(--color-primary); z-index:10001; background:#222; object-fit:cover; box-shadow:0 6px 16px rgba(0,0,0,0.4); transition: all 0.3s ease;"></video>
-            
-            <div id="video-call-controls" style="position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:10002; display:flex; gap:12px; background:rgba(0,0,0,0.6); padding:8px 16px; border-radius:30px; backdrop-filter:blur(8px); align-items:center;">
-                <button id="btn-toggle-mic" class="icon-btn-call" style="background:#22c55e; color:#fff; border:none; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="mic" style="width:14px; height:14px;"></i></button>
-                <button id="btn-toggle-cam" class="icon-btn-call" style="background:#22c55e; color:#fff; border:none; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="video" style="width:14px; height:14px;"></i></button>
-                <button id="btn-hangup" class="icon-btn-call" style="background:#ef4444; color:#fff; border:none; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="phone-off" style="width:14px; height:14px;"></i></button>
+    <!-- Tela: Videochamada Integrada Split Screen (Nativa WebRTC) -->
+    <div class="app-screen" id="screen-video-call" style="background:#0b0f19; padding:0; display:none; flex-direction:row; height:100vh; width:100vw; position:fixed; top:0; left:0; z-index:9999; justify-content:center; align-items:center; overflow:hidden; font-family:'Inter', sans-serif;">
+        <!-- Coluna Esquerda: Vídeo Chamada (40%) -->
+        <div id="video-call-left-panel" style="width:40%; height:100%; position:relative; background:#111; display:flex; flex-direction:column; border-right:1px solid rgba(255,255,255,0.08);">
+            <div id="video-call-header" style="position:absolute; top:16px; left:16px; z-index:10000; display:flex; gap:10px; align-items:center; background:rgba(0,0,0,0.5); padding:8px 16px; border-radius:30px; backdrop-filter:blur(8px);">
+                <button class="icon-btn" id="btn-close-video-call" style="background:rgba(255,255,255,0.1); color:#fff; border-radius:50%; width:32px; height:32px; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                    <i data-lucide="x" style="width:16px; height:16px;"></i>
+                </button>
+                <span style="color:#fff; font-size:12px; font-weight:600;">Consulta por Vídeo</span>
             </div>
-            <div id="video-call-status" style="position:absolute; top:12px; right:12px; color:#fff; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:15px; font-size:10px; font-weight:500; backdrop-filter:blur(4px);">Aguardando paciente...</div>
+            <div id="video-call-container" style="flex:1; width:100%; height:100%; position:relative; display:flex; justify-content:center; align-items:center;">
+                <video id="remote-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover; background:#111;"></video>
+                <video id="local-video" autoplay playsinline muted style="width:100px; height:140px; position:absolute; bottom:96px; right:16px; border-radius:12px; border:2px solid var(--color-primary); z-index:10001; background:#222; object-fit:cover; box-shadow:0 8px 24px rgba(0,0,0,0.4); transition: all 0.3s ease;"></video>
+                
+                <div id="video-call-controls" style="position:absolute; bottom:24px; left:50%; transform:translateX(-50%); z-index:10002; display:flex; gap:16px; background:rgba(0,0,0,0.6); padding:10px 20px; border-radius:40px; backdrop-filter:blur(10px); align-items:center;">
+                    <button id="btn-toggle-mic" class="icon-btn-call" style="background:#22c55e; color:#fff; border:none; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="mic" style="width:16px; height:16px;"></i></button>
+                    <button id="btn-toggle-cam" class="icon-btn-call" style="background:#22c55e; color:#fff; border:none; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="video" style="width:16px; height:16px;"></i></button>
+                    <button id="btn-hangup" class="icon-btn-call" style="background:#ef4444; color:#fff; border:none; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="phone-off" style="width:16px; height:16px;"></i></button>
+                </div>
+                <div id="video-call-status" style="position:absolute; top:20px; right:16px; color:#fff; background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(4px);">Aguardando paciente...</div>
+            </div>
+        </div>
+        
+        <!-- Coluna Direita: Prontuário do Paciente (60%) -->
+        <div id="video-call-right-panel" style="width:60%; height:100%; display:flex; flex-direction:column; background:#0b0f19; color:#fff; overflow-y:auto; padding:24px; box-sizing:border-box;">
+            <!-- Cabeçalho do Prontuário -->
+            <div style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:16px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h2 id="vc-patient-name" style="margin:0; font-size:22px; font-weight:700; color:#fff;">Paciente</h2>
+                    <p id="vc-patient-email" style="margin:4px 0 0 0; font-size:13px; opacity:0.6; color:#fff;">email@paciente.com</p>
+                </div>
+                <span style="background:rgba(34, 197, 94, 0.15); color:#22c55e; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">Consulta Ativa</span>
+            </div>
+            
+            <!-- Grid de Métricas Básicas -->
+            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; margin-bottom:24px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
+                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">PESO</span>
+                    <strong id="vc-patient-weight" style="font-size:14px; font-weight:700; color:#fff;">-</strong>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
+                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">ALTURA</span>
+                    <strong id="vc-patient-height" style="font-size:14px; font-weight:700; color:#fff;">-</strong>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
+                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">META</span>
+                    <strong id="vc-patient-goal" style="font-size:12px; font-weight:700; color:#fff; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">-</strong>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
+                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">META CALÓRICA</span>
+                    <strong id="vc-patient-calories" style="font-size:14px; font-weight:700; color:#fff;">-</strong>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
+                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">ÁGUA HOJE</span>
+                    <strong id="vc-patient-water" style="font-size:12px; font-weight:700; color:#fff;">-</strong>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:20px; flex:1; min-height:0;">
+                <!-- Diário de Alimentação -->
+                <div style="flex:1.2; display:flex; flex-direction:column; background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; box-sizing:border-box;">
+                    <h3 style="margin:0 0 12px 0; font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px;"><i data-lucide="utensils" style="width:16px; height:16px; color:var(--color-primary);"></i> Diário Alimentar Recente</h3>
+                    <div style="flex:1; overflow-y:auto;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.05); text-align:left; font-size:10px; opacity:0.5;">
+                                    <th style="padding:6px 4px;">Hora</th>
+                                    <th style="padding:6px 4px;">Refeição</th>
+                                    <th style="padding:6px 4px;">Tipo</th>
+                                    <th style="padding:6px 4px; text-align:right;">Calorias</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vc-meals-list">
+                                <tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Selecione uma consulta ativa.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Nova Orientação / Feedback -->
+                <div style="flex:1; display:flex; flex-direction:column; background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; box-sizing:border-box;">
+                    <h3 style="margin:0 0 12px 0; font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px;"><i data-lucide="file-text" style="width:16px; height:16px; color:var(--color-primary);"></i> Prescrição e Orientações</h3>
+                    <textarea id="vc-feedback-content" placeholder="Digite aqui as orientações, plano de treino ou dieta acordados com o paciente..." style="flex:1; width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; color:#fff; font-size:12px; line-height:1.5; resize:none; outline:none; box-sizing:border-box; margin-bottom:12px;"></textarea>
+                    <button id="vc-btn-save-feedback" class="btn-primary" style="width:100%; font-size:12px; padding:10px; font-weight:600; border-radius:8px;">Enviar Orientação</button>
+                </div>
+            </div>
         </div>
     </div>
 

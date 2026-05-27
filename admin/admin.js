@@ -1670,7 +1670,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     startCallBtn.addEventListener('click', (e) => {
                         e.preventDefault();
                         const link = e.currentTarget.getAttribute('data-video-link');
-                        startVideoCall(link);
+                        startVideoCall(link, {
+                            id: a.patient_id,
+                            name: a.patient_name,
+                            email: a.patient_email
+                        });
                     });
                 }
 
@@ -1707,7 +1711,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isCamOff = false;
     let remoteCandidatesQueue = [];
 
-    async function startVideoCall(link) {
+    async function startVideoCall(link, patient) {
         let roomName = 'nutrir-room';
         try {
             const urlObj = new URL(link);
@@ -1722,6 +1726,147 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const screenVideoCall = document.getElementById('screen-video-call');
         if (screenVideoCall) screenVideoCall.style.display = 'flex';
+
+        // Preencher prontuário do paciente na coluna direita se houver paciente
+        const vcPatientName = document.getElementById('vc-patient-name');
+        const vcPatientEmail = document.getElementById('vc-patient-email');
+        const vcPatientWeight = document.getElementById('vc-patient-weight');
+        const vcPatientHeight = document.getElementById('vc-patient-height');
+        const vcPatientGoal = document.getElementById('vc-patient-goal');
+        const vcPatientCalories = document.getElementById('vc-patient-calories');
+        const vcPatientWater = document.getElementById('vc-patient-water');
+        const vcMealsList = document.getElementById('vc-meals-list');
+        const vcFeedbackContent = document.getElementById('vc-feedback-content');
+        const vcBtnSaveFeedback = document.getElementById('vc-btn-save-feedback');
+
+        if (patient) {
+            if (vcPatientName) vcPatientName.textContent = patient.name;
+            if (vcPatientEmail) vcPatientEmail.textContent = patient.email;
+            if (vcPatientWeight) vcPatientWeight.textContent = 'Carregando...';
+            if (vcPatientHeight) vcPatientHeight.textContent = 'Carregando...';
+            if (vcPatientGoal) vcPatientGoal.textContent = 'Carregando...';
+            if (vcPatientCalories) vcPatientCalories.textContent = 'Carregando...';
+            if (vcPatientWater) vcPatientWater.textContent = 'Carregando...';
+            if (vcMealsList) vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Carregando diário...</td></tr>';
+            if (vcFeedbackContent) {
+                vcFeedbackContent.value = '';
+                vcFeedbackContent.disabled = false;
+            }
+            if (vcBtnSaveFeedback) vcBtnSaveFeedback.disabled = false;
+
+            // Fazer fetch assíncrono dos dados do paciente e diário
+            (async () => {
+                try {
+                    const res = await fetch(`${API_URL}/professional/patients/${patient.id}/diary`, {
+                        headers: { 'Authorization': `Bearer ${adminState.token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        
+                        if (data.profile) {
+                            if (vcPatientWeight) vcPatientWeight.textContent = data.profile.weight ? `${data.profile.weight} kg` : '-';
+                            if (vcPatientHeight) vcPatientHeight.textContent = data.profile.height ? `${data.profile.height} cm` : '-';
+                            if (vcPatientGoal) vcPatientGoal.textContent = data.profile.goal || '-';
+                            if (vcPatientCalories) vcPatientCalories.textContent = data.profile.target_calories ? `${data.profile.target_calories} kcal` : '-';
+                        } else {
+                            if (vcPatientWeight) vcPatientWeight.textContent = '-';
+                            if (vcPatientHeight) vcPatientHeight.textContent = '-';
+                            if (vcPatientGoal) vcPatientGoal.textContent = '-';
+                            if (vcPatientCalories) vcPatientCalories.textContent = '-';
+                        }
+
+                        if (data.water) {
+                            if (vcPatientWater) vcPatientWater.textContent = `${data.water.consumed} / ${data.water.target} ml`;
+                        } else {
+                            if (vcPatientWater) vcPatientWater.textContent = '0 / 2500 ml';
+                        }
+
+                        if (vcMealsList) {
+                            vcMealsList.innerHTML = '';
+                            if (!data.meals || data.meals.length === 0) {
+                                vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Nenhuma refeição registrada hoje.</td></tr>';
+                            } else {
+                                data.meals.forEach(m => {
+                                    const tr = document.createElement('tr');
+                                    tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                                    tr.style.fontSize = '12px';
+                                    
+                                    const formattedTime = m.time.substring(0, 5);
+                                    const mealTypes = { breakfast: 'Café da Manhã', lunch: 'Almoço', dinner: 'Jantar', snack: 'Lanche', pre_workout: 'Pré-Treino', post_workout: 'Pós-Treino' };
+                                    const typeLabel = mealTypes[m.meal_type] || m.meal_type;
+
+                                    tr.innerHTML = `
+                                        <td style="padding:8px 4px; opacity:0.7;">${formattedTime}</td>
+                                        <td style="padding:8px 4px;"><strong>${m.name}</strong>${m.description ? `<br><small style="opacity:0.6;">${m.description}</small>` : ''}</td>
+                                        <td style="padding:8px 4px;"><span style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px;">${typeLabel}</span></td>
+                                        <td style="padding:8px 4px; text-align:right; font-weight:600;">${m.calories ? `${m.calories} kcal` : '-'}</td>
+                                    `;
+                                    vcMealsList.appendChild(tr);
+                                });
+                            }
+                        }
+                    } else {
+                        throw new Error();
+                    }
+                } catch(err) {
+                    if (vcPatientWeight) vcPatientWeight.textContent = '-';
+                    if (vcPatientHeight) vcPatientHeight.textContent = '-';
+                    if (vcPatientGoal) vcPatientGoal.textContent = '-';
+                    if (vcPatientCalories) vcPatientCalories.textContent = '-';
+                    if (vcPatientWater) vcPatientWater.textContent = '-';
+                    if (vcMealsList) vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px; color:var(--color-danger);">Erro ao carregar prontuário.</td></tr>';
+                }
+            })();
+
+            // Configurar listener para salvar feedback
+            if (vcBtnSaveFeedback) {
+                const newBtn = vcBtnSaveFeedback.cloneNode(true);
+                vcBtnSaveFeedback.parentNode.replaceChild(newBtn, vcBtnSaveFeedback);
+                newBtn.addEventListener('click', async () => {
+                    const content = vcFeedbackContent ? vcFeedbackContent.value.trim() : '';
+                    if (!content) {
+                        alert('Digite as orientações para o paciente antes de salvar.');
+                        return;
+                    }
+                    newBtn.disabled = true;
+                    newBtn.textContent = 'Enviando...';
+                    try {
+                        const feedbackRes = await fetch(`${API_URL}/professional/patients/${patient.id}/feedback`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${adminState.token}`
+                            },
+                            body: JSON.stringify({ content })
+                        });
+                        const feedbackData = await feedbackRes.json();
+                        if (!feedbackRes.ok) throw new Error(feedbackData.error || 'Erro ao enviar feedback.');
+                        alert('Orientação enviada com sucesso para o paciente!');
+                        if (vcFeedbackContent) vcFeedbackContent.value = '';
+                    } catch(err) {
+                        alert(err.message);
+                    } finally {
+                        newBtn.disabled = false;
+                        newBtn.textContent = 'Enviar Orientação';
+                    }
+                });
+            }
+        } else {
+            // Sem paciente vinculado
+            if (vcPatientName) vcPatientName.textContent = 'Paciente Externo';
+            if (vcPatientEmail) vcPatientEmail.textContent = 'Nenhum paciente vinculado a esta chamada';
+            if (vcPatientWeight) vcPatientWeight.textContent = '-';
+            if (vcPatientHeight) vcPatientHeight.textContent = '-';
+            if (vcPatientGoal) vcPatientGoal.textContent = '-';
+            if (vcPatientCalories) vcPatientCalories.textContent = '-';
+            if (vcPatientWater) vcPatientWater.textContent = '-';
+            if (vcMealsList) vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Chamada avulsa sem paciente associado.</td></tr>';
+            if (vcFeedbackContent) {
+                vcFeedbackContent.value = '';
+                vcFeedbackContent.disabled = true;
+            }
+            if (vcBtnSaveFeedback) vcBtnSaveFeedback.disabled = true;
+        }
 
         try {
             // Obter fluxo local de mídia
@@ -2021,6 +2166,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const remoteVideo = document.getElementById('remote-video');
         if (localVideo) localVideo.srcObject = null;
         if (remoteVideo) remoteVideo.srcObject = null;
+
+        // Resetar prontuário do paciente na coluna direita
+        const vcPatientName = document.getElementById('vc-patient-name');
+        const vcPatientEmail = document.getElementById('vc-patient-email');
+        const vcPatientWeight = document.getElementById('vc-patient-weight');
+        const vcPatientHeight = document.getElementById('vc-patient-height');
+        const vcPatientGoal = document.getElementById('vc-patient-goal');
+        const vcPatientCalories = document.getElementById('vc-patient-calories');
+        const vcPatientWater = document.getElementById('vc-patient-water');
+        const vcMealsList = document.getElementById('vc-meals-list');
+        const vcFeedbackContent = document.getElementById('vc-feedback-content');
+
+        if (vcPatientName) vcPatientName.textContent = 'Paciente';
+        if (vcPatientEmail) vcPatientEmail.textContent = 'email@paciente.com';
+        if (vcPatientWeight) vcPatientWeight.textContent = '-';
+        if (vcPatientHeight) vcPatientHeight.textContent = '-';
+        if (vcPatientGoal) vcPatientGoal.textContent = '-';
+        if (vcPatientCalories) vcPatientCalories.textContent = '-';
+        if (vcPatientWater) vcPatientWater.textContent = '-';
+        if (vcMealsList) vcMealsList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Selecione uma consulta ativa.</td></tr>';
+        if (vcFeedbackContent) {
+            vcFeedbackContent.value = '';
+            vcFeedbackContent.disabled = false;
+        }
 
         remoteCandidatesQueue = [];
         const screenVideoCall = document.getElementById('screen-video-call');
