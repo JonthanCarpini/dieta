@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (navSettings) navSettings.classList.remove('hidden');
         } else {
             // profissional (nutritionist ou trainer)
-            if (navOverview) navOverview.classList.add('hidden');
+            if (navOverview) navOverview.classList.remove('hidden');
             if (navUsers) navUsers.classList.add('hidden');
             if (navProfessionals) navProfessionals.classList.add('hidden');
             if (navPlans) navPlans.classList.add('hidden');
@@ -378,6 +378,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. MÉTODOS DA ABA: VISÃO GERAL (OVERVIEW)
     async function loadOverviewData() {
+        if (adminState.user.role !== 'admin') {
+            document.getElementById('overview-admin-content')?.classList.add('hidden');
+            document.getElementById('overview-pro-content')?.classList.remove('hidden');
+            const titleEl = document.getElementById('overview-title');
+            const subEl   = document.getElementById('overview-subtitle');
+            if (titleEl) titleEl.innerText = 'Meu Painel';
+            if (subEl)   subEl.innerText   = 'Resumo da sua atividade na plataforma';
+            await loadProOverviewData();
+            return;
+        }
+
+        document.getElementById('overview-admin-content')?.classList.remove('hidden');
+        document.getElementById('overview-pro-content')?.classList.add('hidden');
+
         try {
             // Carrega usuários para as métricas
             const usersRes = await fetch(`${API_URL}/admin/users`, {
@@ -423,6 +437,88 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Erro ao carregar dados da visão geral:', err);
         }
+    }
+
+    async function loadProOverviewData() {
+        const proContent = document.getElementById('overview-pro-content');
+        if (!proContent) return;
+        proContent.innerHTML = '<p class="description" style="text-align:center;padding:40px;">Carregando...</p>';
+
+        try {
+            const res = await fetch(`${API_URL}/admin/pro-overview`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            if (!res.ok) throw new Error('Não foi possível carregar o painel.');
+            const d = await res.json();
+
+            const now  = new Date();
+            const hour = now.getHours();
+            const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+            const firstName = (adminState.user.name || '').split(' ')[0];
+            const roleLabel = adminState.user.role === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+            const dayNames = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+            const dayStr  = dayNames[now.getDay()];
+            const dateStr = now.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+
+            let nextRows = '';
+            if (d.nextAppointments.length === 0) {
+                nextRows = '<tr><td colspan="3" style="text-align:center; color:var(--color-text-muted); padding:20px;">Nenhuma consulta agendada.</td></tr>';
+            } else {
+                const todayStr = now.toISOString().split('T')[0];
+                nextRows = d.nextAppointments.map(a => {
+                    const aDate = String(a.appointment_date).split('T')[0];
+                    const isToday = aDate === todayStr;
+                    const [y,mo,day] = aDate.split('-');
+                    const dateLbl = isToday ? `<span style="color:var(--color-primary);font-weight:700;">Hoje</span>` : `${day}/${mo}`;
+                    const time = String(a.start_time).substring(0,5);
+                    const videoBtn = `<a href="${a.video_link}" target="_blank" class="btn-primary" style="font-size:11px;padding:4px 12px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;"><i data-lucide="video" style="width:12px;height:12px;"></i> Entrar</a>`;
+                    return `<tr><td>${dateLbl} ${time}</td><td><strong>${a.patient_name}</strong></td><td>${videoBtn}</td></tr>`;
+                }).join('');
+            }
+
+            proContent.innerHTML = `
+                <div class="pro-greeting-card">
+                    <div>
+                        <h2 class="pro-greeting-title">${greeting}, ${firstName}!</h2>
+                        <p class="pro-greeting-sub">${dayStr}, ${dateStr} &middot; ${roleLabel}</p>
+                    </div>
+                    <button class="btn-secondary" onclick="switchTab('schedule')" style="font-size:12px;padding:8px 14px;">
+                        <i data-lucide="calendar-clock"></i> Gerenciar Agenda
+                    </button>
+                </div>
+                <div class="stats-grid margin-top-lg">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-blue"><i data-lucide="users"></i></div>
+                        <div class="stat-details"><span class="stat-label">Pacientes Ativos</span><h3>${d.totalPatients}</h3></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-green"><i data-lucide="video"></i></div>
+                        <div class="stat-details"><span class="stat-label">Consultas Hoje</span><h3 style="${d.consultationsToday > 0 ? 'color:var(--color-primary)' : ''}">${d.consultationsToday}</h3></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-purple"><i data-lucide="calendar-clock"></i></div>
+                        <div class="stat-details"><span class="stat-label">Slots Disponíveis Hoje</span><h3>${d.slotsToday}</h3></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-yellow"><i data-lucide="dollar-sign"></i></div>
+                        <div class="stat-details"><span class="stat-label">Comissões Este Mês</span><h3>R$ ${d.commissionsMonth.toFixed(2).replace('.',',')}</h3></div>
+                    </div>
+                </div>
+                <div class="dashboard-card margin-top-lg">
+                    <h3>Próximas Consultas</h3>
+                    <p class="description">Consultas agendadas a partir de hoje</p>
+                    <div class="table-responsive margin-top-md">
+                        <table class="data-table">
+                            <thead><tr><th>Data / Hora</th><th>Paciente</th><th>Ação</th></tr></thead>
+                            <tbody>${nextRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } catch (err) {
+            if (proContent) proContent.innerHTML = `<p style="color:var(--color-danger);text-align:center;padding:40px;">${err.message}</p>`;
+        }
+        lucide.createIcons();
     }
 
     // 5. MÉTODOS DA ABA: GERENCIAMENTO DE USUÁRIOS
@@ -1173,13 +1269,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${adminState.token}` }
             });
             if (!res.ok) throw new Error('Não foi possível carregar a lista de pacientes.');
-            
+
             const patients = await res.json();
+            adminState.allPatients = patients;
             renderPatientsTable(patients);
+
+            // Ligar filtros
+            const searchInput = document.getElementById('patient-search-input');
+            const goalSelect  = document.getElementById('patient-goal-filter');
+            if (searchInput) { searchInput.value = ''; searchInput.oninput = applyPatientFilters; }
+            if (goalSelect)  { goalSelect.value  = ''; goalSelect.onchange = applyPatientFilters; }
         } catch (err) {
             console.error(err);
             alert(err.message);
         }
+    }
+
+    function applyPatientFilters() {
+        const search = (document.getElementById('patient-search-input')?.value || '').toLowerCase().trim();
+        const goal   = document.getElementById('patient-goal-filter')?.value || '';
+        const filtered = (adminState.allPatients || []).filter(p => {
+            const matchSearch = !search || p.name.toLowerCase().includes(search) || p.email.toLowerCase().includes(search);
+            const matchGoal   = !goal   || p.goal === goal;
+            return matchSearch && matchGoal;
+        });
+        renderPatientsTable(filtered);
     }
 
     function renderPatientsTable(patients) {
@@ -1192,6 +1306,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const countLabel = document.getElementById('patients-count-label');
+        if (countLabel) countLabel.textContent = `${patients.length} paciente${patients.length !== 1 ? 's' : ''}`;
+
+        const goalLabels = { lose: 'Emagrecer', gain: 'Ganhar Massa', maintain: 'Manutenção' };
+
         patients.forEach(p => {
             const tr = document.createElement('tr');
             const isPremium = p.plan && p.plan !== 'trial';
@@ -1199,11 +1318,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const planLabel = p.plan === 'premium' ? 'Premium' : p.plan;
             const weightHeight = p.weight && p.height ? `${p.weight} kg / ${p.height} cm` : '-';
             const calories = p.target_calories ? `${p.target_calories} kcal` : '-';
+            const goalLabel = goalLabels[p.goal] || p.goal || '-';
 
             tr.innerHTML = `
                 <td><strong>${p.name}</strong></td>
                 <td>${p.email}</td>
                 <td><span class="badge-plan ${planBadgeClass}">${planLabel}</span></td>
+                <td><span style="font-size:12px; color:var(--color-text-muted);">${goalLabel}</span></td>
                 <td>${weightHeight}</td>
                 <td>${calories}</td>
                 <td>
@@ -1533,36 +1654,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mealsBody) mealsBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Carregando diário...</td></tr>`;
         if (weightHistoryBody) weightHistoryBody.innerHTML = `<tr><td colspan="2" style="text-align: center; opacity: 0.5;">Carregando pesos...</td></tr>`;
 
-        // Busca histórico de pesos do paciente
+        // Busca histórico de pesos e renderiza gráfico
         fetch(`${API_URL}/professional/patients/${patient.id}/weight-log`, {
             headers: { 'Authorization': `Bearer ${adminState.token}` }
         })
         .then(res => res.json())
-        .then(weights => {
-            if (weightHistoryBody) {
-                weightHistoryBody.innerHTML = '';
-                if (!weights || weights.length === 0) {
-                    weightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; opacity:0.5;">Nenhum peso registrado.</td></tr>';
-                } else {
-                    const sortedWeights = [...weights].reverse();
-                    sortedWeights.forEach(w => {
-                        const tr = document.createElement('tr');
-                        const [year, month, day] = w.date.split('-');
-                        const formattedDate = `${day}/${month}/${year}`;
-                        tr.innerHTML = `
-                            <td>${formattedDate}</td>
-                            <td><strong>${w.weight} kg</strong></td>
-                        `;
-                        weightHistoryBody.appendChild(tr);
-                    });
-                }
-            }
-        })
+        .then(weights => renderPatientWeightChart(weights))
         .catch(err => {
-            console.error("Erro ao carregar histórico de peso:", err);
-            if (weightHistoryBody) {
-                weightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--color-danger);">Erro ao carregar.</td></tr>';
-            }
+            console.error('Erro ao carregar histórico de peso:', err);
+            const emptyEl = document.getElementById('detail-weight-empty');
+            if (emptyEl) { emptyEl.textContent = 'Erro ao carregar pesos.'; emptyEl.style.display = 'block'; }
         });
 
         try {
@@ -1597,47 +1698,174 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (fastingStatus) fastingStatus.innerText = 'Não ativo';
             }
 
-            // 4. Refeições
-            if (mealsBody) {
-                mealsBody.innerHTML = '';
-                
-                if (!data.meals || data.meals.length === 0) {
-                    mealsBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--color-text-muted);">Nenhuma refeição registrada nos últimos dias.</td></tr>`;
-                } else {
-                    data.meals.forEach(m => {
-                        const tr = document.createElement('tr');
-                        tr.style.cursor = 'pointer';
-                        const mealDate = new Date(m.date + 'T' + m.time);
-                        const formattedDateTime = `${mealDate.toLocaleDateString('pt-BR')} ${m.time.substring(0, 5)}`;
-                        
-                        const typeLabel = getMealTypeLabel(m);
+            // 4. Refeições — armazena e renderiza com filtro
+            adminState._allMeals = data.meals || [];
+            adminState._patientTargetCalories = data.profile?.target_calories || 0;
 
-                        const totalObj = m.total && typeof m.total === 'object' ? m.total : {};
-                        const carbs = totalObj.carbs !== undefined ? `${totalObj.carbs}g` : (m.carbs ? `${m.carbs}g` : '-');
-                        const protein = totalObj.protein !== undefined ? `${totalObj.protein}g` : (m.protein ? `${m.protein}g` : '-');
-                        const fat = totalObj.fat !== undefined ? `${totalObj.fat}g` : (m.fat ? `${m.fat}g` : '-');
-                        const caloriesVal = totalObj.calories !== undefined ? `${totalObj.calories} kcal` : (m.calories ? `${m.calories} kcal` : '-');
-                        const macros = `C:${carbs} | P:${protein} | F:${fat}`;
-
-                        tr.innerHTML = `
-                            <td>${formattedDateTime}</td>
-                            <td><strong>${m.name}</strong><br><small>${m.description || ''}</small></td>
-                            <td><span class="badge-role user" style="background-color: rgba(255,255,255,0.05); color: var(--color-text);">${typeLabel}</span></td>
-                            <td>${caloriesVal}</td>
-                            <td><small>${macros}</small></td>
-                        `;
-                        tr.addEventListener('click', () => {
-                            openAdminMealDetailsModal(m);
-                        });
-                        mealsBody.appendChild(tr);
-                    });
-                }
-            }
+            // Ligar filtros de período
+            document.querySelectorAll('.diary-filter-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.diary-filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    applyMealFilter(parseInt(btn.dataset.days));
+                };
+            });
+            // Resetar para 7 dias
+            document.querySelectorAll('.diary-filter-btn').forEach(b => b.classList.remove('active'));
+            const btn7 = document.querySelector('.diary-filter-btn[data-days="7"]');
+            if (btn7) btn7.classList.add('active');
+            applyMealFilter(7);
         } catch (err) {
             console.error(err);
             alert(err.message);
         }
+        await loadFeedbackHistory(patient.id);
         lucide.createIcons();
+    }
+
+    function applyMealFilter(days) {
+        const meals = adminState._allMeals || [];
+        const targetCal = adminState._patientTargetCalories || 0;
+        const now = new Date();
+        const cutoffMs = days > 0 ? now - days * 86400000 : 0;
+
+        const filtered = cutoffMs
+            ? meals.filter(m => new Date(m.date + 'T00:00:00').getTime() >= cutoffMs)
+            : meals;
+
+        // Caloric adherence
+        const adherenceInfo = document.getElementById('diary-adherence-info');
+        const adherenceEl   = document.getElementById('detail-caloric-adherence');
+        if (targetCal > 0 && filtered.length > 0) {
+            const byDate = {};
+            filtered.forEach(m => {
+                const d = m.date;
+                const cal = (m.total?.calories ?? m.calories ?? 0);
+                byDate[d] = (byDate[d] || 0) + cal;
+            });
+            const vals = Object.values(byDate);
+            const avgAdh = vals.reduce((s, c) => s + Math.min(150, Math.round(c / targetCal * 100)), 0) / vals.length;
+            if (adherenceEl) {
+                adherenceEl.textContent = `${Math.round(avgAdh)}%`;
+                adherenceEl.style.color = avgAdh >= 85 && avgAdh <= 110 ? 'var(--color-success)' : avgAdh > 110 ? 'var(--color-danger)' : 'var(--color-primary)';
+            }
+            if (adherenceInfo) adherenceInfo.style.display = 'flex';
+        } else {
+            if (adherenceInfo) adherenceInfo.style.display = 'none';
+        }
+
+        renderPatientMealsTable(filtered);
+    }
+
+    function renderPatientMealsTable(meals) {
+        const mealsBody = document.getElementById('detail-meals-table-body');
+        if (!mealsBody) return;
+        mealsBody.innerHTML = '';
+        if (!meals || meals.length === 0) {
+            mealsBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--color-text-muted); padding:20px;">Nenhuma refeição no período.</td></tr>`;
+            return;
+        }
+        meals.forEach(m => {
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            const totalObj = m.total && typeof m.total === 'object' ? m.total : {};
+            const carbs    = totalObj.carbs    !== undefined ? `${totalObj.carbs}g`    : (m.carbs    ? `${m.carbs}g`    : '-');
+            const protein  = totalObj.protein  !== undefined ? `${totalObj.protein}g`  : (m.protein  ? `${m.protein}g`  : '-');
+            const fat      = totalObj.fat      !== undefined ? `${totalObj.fat}g`      : (m.fat      ? `${m.fat}g`      : '-');
+            const calVal   = totalObj.calories !== undefined ? `${totalObj.calories} kcal` : (m.calories ? `${m.calories} kcal` : '-');
+            tr.innerHTML = `
+                <td>${new Date(m.date + 'T00:00:00').toLocaleDateString('pt-BR')} ${m.time.substring(0,5)}</td>
+                <td><strong>${m.name}</strong><br><small>${m.description || ''}</small></td>
+                <td><span class="badge-role user" style="background-color:rgba(255,255,255,0.05);color:var(--color-text);">${getMealTypeLabel(m)}</span></td>
+                <td>${calVal}</td>
+                <td><small>C:${carbs} | P:${protein} | F:${fat}</small></td>
+            `;
+            tr.addEventListener('click', () => openAdminMealDetailsModal(m));
+            mealsBody.appendChild(tr);
+        });
+    }
+
+    function renderPatientWeightChart(weights) {
+        const canvas   = document.getElementById('detail-weight-chart');
+        const emptyEl  = document.getElementById('detail-weight-empty');
+        if (!canvas) return;
+        if (!weights || weights.length === 0) {
+            canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        canvas.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        if (adminState._patientWeightChart) {
+            try { adminState._patientWeightChart.destroy(); } catch(e) {}
+        }
+        const labels = weights.map(w => { const [y,mo,d] = w.date.split('-'); return `${d}/${mo}`; });
+        const values = weights.map(w => parseFloat(w.weight));
+        adminState._patientWeightChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Peso (kg)',
+                    data: values,
+                    borderColor: '#f5c14d',
+                    backgroundColor: 'rgba(245,193,77,0.07)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#f5c14d',
+                    tension: 0.35,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(17,17,22,0.95)',
+                        titleColor: '#f4f1ec',
+                        bodyColor: 'rgba(244,241,236,0.7)',
+                        borderColor: 'rgba(245,193,77,0.2)',
+                        borderWidth: 1,
+                        callbacks: { label: ctx => `${ctx.raw} kg` }
+                    }
+                },
+                scales: {
+                    x: { grid: { color: 'rgba(255,250,240,0.05)' }, ticks: { color: 'rgba(244,241,236,0.4)', font: { size: 9 } } },
+                    y: { grid: { color: 'rgba(255,250,240,0.05)' }, ticks: { color: 'rgba(244,241,236,0.4)', font: { size: 9 }, callback: v => `${v}kg` } }
+                }
+            }
+        });
+    }
+
+    async function loadFeedbackHistory(patientId) {
+        const list  = document.getElementById('feedback-history-list');
+        const badge = document.getElementById('feedback-history-count');
+        if (!list) return;
+        list.innerHTML = '<p class="description" style="text-align:center;">Carregando...</p>';
+        try {
+            const res = await fetch(`${API_URL}/professional/patients/${patientId}/feedbacks`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            if (!res.ok) throw new Error();
+            const feedbacks = await res.json();
+            if (badge) badge.textContent = feedbacks.length > 0 ? feedbacks.length : '';
+            if (feedbacks.length === 0) {
+                list.innerHTML = '<p class="description" style="text-align:center;">Nenhuma orientação enviada ainda.</p>';
+                return;
+            }
+            list.innerHTML = feedbacks.map(f => {
+                const dt = new Date(f.created_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
+                return `<div class="fhi-item">
+                    <div class="fhi-header"><span class="fhi-date">${dt}</span></div>
+                    <p class="fhi-body">${(f.content || '').replace(/\n/g, '<br>')}</p>
+                </div>`;
+            }).join('');
+        } catch {
+            list.innerHTML = '<p class="description" style="text-align:center; color:var(--color-danger);">Erro ao carregar.</p>';
+        }
     }
 
     async function loadAppointmentsData() {

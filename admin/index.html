@@ -97,9 +97,12 @@
             <!-- ABA: VISÃO GERAL (OVERVIEW) -->
             <section id="tab-overview" class="tab-content active">
                 <div class="header-section">
-                    <h1>Visão Geral</h1>
-                    <p>Métricas gerais do Nutrir em tempo real</p>
+                    <h1 id="overview-title">Visão Geral</h1>
+                    <p id="overview-subtitle">Métricas gerais do Nutrir em tempo real</p>
                 </div>
+
+                <!-- Conteúdo Admin -->
+                <div id="overview-admin-content">
 
                 <!-- Cards de Estatísticas -->
                 <div class="stats-grid">
@@ -151,6 +154,11 @@
                         </div>
                     </div>
                 </div>
+                </div><!-- /overview-admin-content -->
+
+                <!-- Conteúdo Profissional (injetado via JS) -->
+                <div id="overview-pro-content" class="hidden"></div>
+
             </section>
 
             <!-- ABA: GERENCIAMENTO DE USUÁRIOS -->
@@ -561,6 +569,19 @@
 
                 <!-- Lista de Pacientes -->
                 <div id="patients-list-view" class="dashboard-card">
+                    <div class="patients-filter-bar">
+                        <div class="search-box">
+                            <i data-lucide="search"></i>
+                            <input type="text" id="patient-search-input" placeholder="Buscar por nome ou e-mail...">
+                        </div>
+                        <select id="patient-goal-filter" class="table-select">
+                            <option value="">Todos os objetivos</option>
+                            <option value="lose">Emagrecer</option>
+                            <option value="gain">Ganhar Massa</option>
+                            <option value="maintain">Manter Peso</option>
+                        </select>
+                        <span id="patients-count-label" class="patients-count-label"></span>
+                    </div>
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
@@ -568,6 +589,7 @@
                                     <th>Nome</th>
                                     <th>E-mail</th>
                                     <th>Plano</th>
+                                    <th>Objetivo</th>
                                     <th>Peso / Altura</th>
                                     <th>Meta Calorias</th>
                                     <th>Ações</th>
@@ -616,19 +638,10 @@
                                 </div>
                             </div>
 
-                            <h3>Histórico Evolutivo de Peso</h3>
-                            <div class="table-responsive margin-top-md" style="max-height: 180px; overflow-y: auto; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; background: rgba(0,0,0,0.1);">
-                                <table class="data-table" style="font-size: 12px; width: 100%;">
-                                    <thead>
-                                        <tr>
-                                            <th>Data</th>
-                                            <th>Peso (kg)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="detail-weight-history-body">
-                                        <tr><td colspan="2" style="text-align:center; opacity:0.5;">Nenhum peso registrado.</td></tr>
-                                    </tbody>
-                                </table>
+                            <h3>Evolução de Peso</h3>
+                            <div class="weight-chart-wrap margin-top-md">
+                                <canvas id="detail-weight-chart"></canvas>
+                                <p id="detail-weight-empty" class="description" style="display:none; text-align:center; padding:16px;">Nenhum peso registrado ainda.</p>
                             </div>
 
                             <h3>Enviar Nova Prescrição / Feedback</h3>
@@ -641,6 +654,17 @@
                                 </div>
                                 <button type="submit" class="btn-primary w-full">Enviar para o Painel do Paciente</button>
                             </form>
+
+                            <!-- Histórico de orientações enviadas -->
+                            <div class="margin-top-lg" id="feedback-history-section">
+                                <div class="feedback-history-header">
+                                    <h3>Orientações Enviadas</h3>
+                                    <span id="feedback-history-count" class="feedback-history-badge"></span>
+                                </div>
+                                <div id="feedback-history-list" class="feedback-history-list margin-top-md">
+                                    <!-- injetado via JS -->
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Diário do Paciente (Refeições, Água, Jejum) -->
@@ -666,7 +690,19 @@
                                 </div>
                             </div>
 
-                            <h3>Refeições Registradas</h3>
+                            <div class="diary-filter-bar margin-top-md">
+                                <span class="diary-filter-label">Período:</span>
+                                <div class="diary-filter-btns">
+                                    <button class="diary-filter-btn active" data-days="7">7 dias</button>
+                                    <button class="diary-filter-btn" data-days="30">30 dias</button>
+                                    <button class="diary-filter-btn" data-days="0">Tudo</button>
+                                </div>
+                                <div class="diary-adherence-info" id="diary-adherence-info" style="display:none;">
+                                    <span>Aderência calórica:</span>
+                                    <strong id="detail-caloric-adherence">-</strong>
+                                </div>
+                            </div>
+                            <h3 class="margin-top-md">Refeições Registradas</h3>
                             <div class="table-responsive margin-top-md" style="max-height: 400px; overflow-y: auto;">
                                 <table class="data-table">
                                     <thead>

@@ -1159,3 +1159,144 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     line-height: 1.5;
     white-space: pre-wrap;
 }
+
+/* ── Pro Overview ── */
+.pro-greeting-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, rgba(245,193,77,0.08) 0%, rgba(255,250,240,0.02) 100%);
+    border: 1px solid rgba(245,193,77,0.18);
+    border-radius: var(--radius-lg);
+    padding: 24px 28px;
+}
+.pro-greeting-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+}
+.pro-greeting-sub {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+}
+
+/* ── Patients filter bar ── */
+.patients-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--color-border);
+    flex-wrap: wrap;
+}
+.patients-count-label {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+}
+
+/* ── Weight chart ── */
+.weight-chart-wrap {
+    position: relative;
+    height: 160px;
+    margin-bottom: 16px;
+}
+
+/* ── Feedback history ── */
+.feedback-history-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.feedback-history-badge {
+    background: var(--color-primary-dim);
+    color: var(--color-primary);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-family: var(--font-mono);
+}
+.feedback-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 260px;
+    overflow-y: auto;
+}
+.fhi-item {
+    background: rgba(255,250,240,0.03);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+}
+.fhi-header { margin-bottom: 6px; }
+.fhi-date {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: var(--font-mono);
+}
+.fhi-body {
+    font-size: 12.5px;
+    color: var(--color-text);
+    line-height: 1.55;
+}
+
+/* ── Diary filter bar ── */
+.diary-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.diary-filter-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+.diary-filter-btns {
+    display: flex;
+    gap: 4px;
+}
+.diary-filter-btn {
+    background: rgba(255,250,240,0.04);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    padding: 4px 12px;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: var(--font-sans);
+}
+.diary-filter-btn:hover {
+    border-color: rgba(245,193,77,0.3);
+    color: var(--color-primary);
+}
+.diary-filter-btn.active {
+    background: var(--color-primary-dim);
+    border-color: rgba(245,193,77,0.35);
+    color: var(--color-primary);
+    font-weight: 600;
+}
+.diary-adherence-info {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+.diary-adherence-info strong {
+    font-family: var(--font-mono);
+    font-size: 14px;
+}

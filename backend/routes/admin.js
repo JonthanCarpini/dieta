@@ -81,6 +81,58 @@ router.get('/billing', async (req, res) => {
 // ROTAS DE AGENDA (PROFISSIONAIS E ADMINS)
 // ====================================================
 
+// GET /api/admin/pro-overview - Resumo do dashboard para profissional logado
+router.get('/pro-overview', requireRole(['nutritionist', 'trainer']), async (req, res) => {
+  const professionalId = req.user.id;
+  const today = new Date().toISOString().split('T')[0];
+  const todayDow = new Date().getDay();
+
+  try {
+    const [patientsRes, nextRes, slotsRes, commissionsRes] = await Promise.all([
+      db.query(
+        `SELECT COUNT(*) as count FROM professional_links WHERE professional_id = $1 AND type = $2`,
+        [professionalId, req.user.role]
+      ),
+      db.query(
+        `SELECT a.id, a.appointment_date, a.start_time, a.end_time, a.status, a.video_link,
+                u.name as patient_name
+         FROM appointments a
+         JOIN users u ON a.patient_id = u.id
+         WHERE a.professional_id = $1 AND a.appointment_date >= $2 AND a.status = 'scheduled'
+         ORDER BY a.appointment_date ASC, a.start_time ASC
+         LIMIT 8`,
+        [professionalId, today]
+      ),
+      db.query(
+        `SELECT COUNT(*) as count FROM professional_availability
+         WHERE professional_id = $1 AND day_of_week = $2 AND active = true`,
+        [professionalId, todayDow]
+      ),
+      db.query(
+        `SELECT COALESCE(SUM(commission_amount), 0) as total FROM payments
+         WHERE professional_id = $1 AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)`,
+        [professionalId]
+      )
+    ]);
+
+    const consultationsToday = nextRes.rows.filter(a => {
+      const d = String(a.appointment_date).split('T')[0];
+      return d === today;
+    }).length;
+
+    res.json({
+      totalPatients:     parseInt(patientsRes.rows[0].count),
+      consultationsToday,
+      slotsToday:        parseInt(slotsRes.rows[0].count),
+      commissionsMonth:  parseFloat(commissionsRes.rows[0].total || 0),
+      nextAppointments:  nextRes.rows
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao carregar visão geral do profissional.' });
+  }
+});
+
 // GET /admin/availability - Retorna os horários disponíveis do profissional logado
 router.get('/availability', async (req, res) => {
   const professionalId = req.user.id;
