@@ -282,6 +282,40 @@ document.addEventListener('DOMContentLoaded', () => {
         if (settingsForm) {
             settingsForm.addEventListener('submit', handleSettingsSave);
         }
+
+        // Fechar modal de detalhes de refeição do admin
+        const closeBtn = document.getElementById('btn-close-admin-meal-details');
+        const closeFooterBtn = document.getElementById('btn-close-admin-meal-details-footer');
+        const adminMealDetailsModal = document.getElementById('admin-meal-details-modal');
+
+        const closeModal = () => {
+            if (adminMealDetailsModal) adminMealDetailsModal.style.display = 'none';
+        };
+
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (closeFooterBtn) closeFooterBtn.addEventListener('click', closeModal);
+        if (adminMealDetailsModal) {
+            adminMealDetailsModal.addEventListener('click', (e) => {
+                if (e.target === adminMealDetailsModal) closeModal();
+            });
+        }
+
+        // Alternar exibição do histórico de peso na vídeo chamada (Acordeão)
+        const vcWeightHistoryHeader = document.getElementById('vc-weight-history-header');
+        const vcWeightHistoryContent = document.getElementById('vc-weight-history-content');
+        const vcWeightHistoryArrow = document.getElementById('vc-weight-history-arrow');
+        if (vcWeightHistoryHeader && vcWeightHistoryContent) {
+            vcWeightHistoryHeader.addEventListener('click', () => {
+                const isHidden = vcWeightHistoryContent.style.display === 'none' || vcWeightHistoryContent.style.display === '';
+                if (isHidden) {
+                    vcWeightHistoryContent.style.display = 'block';
+                    if (vcWeightHistoryArrow) vcWeightHistoryArrow.style.transform = 'rotate(180deg)';
+                } else {
+                    vcWeightHistoryContent.style.display = 'none';
+                    if (vcWeightHistoryArrow) vcWeightHistoryArrow.style.transform = 'rotate(0deg)';
+                }
+            });
+        }
     }
 
     // Roteia o conteúdo de cada aba
@@ -1488,6 +1522,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const waterStatus = document.getElementById('detail-water-status');
         const fastingStatus = document.getElementById('detail-fasting-status');
         const mealsBody = document.getElementById('detail-meals-table-body');
+        const weightHistoryBody = document.getElementById('detail-weight-history-body');
         
         if (weightLabel) weightLabel.innerText = patient.weight ? `${patient.weight} kg` : '-';
         if (heightLabel) heightLabel.innerText = patient.height ? `${patient.height} cm` : '-';
@@ -1496,6 +1531,39 @@ document.addEventListener('DOMContentLoaded', () => {
         if (waterStatus) waterStatus.innerText = 'Carregando...';
         if (fastingStatus) fastingStatus.innerText = 'Carregando...';
         if (mealsBody) mealsBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Carregando diário...</td></tr>`;
+        if (weightHistoryBody) weightHistoryBody.innerHTML = `<tr><td colspan="2" style="text-align: center; opacity: 0.5;">Carregando pesos...</td></tr>`;
+
+        // Busca histórico de pesos do paciente
+        fetch(`${API_URL}/professional/patients/${patient.id}/weight-log`, {
+            headers: { 'Authorization': `Bearer ${adminState.token}` }
+        })
+        .then(res => res.json())
+        .then(weights => {
+            if (weightHistoryBody) {
+                weightHistoryBody.innerHTML = '';
+                if (!weights || weights.length === 0) {
+                    weightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; opacity:0.5;">Nenhum peso registrado.</td></tr>';
+                } else {
+                    const sortedWeights = [...weights].reverse();
+                    sortedWeights.forEach(w => {
+                        const tr = document.createElement('tr');
+                        const [year, month, day] = w.date.split('-');
+                        const formattedDate = `${day}/${month}/${year}`;
+                        tr.innerHTML = `
+                            <td>${formattedDate}</td>
+                            <td><strong>${w.weight} kg</strong></td>
+                        `;
+                        weightHistoryBody.appendChild(tr);
+                    });
+                }
+            }
+        })
+        .catch(err => {
+            console.error("Erro ao carregar histórico de peso:", err);
+            if (weightHistoryBody) {
+                weightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--color-danger);">Erro ao carregar.</td></tr>';
+            }
+        });
 
         try {
             const res = await fetch(`${API_URL}/professional/patients/${patient.id}/diary`, {
@@ -1538,6 +1606,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     data.meals.forEach(m => {
                         const tr = document.createElement('tr');
+                        tr.style.cursor = 'pointer';
                         const mealDate = new Date(m.date + 'T' + m.time);
                         const formattedDateTime = `${mealDate.toLocaleDateString('pt-BR')} ${m.time.substring(0, 5)}`;
                         
@@ -1557,6 +1626,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td>${caloriesVal}</td>
                             <td><small>${macros}</small></td>
                         `;
+                        tr.addEventListener('click', () => {
+                            openAdminMealDetailsModal(m);
+                        });
                         mealsBody.appendChild(tr);
                     });
                 }
@@ -1797,8 +1869,48 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (vcBtnSaveFeedback) vcBtnSaveFeedback.disabled = false;
 
-            // Fazer fetch assíncrono dos dados do paciente e diário
+            // Fazer fetch assíncrono dos dados do paciente, diário e histórico de pesos
             (async () => {
+                // Carregar histórico de peso para a vídeo chamada
+                const vcWeightHistoryBody = document.getElementById('vc-weight-history-body');
+                if (vcWeightHistoryBody) {
+                    vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding: 12px; opacity:0.5;">Carregando pesos...</td></tr>';
+                }
+                
+                try {
+                    const weightRes = await fetch(`${API_URL}/professional/patients/${patient.id}/weight-log`, {
+                        headers: { 'Authorization': `Bearer ${adminState.token}` }
+                    });
+                    if (weightRes.ok) {
+                        const weights = await weightRes.json();
+                        if (vcWeightHistoryBody) {
+                            vcWeightHistoryBody.innerHTML = '';
+                            if (!weights || weights.length === 0) {
+                                vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; opacity:0.5; padding: 12px;">Nenhum peso registrado.</td></tr>';
+                            } else {
+                                const sortedWeights = [...weights].reverse();
+                                sortedWeights.forEach(w => {
+                                    const tr = document.createElement('tr');
+                                    const [year, month, day] = w.date.split('-');
+                                    const formattedDate = `${day}/${month}/${year}`;
+                                    tr.innerHTML = `
+                                        <td style="padding: 6px 8px;">${formattedDate}</td>
+                                        <td style="padding: 6px 8px;"><strong>${w.weight} kg</strong></td>
+                                    `;
+                                    vcWeightHistoryBody.appendChild(tr);
+                                });
+                            }
+                        }
+                    } else {
+                        throw new Error();
+                    }
+                } catch (wErr) {
+                    console.error("Erro ao carregar pesos da video chamada:", wErr);
+                    if (vcWeightHistoryBody) {
+                        vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--color-danger); padding: 12px;">Erro ao carregar pesos.</td></tr>';
+                    }
+                }
+
                 try {
                     const res = await fetch(`${API_URL}/professional/patients/${patient.id}/diary`, {
                         headers: { 'Authorization': `Bearer ${adminState.token}` }
@@ -1896,24 +2008,34 @@ document.addEventListener('DOMContentLoaded', () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    ${dayMeals.map(m => {
-                                                        const formattedTime = m.time.substring(0, 5);
-                                                        const typeLabel = getMealTypeLabel(m);
-                                                        const tot = m.total && typeof m.total === 'object' ? m.total : {};
-                                                        const calVal = tot.calories !== undefined ? `${tot.calories} kcal` : '-';
-                                                        return `
-                                                            <tr style="border-bottom:1px solid rgba(255,255,255,0.03); font-size:12px;">
-                                                                <td style="padding:8px 4px; opacity:0.7;">${formattedTime}</td>
-                                                                <td style="padding:8px 4px;"><strong>${m.name}</strong></td>
-                                                                <td style="padding:8px 4px;"><span style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px;">${typeLabel}</span></td>
-                                                                <td style="padding:8px 4px; text-align:right; font-weight:600;">${calVal}</td>
-                                                            </tr>
-                                                        `;
-                                                    }).join('')}
                                                 </tbody>
                                             </table>
                                         </div>
                                     `;
+
+                                    const tbody = dayGroup.querySelector('tbody');
+                                    dayMeals.forEach(m => {
+                                        const tr = document.createElement('tr');
+                                        tr.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+                                        tr.style.fontSize = '12px';
+                                        tr.style.cursor = 'pointer';
+                                        const formattedTime = m.time.substring(0, 5);
+                                        const typeLabel = getMealTypeLabel(m);
+                                        const tot = m.total && typeof m.total === 'object' ? m.total : {};
+                                        const calVal = tot.calories !== undefined ? `${tot.calories} kcal` : '-';
+                                        
+                                        tr.innerHTML = `
+                                            <td style="padding:8px 4px; opacity:0.7;">${formattedTime}</td>
+                                            <td style="padding:8px 4px;"><strong>${m.name}</strong></td>
+                                            <td style="padding:8px 4px;"><span style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px;">${typeLabel}</span></td>
+                                            <td style="padding:8px 4px; text-align:right; font-weight:600;">${calVal}</td>
+                                        `;
+                                        
+                                        tr.addEventListener('click', () => {
+                                            openAdminMealDetailsModal(m);
+                                        });
+                                        tbody.appendChild(tr);
+                                    });
 
                                     // Listener de expansão/recolhimento
                                     dayGroup.querySelector('.vc-diary-day-header').addEventListener('click', () => {
@@ -2366,6 +2488,82 @@ document.addEventListener('DOMContentLoaded', () => {
         const screenVideoCall = document.getElementById('screen-video-call');
         if (screenVideoCall) screenVideoCall.style.display = 'none';
 
+        const vcWeightHistoryContent = document.getElementById('vc-weight-history-content');
+        const vcWeightHistoryArrow = document.getElementById('vc-weight-history-arrow');
+        const vcWeightHistoryBody = document.getElementById('vc-weight-history-body');
+        if (vcWeightHistoryContent) vcWeightHistoryContent.style.display = 'none';
+        if (vcWeightHistoryArrow) vcWeightHistoryArrow.style.transform = 'rotate(0deg)';
+        if (vcWeightHistoryBody) {
+            vcWeightHistoryBody.innerHTML = '<tr><td colspan="2" style="text-align:center; opacity:0.5; padding: 12px;">Nenhum peso registrado.</td></tr>';
+        }
+
         loadAppointmentsData();
+    }
+
+    function openAdminMealDetailsModal(meal) {
+        const modal = document.getElementById('admin-meal-details-modal');
+        if (!modal) return;
+
+        const titleEl = document.getElementById('admin-meal-detail-title');
+        if (titleEl) titleEl.textContent = meal.name || 'Detalhes da Refeição';
+
+        const total = meal.total && typeof meal.total === 'object' ? meal.total : {};
+        const caloriesEl = document.getElementById('admin-meal-detail-calories');
+        const proteinEl = document.getElementById('admin-meal-detail-protein');
+        const carbsEl = document.getElementById('admin-meal-detail-carbs');
+        const fatEl = document.getElementById('admin-meal-detail-fat');
+
+        if (caloriesEl) caloriesEl.textContent = total.calories !== undefined ? `${total.calories} kcal` : (meal.calories ? `${meal.calories} kcal` : '-');
+        if (proteinEl) proteinEl.textContent = total.protein !== undefined ? `${total.protein}g` : (meal.protein ? `${meal.protein}g` : '-');
+        if (carbsEl) carbsEl.textContent = total.carbs !== undefined ? `${total.carbs}g` : (meal.carbs ? `${meal.carbs}g` : '-');
+        if (fatEl) fatEl.textContent = total.fat !== undefined ? `${total.fat}g` : (meal.fat ? `${meal.fat}g` : '-');
+
+        const imageWrapper = document.getElementById('admin-meal-detail-image-wrapper');
+        const photoImg = document.getElementById('admin-meal-detail-photo');
+        if (imageWrapper && photoImg) {
+            const hasImage = total && total.image && total.image.startsWith('data:image/');
+            if (hasImage) {
+                photoImg.src = total.image;
+                imageWrapper.style.display = 'block';
+            } else {
+                photoImg.src = '';
+                imageWrapper.style.display = 'none';
+            }
+        }
+
+        const itemsContainer = document.getElementById('admin-meal-detail-items');
+        if (itemsContainer) {
+            itemsContainer.innerHTML = '';
+            const items = Array.isArray(meal.items) ? meal.items : [];
+            if (items.length === 0) {
+                itemsContainer.innerHTML = '<div style="font-size:12px; opacity:0.5; text-align:center; padding:10px;">Nenhum alimento identificado.</div>';
+            } else {
+                items.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.style.display = 'flex';
+                    itemDiv.style.justifyContent = 'space-between';
+                    itemDiv.style.alignItems = 'center';
+                    itemDiv.style.background = 'rgba(255,255,255,0.02)';
+                    itemDiv.style.border = '1px solid rgba(255,255,255,0.05)';
+                    itemDiv.style.borderRadius = '8px';
+                    itemDiv.style.padding = '8px 12px';
+                    itemDiv.style.fontSize = '12px';
+
+                    const itemCal = item.calories !== undefined ? `${item.calories} kcal` : '';
+                    const itemMacros = `C:${item.carbs || 0}g P:${item.protein || 0}g F:${item.fat || 0}g`;
+
+                    itemDiv.innerHTML = `
+                        <div>
+                            <strong style="color:#fff;">${item.name}</strong>
+                            <div style="font-size:10px; opacity:0.5; margin-top:2px;">${itemMacros}</div>
+                        </div>
+                        <span style="font-weight:600; color:var(--color-primary);">${itemCal}</span>
+                    `;
+                    itemsContainer.appendChild(itemDiv);
+                });
+            }
+        }
+
+        modal.style.display = 'flex';
     }
 });

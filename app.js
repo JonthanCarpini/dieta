@@ -31,7 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
         weeklyChart: null,
         fastingInterval: null,   // Intervalo do cronômetro de jejum
         savedAiRecipes: [],      // Receitas diárias geradas por IA salvas
-        savedWeeklyPlans: []     // Planos semanais gerados por IA salvos
+        savedWeeklyPlans: [],    // Planos semanais gerados por IA salvos
+        weightHistory: []        // Histórico de pesos registrados
     };
 
     // 2. BANCO DE DADOS DE ALIMENTOS BRASILEIROS (NUTRIR BRAZIL DATABASE)
@@ -307,6 +308,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
             }
 
+            // 4.5. Carrega Histórico de Peso (Área Evolutiva)
+            const weightLogRes = await fetch(`${API_URL}/user/weight-log`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (weightLogRes.ok) {
+                state.weightHistory = await weightLogRes.json();
+            } else {
+                state.weightHistory = [];
+            }
+
             // Carrega api key global do banco de dados
             if (data.geminiApiKey && data.geminiApiKey.trim() !== '') {
                 state.geminiApiKey = data.geminiApiKey;
@@ -350,6 +361,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     target_carbs: profile.targetCarbs,
                     target_fat: profile.targetFat
                 })
+            });
+
+            // Sincroniza o peso no histórico
+            await fetch(`${API_URL}/user/weight-log`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ weight: profile.weight })
             });
         } catch (err) {
             console.error("Erro ao salvar perfil na API:", err);
@@ -3547,13 +3568,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const timeStr = `${hours}:${minutes}`;
 
+        // Salva a foto (base64) dentro do campo total.image
+        const totalWithImage = {
+            ...state.currentAnalyzingMeal.total,
+            image: state.currentCapturedImage || ''
+        };
+
         const newMealEntry = {
             id: 'meal_' + Date.now(),
             date: todayStr,
             time: timeStr,
             name: `Escaner de Alimento (${timeStr})`,
             items: state.currentAnalyzingMeal.items,
-            total: state.currentAnalyzingMeal.total
+            total: totalWithImage
         };
 
         state.mealsLog.push(newMealEntry);
@@ -3707,7 +3734,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     expandBtn.classList.toggle('open');
                 };
                 expandBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleExpand(); });
-                item.querySelector('.meal-item-top').addEventListener('click', toggleExpand);
+                item.querySelector('.meal-item-top').addEventListener('click', () => openMealDetailModal(meal));
 
                 listEl.appendChild(item);
             });
@@ -3814,7 +3841,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mealsHtml = meals
                     .sort((a,b) => b.time.localeCompare(a.time))
                     .map(m => `
-                        <div class="hdc-meal-item">
+                        <div class="hdc-meal-item" data-meal-id="${m.id}" style="cursor:pointer;">
                             <div class="hdc-meal-top">
                                 <span class="hdc-meal-name">${m.name}</span>
                                 <span class="hdc-meal-kcal">${Math.round(m.total.calories)} kcal</span>
@@ -3866,6 +3893,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     mealsList.classList.toggle('hidden');
                     btn.classList.toggle('open');
                     lucide.createIcons();
+                });
+
+                // Liga o clique em cada refeição do histórico para abrir o modal detalhado
+                card.querySelectorAll('.hdc-meal-item').forEach(mealEl => {
+                    mealEl.addEventListener('click', () => {
+                        const mealId = mealEl.dataset.mealId;
+                        const foundMeal = meals.find(m => m.id === mealId);
+                        if (foundMeal) {
+                            openMealDetailModal(foundMeal);
+                        }
+                    });
                 });
 
                 container.appendChild(card);
@@ -3933,6 +3971,108 @@ document.addEventListener('DOMContentLoaded', () => {
         if (adminCard) {
             adminCard.style.display = (state.user && state.user.role === 'admin') ? 'block' : 'none';
         }
+
+        // Renderiza o histórico de peso na Área Evolutiva
+        renderWeightHistory();
+     }
+
+    function renderWeightHistory() {
+        const historyContainer = document.getElementById('weight-history-list');
+        if (!historyContainer) return;
+
+        historyContainer.innerHTML = '';
+        const history = state.weightHistory || [];
+
+        if (history.length === 0) {
+            historyContainer.innerHTML = `
+                <p class="empty-weight-history" style="text-align: center; color: rgba(255,255,255,0.4); font-size: 13px; margin: 12px 0;">Nenhum registro de peso encontrado.</p>
+            `;
+            return;
+        }
+
+        // Ordenado por data decrescente para mostrar o mais recente primeiro no histórico
+        const sortedHistory = [...history].sort((a, b) => b.date.localeCompare(a.date));
+
+        sortedHistory.forEach(item => {
+            const dateParts = item.date.split('-');
+            const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+
+            const row = document.createElement('div');
+            row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; font-size: 13px; color: #fff;';
+            row.innerHTML = `
+                <span style="font-weight: 500;">${formattedDate}</span>
+                <span style="color: var(--color-primary); font-weight: 600;">${parseFloat(item.weight).toFixed(1)} kg</span>
+            `;
+            historyContainer.appendChild(row);
+        });
+    }
+
+    function openMealDetailModal(meal) {
+        const modal = document.getElementById('meal-detail-modal');
+        if (!modal) return;
+
+        document.getElementById('meal-detail-title').innerText = meal.name;
+        
+        // Exibe macros totais
+        document.getElementById('meal-detail-calories').innerText = `${Math.round(meal.total.calories)} kcal`;
+        document.getElementById('meal-detail-protein').innerText = `${Math.round(meal.total.protein)}g`;
+        document.getElementById('meal-detail-carbs').innerText = `${Math.round(meal.total.carbs)}g`;
+        document.getElementById('meal-detail-fat').innerText = `${Math.round(meal.total.fat)}g`;
+
+        // Trata imagem do prato
+        const imgWrapper = document.getElementById('meal-detail-image-wrapper');
+        const imgEl = document.getElementById('meal-detail-photo');
+        
+        // Verifica se existe foto armazenada em total.image
+        if (meal.total && meal.total.image) {
+            imgEl.src = meal.total.image;
+            imgWrapper.style.display = 'block';
+        } else {
+            imgEl.src = '';
+            imgWrapper.style.display = 'none';
+        }
+
+        // Renderiza itens individuais da refeição
+        const itemsContainer = document.getElementById('meal-detail-items-list');
+        itemsContainer.innerHTML = '';
+
+        const items = meal.items || [];
+        items.forEach(item => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'food-item-card-v2';
+            itemDiv.style.cssText = 'padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;';
+            itemDiv.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; font-weight:600;">
+                    <span>${item.name}</span>
+                    <span style="color:var(--color-primary);">${Math.round(item.calories)} kcal</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; opacity:0.7;">
+                    <span>${item.weight_g || item.weight}g</span>
+                    <div style="display:flex; gap:6px;">
+                        <span style="color:#22c55e;">P ${item.protein}g</span>
+                        <span style="color:#3b82f6;">C ${item.carbs}g</span>
+                        <span style="color:#f97316;">G ${item.fat}g</span>
+                    </div>
+                </div>
+            `;
+            itemsContainer.appendChild(itemDiv);
+        });
+
+        // Configura ouvintes de fechar
+        const closeBtn = document.getElementById('btn-close-meal-detail');
+        const closeBtnFooter = document.getElementById('btn-close-meal-detail-footer');
+
+        const closeModal = () => modal.classList.remove('active');
+        
+        closeBtn.removeEventListener('click', closeModal);
+        closeBtnFooter.removeEventListener('click', closeModal);
+        closeBtn.addEventListener('click', closeModal);
+        closeBtnFooter.addEventListener('click', closeModal);
+
+        modal.classList.add('active');
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
     }
 
     // 22. CONFIGURAÇÕES DE EVENTOS GERAIS
@@ -3941,6 +4081,58 @@ document.addEventListener('DOMContentLoaded', () => {
         navItems.forEach(item => {
             item.addEventListener('click', () => showScreen(item.dataset.target));
         });
+
+        // Ouvinte para registro de novo peso
+        const weightLogForm = document.getElementById('weight-log-form');
+        if (weightLogForm) {
+            weightLogForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const inputWeight = document.getElementById('input-new-weight');
+                const newWeight = parseFloat(inputWeight.value);
+
+                if (isNaN(newWeight) || newWeight <= 30 || newWeight > 250) {
+                    alert('Por favor, insira um peso válido entre 30 e 250 kg.');
+                    return;
+                }
+
+                const token = localStorage.getItem('nutrir_token');
+                try {
+                    const res = await fetch(`${API_URL}/user/weight-log`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ weight: newWeight })
+                    });
+
+                    if (!res.ok) throw new Error('Erro ao salvar peso.');
+                    
+                    const savedLog = await res.json();
+                    
+                    // Atualiza perfil no estado local
+                    if (state.userProfile) {
+                        state.userProfile.weight = newWeight;
+                        localStorage.setItem('nutrir_profile', JSON.stringify(state.userProfile));
+                    }
+
+                    // Recarrega histórico
+                    const weightLogRes = await fetch(`${API_URL}/user/weight-log`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (weightLogRes.ok) {
+                        state.weightHistory = await weightLogRes.json();
+                    }
+
+                    inputWeight.value = '';
+                    renderSettingsPage();
+                    updateDashboard();
+                    alert('Peso registrado com sucesso!');
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        }
 
         // Água botões
         document.querySelectorAll('.btn-water-quick').forEach(btn => {

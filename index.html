@@ -732,6 +732,24 @@
                     </button>
                 </div>
 
+                <!-- Área Evolutiva (Histórico de Peso) -->
+                <div class="settings-card">
+                    <div class="card-header-icon border-profile">
+                        <i data-lucide="trending-up" class="text-profile"></i>
+                        <h3>Área Evolutiva (Histórico de Peso)</h3>
+                    </div>
+                    <p class="settings-description">Acompanhe sua evolução e registre novos pesos para mostrar ao seu profissional.</p>
+                    
+                    <form id="weight-log-form" class="weight-input-row" style="display: flex; gap: 8px; margin-bottom: 16px;">
+                        <input type="number" id="input-new-weight" step="0.1" min="30" max="250" placeholder="Ex: 75.5" required style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
+                        <button type="submit" class="btn-primary" style="padding: 10px 16px; font-size: 14px; border-radius: 8px;">Registrar</button>
+                    </form>
+
+                    <div id="weight-history-list" class="weight-history-container" style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; background: rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 8px;">
+                        <p class="empty-weight-history" style="text-align: center; color: rgba(255,255,255,0.4); font-size: 13px; margin: 12px 0;">Nenhum registro de peso encontrado.</p>
+                    </div>
+                </div>
+
                 <!-- Acompanhamento Profissional -->
                 <div class="settings-card" id="premium-professional-card">
                     <div class="card-header-icon border-gemini">
@@ -1351,6 +1369,56 @@
             <div class="modal-footer" style="display:flex; gap:12px;">
                 <button class="btn-secondary flex-1" id="btn-cancel-book-appointment">Cancelar</button>
                 <button class="btn-primary flex-1" id="btn-save-book-appointment">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes da Refeição (Paciente) -->
+    <div class="modal-overlay" id="meal-detail-modal">
+        <div class="modal-card" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3 id="meal-detail-title">Detalhes da Refeição</h3>
+                <button class="icon-btn" id="btn-close-meal-detail"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body scrollable-modal-content" style="display:flex; flex-direction:column; gap:16px; max-height: 60vh; overflow-y: auto;">
+                <!-- Imagem se escaneada -->
+                <div id="meal-detail-image-wrapper" class="result-image-preview" style="display: none; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); position: relative;">
+                    <img id="meal-detail-photo" src="" alt="Foto da refeição" style="width: 100%; height: auto; object-fit: cover; display: block; max-height: 220px;">
+                    <div class="source-badge" style="position: absolute; bottom: 8px; right: 8px;"><i data-lucide="scan"></i> Escaneada por IA</div>
+                </div>
+
+                <!-- Resumo dos Macros -->
+                <div class="stats-overview-card" style="padding:12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                    <div class="target-stats-grid" style="grid-template-columns: repeat(4, 1fr); gap:8px;">
+                        <div class="t-stat">
+                            <span class="t-val" id="meal-detail-calories" style="font-size:14px; color: var(--color-primary);">0 kcal</span>
+                            <span class="t-lbl">Calorias</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val text-protein" id="meal-detail-protein" style="font-size:14px;">0g</span>
+                            <span class="t-lbl">Prot</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val text-carbs" id="meal-detail-carbs" style="font-size:14px;">0g</span>
+                            <span class="t-lbl">Carbo</span>
+                        </div>
+                        <div class="t-stat">
+                            <span class="t-val text-fat" id="meal-detail-fat" style="font-size:14px;">0g</span>
+                            <span class="t-lbl">Gord</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalhes do Alimento -->
+                <div>
+                    <h4 style="margin-bottom:8px; font-size:13px; font-weight:600; opacity:0.8;">Itens da Refeição</h4>
+                    <div class="food-items-list" id="meal-detail-items-list" style="display:flex; flex-direction:column; gap:8px;">
+                        <!-- Injetado por JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <button class="btn-secondary w-full" id="btn-close-meal-detail-footer">Fechar</button>
             </div>
         </div>
     </div>

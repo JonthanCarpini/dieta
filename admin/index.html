@@ -614,6 +614,21 @@
                                 </div>
                             </div>
 
+                            <h3>Histórico Evolutivo de Peso</h3>
+                            <div class="table-responsive margin-top-md" style="max-height: 180px; overflow-y: auto; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; background: rgba(0,0,0,0.1);">
+                                <table class="data-table" style="font-size: 12px; width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Peso (kg)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detail-weight-history-body">
+                                        <tr><td colspan="2" style="text-align:center; opacity:0.5;">Nenhum peso registrado.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
                             <h3>Enviar Nova Prescrição / Feedback</h3>
                             <p class="description">Oriente seu paciente sobre dietas, treinos ou rotinas diretamente no app dele.</p>
                             <form id="patient-feedback-form" class="margin-top-md">
@@ -778,6 +793,30 @@
                 </div>
             </div>
             
+            <!-- Seção Colapsável de Evolução de Peso -->
+            <div id="vc-weight-history-section" style="margin-bottom: 20px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden;">
+                <div id="vc-weight-history-header" style="padding: 10px 16px; background: rgba(255,255,255,0.02); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                    <span style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="trending-up" style="width: 16px; height: 16px; color: var(--color-primary);"></i>
+                        Evolução de Peso do Paciente
+                    </span>
+                    <i data-lucide="chevron-down" id="vc-weight-history-arrow" style="width: 16px; height: 16px; transition: transform 0.2s;"></i>
+                </div>
+                <div id="vc-weight-history-content" style="padding: 12px; display: none; border-top: 1px solid rgba(255,255,255,0.05); max-height: 150px; overflow-y: auto;">
+                    <table class="data-table" style="font-size: 11.5px; width: 100%;">
+                        <thead>
+                            <tr>
+                                <th style="padding: 6px 8px;">Data</th>
+                                <th style="padding: 6px 8px;">Peso (kg)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vc-weight-history-body">
+                            <tr><td colspan="2" style="text-align:center; opacity:0.5; padding: 12px;">Nenhum peso registrado.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
             <!-- Barra de Abas -->
             <div class="vc-tabs-bar">
                 <button class="vc-tab-btn active" id="vc-tab-btn-diary" data-vc-tab="diary">
@@ -817,6 +856,56 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes de Refeição (Admin/Pro) -->
+    <div class="modal-overlay" id="admin-meal-details-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:100000; justify-content:center; align-items:center;">
+        <div class="modal-card" style="max-width: 420px; background:#181d28; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; width:90%; box-sizing:border-box;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px; margin-bottom:16px;">
+                <h3 id="admin-meal-detail-title" style="margin:0; font-size:16px; font-weight:700; color:#fff;">Detalhes da Refeição</h3>
+                <button class="icon-btn" id="btn-close-admin-meal-details" style="background:transparent; border:none; color:#8e8e93; cursor:pointer;"><i data-lucide="x" style="width:18px; height:18px;"></i></button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:16px; max-height:60vh; overflow-y:auto; padding-right:4px;">
+                <!-- Imagem se escaneada -->
+                <div id="admin-meal-detail-image-wrapper" style="display:none; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.05); position:relative;">
+                    <img id="admin-meal-detail-photo" src="" alt="Foto do Prato" style="width:100%; height:auto; object-fit:cover; display:block; max-height:200px;">
+                    <div style="position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.6); color:#fee440; padding:4px 8px; border-radius:12px; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;"><i data-lucide="scan" style="width:10px; height:10px; vertical-align:middle; margin-right:2px;"></i> Escaneado</div>
+                </div>
+
+                <!-- Resumo dos Macros -->
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:12px;">
+                    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; text-align:center;">
+                        <div>
+                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:2px;">CALORIAS</span>
+                            <strong id="admin-meal-detail-calories" style="font-size:12px; font-weight:700; color:#fff;">-</strong>
+                        </div>
+                        <div>
+                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:2px; color:#22c55e;">PROT</span>
+                            <strong id="admin-meal-detail-protein" style="font-size:12px; font-weight:700; color:#22c55e;">-</strong>
+                        </div>
+                        <div>
+                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:2px; color:#3b82f6;">CARBO</span>
+                            <strong id="admin-meal-detail-carbs" style="font-size:12px; font-weight:700; color:#3b82f6;">-</strong>
+                        </div>
+                        <div>
+                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:2px; color:#f97316;">GORD</span>
+                            <strong id="admin-meal-detail-fat" style="font-size:12px; font-weight:700; color:#f97316;">-</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista de Alimentos -->
+                <div>
+                    <h4 style="margin:0 0 8px 0; font-size:12.5px; font-weight:600; opacity:0.8; color:#fff;">Alimentos Identificados</h4>
+                    <div id="admin-meal-detail-items" style="display:flex; flex-direction:column; gap:8px;">
+                        <!-- Injetado por JS -->
+                    </div>
+                </div>
+            </div>
+            <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-top:16px;">
+                <button id="btn-close-admin-meal-details-footer" class="btn-secondary w-full" style="font-size:12px; padding:10px; border-radius:8px;">Fechar</button>
             </div>
         </div>
     </div>

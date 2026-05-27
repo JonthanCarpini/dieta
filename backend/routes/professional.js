@@ -188,4 +188,21 @@ router.post('/appointments/:id/cancel', async (req, res) => {
   }
 });
 
+// ==========================================
+// 5. HISTÓRICO DE PESO DO PACIENTE (ÁREA EVOLUTIVA)
+// ==========================================
+router.get('/patients/:id/weight-log', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  try {
+    const historyRes = await db.query(
+      "SELECT id, weight, TO_CHAR(date, 'YYYY-MM-DD') as date, created_at FROM weight_log WHERE user_id = $1 ORDER BY date ASC",
+      [patientId]
+    );
+    res.json(historyRes.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico de peso do paciente.' });
+  }
+});
+
 module.exports = router;

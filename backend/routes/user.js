@@ -612,4 +612,73 @@ router.post('/appointments/:id/cancel', async (req, res) => {
   }
 });
 
+// ==========================================
+// 8. HISTÓRICO DE PESO (ÁREA EVOLUTIVA)
+// ==========================================
+
+// Salvar ou atualizar peso
+router.post('/weight-log', async (req, res) => {
+  const { weight, date } = req.body;
+
+  if (weight === undefined || isNaN(parseFloat(weight))) {
+    return res.status(400).json({ error: 'Peso inválido ou não informado.' });
+  }
+
+  // Define data padrão como hoje (formato YYYY-MM-DD) no fuso America/Sao_Paulo
+  let targetDate = date;
+  if (!targetDate) {
+    const nowSaoPaulo = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    const year = nowSaoPaulo.getFullYear();
+    const month = String(nowSaoPaulo.getMonth() + 1).padStart(2, '0');
+    const day = String(nowSaoPaulo.getDate()).padStart(2, '0');
+    targetDate = `${year}-${month}-${day}`;
+  }
+
+  try {
+    // 1. Salvar ou atualizar na tabela weight_log
+    const logRes = await db.query(`
+      INSERT INTO weight_log (user_id, weight, date)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (user_id, date) DO UPDATE SET
+        weight = EXCLUDED.weight
+      RETURNING *
+    `, [req.user.id, parseFloat(weight), targetDate]);
+
+    // 2. Atualizar peso atual na tabela profiles
+    // Só atualizamos se for a data mais recente ou hoje para manter coerência
+    const maxDateRes = await db.query(`
+      SELECT MAX(date) as max_date FROM weight_log WHERE user_id = $1
+    `, [req.user.id]);
+    
+    const maxDate = maxDateRes.rows[0].max_date;
+    // Se o registro inserido/atualizado for na data máxima (ou igual), atualiza profiles
+    if (!maxDate || new Date(targetDate) >= new Date(maxDate)) {
+      await db.query(`
+        UPDATE profiles 
+        SET weight = $1, updated_at = NOW() 
+        WHERE user_id = $2
+      `, [parseFloat(weight), req.user.id]);
+    }
+
+    res.status(201).json(logRes.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar peso.' });
+  }
+});
+
+// Buscar histórico de peso
+router.get('/weight-log', async (req, res) => {
+  try {
+    const historyRes = await db.query(
+      "SELECT id, weight, TO_CHAR(date, 'YYYY-MM-DD') as date, created_at FROM weight_log WHERE user_id = $1 ORDER BY date ASC",
+      [req.user.id]
+    );
+    res.json(historyRes.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico de peso.' });
+  }
+});
+
 module.exports = router;

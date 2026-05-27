@@ -186,6 +186,19 @@ async function runMigrations() {
   await db.query(`
     CREATE INDEX IF NOT EXISTS idx_availability_professional ON professional_availability(professional_id)
   `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS weight_log (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      weight DECIMAL(5,2) NOT NULL,
+      date DATE NOT NULL DEFAULT CURRENT_DATE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_user_date_weight UNIQUE (user_id, date)
+    )
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_weight_log_user_date ON weight_log(user_id, date)
+  `);
   console.log('Migrações executadas com sucesso.');
 }
 

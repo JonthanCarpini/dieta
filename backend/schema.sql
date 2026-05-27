@@ -186,3 +186,16 @@ CREATE TABLE IF NOT EXISTS appointments (
 
 CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments(patient_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_professional ON appointments(professional_id);
+
+-- 14. TABELA DE HISTÓRICO DE PESO (ÁREA EVOLUTIVA)
+CREATE TABLE IF NOT EXISTS weight_log (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    weight DECIMAL(5,2) NOT NULL,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_user_date_weight UNIQUE (user_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_weight_log_user_date ON weight_log(user_id, date);
+
