@@ -104,6 +104,10 @@ class MainActivity : ComponentActivity() {
                                 settings.loadWithOverviewMode = true
                                 settings.useWideViewPort = true
                                 settings.mediaPlaybackRequiresUserGesture = false
+                                settings.cacheMode = WebSettings.LOAD_DEFAULT
+                                // Aceita cookies para persistência de sessão
+                                android.webkit.CookieManager.getInstance().setAcceptCookie(true)
+                                android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 webViewClient = object : WebViewClient() {
                                     override fun onReceivedSslError(
                                         view: WebView?,
@@ -202,6 +206,25 @@ class MainActivity : ComponentActivity() {
     }
 
     inner class WebAppInterface(private val context: Context) {
+        private val prefs by lazy {
+            context.getSharedPreferences("nutrir_auth", Context.MODE_PRIVATE)
+        }
+
+        @JavascriptInterface
+        fun saveToken(token: String) {
+            prefs.edit().putString("nutrir_token", token).apply()
+        }
+
+        @JavascriptInterface
+        fun getToken(): String {
+            return prefs.getString("nutrir_token", "") ?: ""
+        }
+
+        @JavascriptInterface
+        fun clearToken() {
+            prefs.edit().remove("nutrir_token").apply()
+        }
+
         @JavascriptInterface
         fun scheduleNotification(id: Int, title: String, message: String, timeInMillis: Long) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager

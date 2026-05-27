@@ -13,6 +13,42 @@ document.addEventListener('DOMContentLoaded', () => {
     let _listenersInitialized = false; // guard: setup functions run only once
     let _googleLoginInitialized = false;
 
+    // Token storage: usa Android SharedPreferences (via JS bridge) como backup
+    // do localStorage, garantindo persistência mesmo se o WebView limpar o
+    // storage entre sessões do app.
+    const TOKEN_KEY = 'nutrir_token';
+    const _androidBridge = (typeof window.AndroidApp !== 'undefined') ? window.AndroidApp : null;
+
+    function saveToken(token) {
+        try { localStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+        if (_androidBridge && typeof _androidBridge.saveToken === 'function') {
+            try { _androidBridge.saveToken(token); } catch (e) {}
+        }
+    }
+
+    function getToken() {
+        let token = null;
+        try { token = localStorage.getItem(TOKEN_KEY); } catch (e) {}
+        if (!token && _androidBridge && typeof _androidBridge.getToken === 'function') {
+            try {
+                const nativeToken = _androidBridge.getToken();
+                if (nativeToken) {
+                    token = nativeToken;
+                    // Restaura no localStorage para que outras partes do app funcionem
+                    try { localStorage.setItem(TOKEN_KEY, nativeToken); } catch (e) {}
+                }
+            } catch (e) {}
+        }
+        return token;
+    }
+
+    function clearToken() {
+        try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+        if (_androidBridge && typeof _androidBridge.clearToken === 'function') {
+            try { _androidBridge.clearToken(); } catch (e) {}
+        }
+    }
+
     // 1. ESTADO GLOBAL DA APLICAÇÃO
     const state = {
         userProfile: null,       // Perfil do usuário (peso, metas, onboarding)
@@ -180,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Verifica token e carrega estado da API
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (token) {
             const success = await loadStateFromAPI(token);
             if (success) {
@@ -221,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!profileRes.ok) {
                 // Only clear token on auth errors — network/server errors must NOT kick the user out
                 if (profileRes.status === 401 || profileRes.status === 403) {
-                    localStorage.removeItem('nutrir_token');
+                    clearToken();
                     return false;
                 }
                 // 5xx or other: keep the token, retry on next app init
@@ -356,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.userProfile = profile;
         localStorage.setItem('nutrir_profile', JSON.stringify(profile));
 
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
 
         try {
@@ -399,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveMealsToLocalStorage() {
         localStorage.setItem('nutrir_meals_log', JSON.stringify(state.mealsLog));
 
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
 
         // Envia as refeições para sincronizar no backend
@@ -427,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function deleteMealFromAPI(mealId) {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
         try {
             await fetch(`${API_URL}/user/meals/${mealId}`, {
@@ -440,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveWaterToAPI() {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
         try {
             await fetch(`${API_URL}/user/water`, {
@@ -461,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveFastingToAPI(active) {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
         try {
             await fetch(`${API_URL}/user/fasting`, {
@@ -483,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveAiRecipesToLocalStorage() {
         localStorage.setItem('nutrir_saved_ai_recipes', JSON.stringify(state.savedAiRecipes));
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
 
         for (const recipe of state.savedAiRecipes) {
@@ -509,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveWeeklyPlansToLocalStorage() {
         localStorage.setItem('nutrir_saved_weekly_plans', JSON.stringify(state.savedWeeklyPlans));
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
 
         for (const plan of state.savedWeeklyPlans) {
@@ -589,7 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(data.error || 'Erro na requisição.');
                 }
 
-                localStorage.setItem('nutrir_token', data.token);
+                saveToken(data.token);
                 await initApp();
             } catch (err) {
                 alert(`Erro de autenticação: ${err.message}`);
@@ -641,7 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || 'Erro na autenticação do Google.');
             }
 
-            localStorage.setItem('nutrir_token', data.token);
+            saveToken(data.token);
             await initApp();
         } catch (err) {
             alert(`Falha no Login Google: ${err.message}`);
@@ -652,7 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // PAINEL DO ADMINISTRADOR - EVENTOS E MÉTODOS
     // ==========================================================
     async function renderAdminPanel() {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
 
         try {
@@ -773,7 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const password = document.getElementById('admin-pro-password').value;
                 const role = document.getElementById('admin-pro-role').value;
 
-                const token = localStorage.getItem('nutrir_token');
+                const token = getToken();
                 try {
                     const res = await fetch(`${API_URL}/admin/register-professional`, {
                         method: 'POST',
@@ -800,7 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
             geminiForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const gemini_api_key = document.getElementById('admin-gemini-key').value.trim();
-                const token = localStorage.getItem('nutrir_token');
+                const token = getToken();
                 try {
                     const res = await fetch(`${API_URL}/admin/settings`, {
                         method: 'POST',
@@ -828,7 +864,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnAdminLogout = document.getElementById('btn-admin-logout');
         if (btnAdminLogout) {
             btnAdminLogout.addEventListener('click', () => {
-                localStorage.removeItem('nutrir_token');
+                clearToken();
                 showScreen('screen-login');
             });
         }
@@ -847,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedPatientId = null;
 
     async function renderProfessionalPanel() {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
 
         try {
@@ -907,7 +943,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function openPatientDetailsModal(patientId, patientName) {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
 
         selectedPatientId = patientId;
@@ -987,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const token = localStorage.getItem('nutrir_token');
+            const token = getToken();
             try {
                 const res = await fetch(`${API_URL}/professional/patients/${selectedPatientId}/feedback`, {
                     method: 'POST',
@@ -1007,7 +1043,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.getElementById('btn-professional-logout').addEventListener('click', () => {
-            localStorage.removeItem('nutrir_token');
+            clearToken();
             showScreen('screen-login');
         });
     }
@@ -1028,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         try {
             const prosRes = await fetch(`${API_URL}/user/available-professionals`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -1101,7 +1137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function linkProfessional(proId, type) {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         try {
             const res = await fetch(`${API_URL}/user/link-professional`, {
                 method: 'POST',
@@ -1120,7 +1156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function simulatePremiumPayment() {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
 
         if (confirm("Você será redirecionado para a simulação de pagamento via Mercado Pago/Asaas (PIX). Confirmar upgrade premium por 30 dias?")) {
@@ -1177,7 +1213,7 @@ document.addEventListener('DOMContentLoaded', () => {
         premiumContainer.classList.remove('hidden');
         loadBodyEval();
 
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         try {
             // 1. Carrega todos os profissionais disponíveis
             const prosRes = await fetch(`${API_URL}/user/available-professionals`, {
@@ -1389,7 +1425,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const res = await fetch(`${API_URL}/user/exams`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('nutrir_token')}` }
+                headers: { 'Authorization': `Bearer ${getToken()}` }
             });
             if (!res.ok) throw new Error();
             const exams = await res.json();
@@ -1448,7 +1484,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         try {
                             const delRes = await fetch(`${API_URL}/user/exams/${examId}`, {
                                 method: 'DELETE',
-                                headers: { 'Authorization': `Bearer ${localStorage.getItem('nutrir_token')}` }
+                                headers: { 'Authorization': `Bearer ${getToken()}` }
                             });
                             if (!delRes.ok) throw new Error();
                             await loadMyExamsList();
@@ -1521,7 +1557,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const slotsContainer = document.getElementById('book-appointment-pro-availability-slots');
         slotsContainer.innerHTML = '<p style="font-size:11px; opacity:0.5;">Buscando horários...</p>';
 
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         try {
             const res = await fetch(`${API_URL}/user/professionals/${proId}/availability`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -1666,7 +1702,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function cancelAppointment(appointmentId) {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         try {
             const res = await fetch(`${API_URL}/user/appointments/${appointmentId}/cancel`, {
                 method: 'POST',
@@ -2714,7 +2750,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function callGeminiForDailyRecipe(mealType, cal, p, c, f) {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         const profile = state.userProfile ? {
             goal: state.userProfile.goal,
             goalWeight: state.userProfile.goalWeight,
@@ -2771,7 +2807,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function callGeminiForWeeklyPlan(mealType, profile) {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         const profilePayload = profile ? {
             goal: profile.goal,
             goalWeight: profile.goalWeight,
@@ -3299,7 +3335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnContinue.classList.add('hidden');
 
         try {
-            const token  = localStorage.getItem('nutrir_token');
+            const token  = getToken();
             const base64 = _weeklyBodyImage.split(',')[1];
 
             const aiRes = await fetch(`${API_URL}/ai/analyze-body`, {
@@ -3626,7 +3662,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function callGeminiApi(base64Image) {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         const response = await fetch('/api/ai/analyze-food', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -4474,7 +4510,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         clearInterval(appointmentAlertInterval);
                         appointmentAlertInterval = null;
                     }
-                    localStorage.removeItem('nutrir_token');
+                    clearToken();
                     closeDrawer();
                     showScreen('screen-login');
                 }
@@ -4494,7 +4530,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                const token = localStorage.getItem('nutrir_token');
+                const token = getToken();
                 try {
                     const res = await fetch(`${API_URL}/user/weight-log`, {
                         method: 'POST',
@@ -4606,7 +4642,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         clearInterval(appointmentAlertInterval);
                         appointmentAlertInterval = null;
                     }
-                    localStorage.removeItem('nutrir_token');
+                    clearToken();
                     showScreen('screen-login');
                 }
             });
@@ -4752,7 +4788,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                const token = localStorage.getItem('nutrir_token');
+                const token = getToken();
                 try {
                     const res = await fetch(`${API_URL}/user/appointments`, {
                         method: 'POST',
@@ -4807,7 +4843,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('nutrir_token')}`
+                            'Authorization': `Bearer ${getToken()}`
                         },
                         body: JSON.stringify({ comorbidities, intolerances, dietary_restrictions })
                     });
@@ -4882,7 +4918,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('nutrir_token')}`
+                                'Authorization': `Bearer ${getToken()}`
                             },
                             body: JSON.stringify(payload)
                         });
@@ -5241,7 +5277,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function checkUpcomingAppointments() {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
         if (!token) return;
         
         const now = new Date();
@@ -5415,7 +5451,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadBodyEval() {
-        const token = localStorage.getItem('nutrir_token');
+        const token = getToken();
 
         // Setup one-time event listeners
         if (!_bodyEvalListenersReady) {
