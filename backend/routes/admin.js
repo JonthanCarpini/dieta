@@ -259,23 +259,43 @@ router.post('/appointments/:id/cancel', async (req, res) => {
 });
 
 // ==========================================
-// PROXY CALORIE NINJAS — usado pelo painel do profissional
+// PROXY USDA FOODDATA CENTRAL — busca nutricional para o construtor de cardápios
+// DEMO_KEY funciona sem cadastro (30 req/h, 50/dia). Chave gratuita em fdc.nal.usda.gov
 // ==========================================
 router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']), async (req, res) => {
   const query = req.query.q || '';
   if (!query.trim()) return res.status(400).json({ error: 'Query obrigatória.' });
   try {
-    const settingsRes = await db.query("SELECT value FROM system_settings WHERE key = 'calorie_ninjas_key'");
-    const apiKey = settingsRes.rows[0]?.value || '';
-    if (!apiKey) return res.status(400).json({ error: 'Chave da API CalorieNinjas não configurada. Configure em Credenciais.' });
-    const url = `https://api.calorieninjas.com/v1/nutrition?query=${encodeURIComponent(query)}`;
-    const response = await fetch(url, { headers: { 'X-Api-Key': apiKey } });
-    if (!response.ok) return res.status(response.status).json({ error: 'Erro na API CalorieNinjas.' });
+    const settingsRes = await db.query("SELECT value FROM system_settings WHERE key = 'usda_api_key'");
+    const apiKey = settingsRes.rows[0]?.value?.trim() || 'DEMO_KEY';
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${apiKey}&pageSize=10&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS)`;
+    const response = await fetch(url);
+    if (!response.ok) return res.status(response.status).json({ error: 'Erro na API USDA FoodData Central.' });
     const data = await response.json();
-    res.json(data);
+
+    // Normaliza para o formato esperado pelo frontend (valores por 100g)
+    const items = (data.foods || []).slice(0, 10).map(food => {
+      const n = food.foodNutrients || [];
+      const get = (...ids) => {
+        for (const id of ids) {
+          const match = n.find(x => x.nutrientId === id);
+          if (match && match.value != null) return Math.round(match.value * 10) / 10;
+        }
+        return 0;
+      };
+      return {
+        name: food.description,
+        calories:                get(1008, 2047, 2048),
+        protein_g:               get(1003),
+        carbohydrates_total_g:   get(1005),
+        fat_total_g:             get(1004),
+        serving_size_g:          100,
+      };
+    });
+    res.json({ items });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erro ao consultar CalorieNinjas.' });
+    res.status(500).json({ error: 'Erro ao consultar banco de dados nutricional USDA.' });
   }
 });
 

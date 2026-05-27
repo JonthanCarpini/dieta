@@ -1136,9 +1136,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('setting-mp-token').value    = adminState.settings.mercadopago_token || '';
             document.getElementById('setting-asaas-key').value   = adminState.settings.asaas_key || '';
 
-            const cnKeyInput = document.getElementById('calorie-ninjas-key-input');
-            if (cnKeyInput && adminState.settings.calorie_ninjas_key !== undefined) {
-                cnKeyInput.value = adminState.settings.calorie_ninjas_key || '';
+            const cnKeyInput = document.getElementById('usda-api-key-input');
+            if (cnKeyInput && adminState.settings.usda_api_key !== undefined) {
+                cnKeyInput.value = adminState.settings.usda_api_key || '';
             }
 
             setActiveLLMCard(adminState.settings.active_llm_provider || 'gemini');
@@ -1158,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', () => {
             google_client_id:     document.getElementById('setting-google-id').value.trim(),
             mercadopago_token:    document.getElementById('setting-mp-token').value.trim(),
             asaas_key:            document.getElementById('setting-asaas-key').value.trim(),
-            calorie_ninjas_key:   document.getElementById('calorie-ninjas-key-input')?.value?.trim() || ''
+            usda_api_key:         document.getElementById('usda-api-key-input')?.value?.trim() || ''
         };
         const res = await fetch(`${API_URL}/admin/settings`, {
             method: 'POST',
@@ -3349,31 +3349,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultsDiv.innerHTML = '<p style="padding:8px;color:var(--color-text-muted);">Nenhum resultado encontrado.</p>';
                 return;
             }
+            // USDA retorna por 100g — mostra input de gramas para escalar os macros
             resultsDiv.innerHTML = data.items.map((item, idx) => `
                 <div class="calorie-result-item" data-idx="${idx}">
                     <div class="calorie-result-name">${item.name}</div>
                     <div class="calorie-result-macros">
+                        <span class="usda-per100">por 100g:</span>
                         ${Math.round(item.calories)} kcal ·
                         P:${Math.round(item.protein_g)}g ·
                         C:${Math.round(item.carbohydrates_total_g)}g ·
                         G:${Math.round(item.fat_total_g)}g
-                        ${item.serving_size_g ? `· ${item.serving_size_g}g` : ''}
                     </div>
-                    <button class="btn-sm btn-primary calorie-add-btn" data-idx="${idx}">+ Adicionar</button>
+                    <div class="calorie-result-actions">
+                        <input type="number" class="calorie-qty-input" value="100" min="1" max="9999" data-idx="${idx}"> <span style="font-size:11px;color:var(--color-text-muted);">g</span>
+                        <button class="btn-sm btn-primary calorie-add-btn" data-idx="${idx}">+ Adicionar</button>
+                    </div>
                 </div>
             `).join('');
             resultsDiv.querySelectorAll('.calorie-add-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const item = data.items[parseInt(btn.dataset.idx)];
+                    const idx = parseInt(btn.dataset.idx);
+                    const item = data.items[idx];
+                    const grams = parseFloat(resultsDiv.querySelector(`.calorie-qty-input[data-idx="${idx}"]`)?.value) || 100;
+                    const ratio = grams / 100;
                     const targetDow  = adminState._targetMealDow  ?? 1;
                     const targetType = adminState._targetMealType ?? 'cafe_da_manha';
                     addItemToPlan(targetDow, targetType, {
                         name:     item.name,
-                        qty:      item.serving_size_g ? `${item.serving_size_g}g` : '',
-                        calories: item.calories,
-                        protein:  item.protein_g,
-                        carbs:    item.carbohydrates_total_g,
-                        fat:      item.fat_total_g,
+                        qty:      `${grams}g`,
+                        calories: Math.round(item.calories * ratio * 10) / 10,
+                        protein:  Math.round(item.protein_g * ratio * 10) / 10,
+                        carbs:    Math.round(item.carbohydrates_total_g * ratio * 10) / 10,
+                        fat:      Math.round(item.fat_total_g * ratio * 10) / 10,
                     });
                     resultsDiv.classList.add('hidden');
                     input.value = '';

@@ -1378,14 +1378,28 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
 .calorie-result-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
+    gap: 8px;
+    padding: 8px 14px;
     border-bottom: 1px solid rgba(255,250,240,0.05);
     flex-wrap: wrap;
 }
 .calorie-result-item:last-child { border-bottom: none; }
-.calorie-result-name { font-weight: 600; font-size: 13px; flex: 1; min-width: 120px; text-transform: capitalize; }
-.calorie-result-macros { font-size: 11px; color: var(--color-text-muted); flex: 2; }
+.calorie-result-name { font-weight: 600; font-size: 12px; flex: 1; min-width: 140px; text-transform: capitalize; line-height: 1.3; }
+.calorie-result-macros { font-size: 11px; color: var(--color-text-muted); flex: 2; min-width: 180px; }
+.usda-per100 { font-size: 10px; color: var(--color-primary); background: var(--color-primary-dim); padding: 1px 5px; border-radius: 3px; margin-right: 4px; }
+.calorie-result-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.calorie-qty-input {
+    width: 60px;
+    background: rgba(255,250,240,0.06);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text);
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    text-align: center;
+}
+.calorie-qty-input:focus { outline: none; border-color: var(--color-primary); }
 .plan-day-tabs {
     display: flex;
     gap: 4px;
