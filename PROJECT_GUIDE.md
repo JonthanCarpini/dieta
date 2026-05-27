@@ -161,10 +161,19 @@ O frontend calcula a fração calórica adequada por tipo de refeição a partir
 - **Tolerância Trial**: Novos usuários iniciam no plano `trial` por 7 dias.
 - **Upgrade Premium**: Webhooks simulados para Mercado Pago e Asaas em `/api/payments/*`.
 
-### D. Acompanhamento e Vinculação Profissional
+### D. Acompanhamento e Vinculação Profissional e Vídeo Chamadas
 - Usuários premium vinculam Nutricionista e/ou Personal Trainer.
 - **Meu Acompanhamento (`screen-my-professionals`)**: Tela dedicada exclusiva para usuários Premium que permite a vinculação de profissionais, exibição estruturada das orientações/recomendações recebidas e agendamento de consultas por vídeo.
 - **Videoconferências Gratuitas (Jitsi Meet)**: Agendamentos geram automaticamente um link único e gratuito hospedado no Jitsi Meet no formato `https://meet.jit.si/nutrir-consultation-<patient_id>-<professional_id>-<timestamp>`, permitindo chamadas diretas pela plataforma por meio de um botão "Iniciar Chamada".
+- **Tela de Vídeo Chamada Split Screen (Profissional)**: Ao iniciar a consulta, o profissional é direcionado para a tela dividida `#screen-video-call`. A coluna da esquerda exibe o feed de vídeo (40%) e a coluna da direita (60%) atua como prontuário eletrônico em tempo real, organizado em abas:
+  - **Diário Alimentar**: Exibe o diário do paciente detalhado e agrupado por dias, incluindo macros e fotos de refeições escaneadas.
+  - **Evolução de Peso [NOVO]**: Painel de acompanhamento físico do paciente com:
+    - KPIs de Peso Inicial, Peso Atual e Meta de Peso.
+    - Card de conquista dinâmico (`#vc-w-achievement-card`) indicando o progresso de peso com base no objetivo (`lose`, `gain`, `maintain`).
+    - Gráfico interativo de linha (`#vc-weight-chart`) renderizado via **Chart.js** comparando o histórico de pesagens com a meta.
+    - Tabela de medições listando datas, pesos e delta de variação entre pesagens consecutivas (ganho em vermelho e perda em verde).
+    - Rotinas automáticas de limpeza e destruição do gráfico e campos ao encerrar a chamada (`closeVideoCall()`) ou antes de recarregar consultas.
+  - **Prescrições e Orientações**: Formulário de envio de novas recomendações e histórico de orientações enviadas.
 - **Cancelamento**: Tanto o paciente quanto o profissional podem cancelar consultas diretamente na interface, mudando o status para `cancelled`.
 
 ### E. Aba "Receitas do Nutricionista" (App do Paciente)
