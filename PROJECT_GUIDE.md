@@ -26,7 +26,7 @@ O app gerencia o acompanhamento de calorias, macronutrientes, hidratação e jej
 2. **PostgreSQL**: Persistência relacional de dados.
 3. **jsonwebtoken (JWT) & bcryptjs**: Geração de tokens de sessão seguros e hashing de senhas.
 4. **google-auth-library**: Validação oficial das credenciais do Google Login no backend.
-5. **Native fetch (Node 18)**: Usado nas chamadas HTTP para as APIs de IA e USDA — sem dependências extras.
+5. **Native fetch (Node 18)**: Usado nas chamadas HTTP para as APIs de IA e Spoonacular — sem dependências extras.
 
 ### Infraestrutura & Deploy:
 1. **Docker & Docker Compose**: Contêineres isolados para banco, API, frontend e proxy.
@@ -66,7 +66,7 @@ dieta/
 │       ├── ai.js            # Proxy de IA: Gemini/OpenAI/Mistral — receitas, scanner, plano semanal
 │       ├── user.js          # Sincronização do diário do paciente, orientações e cardápio semanal
 │       ├── professional.js  # Gestão de diários, feedbacks e cardápios semanais por profissionais
-│       └── admin.js         # Controle de planos, roles, chaves, agenda, faturamento e busca USDA
+│       └── admin.js         # Controle de planos, roles, chaves, agenda, faturamento e busca Spoonacular
 ```
 
 ---
@@ -89,7 +89,7 @@ Os dados do usuário são sincronizados com o PostgreSQL por meio de requisiçõ
    - `active_llm_provider` → `'gemini'` | `'openai'` | `'mistral'`
    - `google_client_id` (deve terminar em `.apps.googleusercontent.com`)
    - `mercadopago_token`, `asaas_api_key`
-   - `usda_api_key` → chave opcional para a USDA FoodData Central API (funciona sem chave com `DEMO_KEY`, limite de 50 req/dia; chave gratuita em fdc.nal.usda.gov)
+   - `spoonacular_api_key` → chave **obrigatória** para busca de receitas fitness no construtor de cardápios (150 req/dia no plano gratuito; cadastro em spoonacular.com/food-api)
 10. **`plans`**: Planos comerciais configuráveis (identificador, preço, duração, benefícios).
 11. **`payments`**: Histórico de transações com cálculo de comissões por profissional vinculado.
 12. **`professional_availability`**: Horários de disponibilidade semanal dos profissionais.
@@ -194,7 +194,7 @@ Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais:
 - Controle de usuários (promoção de cargo, plano, trial).
 - Cadastro de profissionais com comissão de vendas e inline editing.
 - Criação e gestão de planos comerciais.
-- **Aba Credenciais**: Seleção visual do provedor de IA ativo (cards clicáveis para Gemini/OpenAI/Mistral), cadastro individual de chaves por provedor, botão "Testar provedor ativo" que chama `/api/ai/test` e exibe provedor, modelo, latência e nome da receita de exemplo. Campo de chave USDA FoodData Central API (`usda_api_key`) com descrição de uso gratuito.
+- **Aba Credenciais**: Seleção visual do provedor de IA ativo (cards clicáveis para Gemini/OpenAI/Mistral), cadastro individual de chaves por provedor, botão "Testar provedor ativo" que chama `/api/ai/test` e exibe provedor, modelo, latência e nome da receita de exemplo. Campo de chave Spoonacular API (`spoonacular_api_key`) para busca de receitas no construtor de cardápios.
 - **Aba Faturamento**: Montante bruto, total de comissões e lucro líquido.
 - **Aba Consultas (Global)**: Visualização de todas as consultas agendadas na plataforma e permissão para cancelá-las.
 
@@ -219,7 +219,7 @@ A aba **Cardápios** (`#tab-meal-plans`, botão `#nav-meal-plans`) permite ao pr
 - **Barra superior** (`#builder-topbar`): campo de nome do plano, seletor de paciente (`#builder-patient-select`) e botão Salvar.
 - **Abas por dia** (`.plan-day-tabs`): Segunda a Domingo, cada dia com 6 tipos de refeição (Café da Manhã, Lanche da Manhã, Almoço, Lanche da Tarde, Jantar, Ceia).
 - **Cards de refeição** (`.plan-meal-card`): campo de instruções gerais + lista de itens + totais de macros calculados automaticamente.
-- **Busca USDA**: campo de texto + botão buscar chamam `GET /api/admin/calorie-search?q=<termo>`. Resultados exibem nome, macros por 100g e campo de quantidade em gramas para escalar proporcionalmente antes de adicionar ao plano.
+- **Busca Spoonacular**: campo de texto + botão buscar chamam `GET /api/admin/calorie-search?q=<termo>`. Resultados exibem nome da receita, número de porções, tempo de preparo e macros por porção. O profissional escolhe a quantidade de porções e os macros são escalados proporcionalmente antes de adicionar ao plano.
 
 #### Rotas backend (`backend/routes/professional.js`):
 | Rota | Método | Descrição |
@@ -232,15 +232,15 @@ A aba **Cardápios** (`#tab-meal-plans`, botão `#nav-meal-plans`) permite ao pr
 
 Todas as rotas requerem `authenticateToken` + `requireRole(['nutritionist','trainer'])`.
 
-#### Proxy USDA (`backend/routes/admin.js`):
+#### Proxy Spoonacular (`backend/routes/admin.js`):
 ```
 GET /api/admin/calorie-search?q=<termo>
 ```
 - Posicionada **antes** do middleware `requireRole(['admin'])` para que profissionais também possam acessar.
-- Lê `usda_api_key` de `system_settings`; usa `'DEMO_KEY'` como fallback (50 req/dia grátis).
-- Chama `https://api.nal.usda.gov/fdc/v1/foods/search?query=...&api_key=...&pageSize=10`.
-- **Importante**: o parâmetro `dataType` causa erro 400 na API USDA — nunca incluir.
-- Normaliza a resposta para `{ items: [{name, calories, protein_g, carbohydrates_total_g, fat_total_g, serving_size_g: 100}] }`.
+- Lê `spoonacular_api_key` de `system_settings`. **Sem chave configurada retorna 503** — não há fallback gratuito.
+- Chama `https://api.spoonacular.com/recipes/complexSearch?query=...&addRecipeNutrition=true&number=8&apiKey=...`.
+- Normaliza a resposta para `{ items: [{name, servings, ready_in_minutes, calories, protein_g, carbohydrates_total_g, fat_total_g}] }`.
+- Macros são **por porção** (não por 100g). O frontend exibe um input de porções e escala os valores antes de inserir no plano.
 
 ### H. Agenda de Disponibilidade (Profissional) — Grade Visual
 
@@ -361,8 +361,7 @@ O projeto `mobile-android/` é um **WebView wrapper** que carrega `https://nutri
 | Express | `express.urlencoded({ limit })` | `15mb` | `backend/server.js` |
 | Frontend | Resize de imagem scanner | max 900px, JPEG 0.80 | `resizeImageToBase64()` em `app.js` |
 | Gemini | Modelos disponíveis para a chave atual | `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-2.0-flash-001`, `gemini-2.0-flash-lite`, `gemini-2.0-flash-lite-001`, `gemini-flash-latest`, `gemini-2.5-flash-lite`, `gemini-pro-latest` | Verificado via ListModels — **não** inclui `gemini-1.5-*` |
-| USDA API | `dataType` parameter | **Nunca usar** | Causa HTTP 400 independente do valor ou formato de encoding. Omitir — API retorna todos os tipos por padrão |
-| USDA API | `DEMO_KEY` (sem cadastro) | 30 req/hora, 50/dia | Chave gratuita completa em fdc.nal.usda.gov |
+| Spoonacular | Plano gratuito | 150 req/dia | Chave obrigatória — sem fallback. Cadastro em spoonacular.com/food-api |
 
 ---
 
