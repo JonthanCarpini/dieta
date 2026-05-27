@@ -316,6 +316,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+
+        // Filtros de período no diário do paciente
+        document.querySelectorAll('.diary-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.diary-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                applyMealFilter(parseInt(btn.dataset.days));
+            });
+        });
+
+        // Filtros de pacientes (busca + objetivo)
+        const patientSearch = document.getElementById('patient-search-input');
+        const patientGoal   = document.getElementById('patient-goal-filter');
+        if (patientSearch) patientSearch.addEventListener('input', applyPatientFilters);
+        if (patientGoal)   patientGoal.addEventListener('change', applyPatientFilters);
     }
 
     // Roteia o conteúdo de cada aba
@@ -1274,11 +1289,11 @@ document.addEventListener('DOMContentLoaded', () => {
             adminState.allPatients = patients;
             renderPatientsTable(patients);
 
-            // Ligar filtros
+            // Resetar campos de filtro
             const searchInput = document.getElementById('patient-search-input');
             const goalSelect  = document.getElementById('patient-goal-filter');
-            if (searchInput) { searchInput.value = ''; searchInput.oninput = applyPatientFilters; }
-            if (goalSelect)  { goalSelect.value  = ''; goalSelect.onchange = applyPatientFilters; }
+            if (searchInput) searchInput.value = '';
+            if (goalSelect)  goalSelect.value  = '';
         } catch (err) {
             console.error(err);
             alert(err.message);
@@ -1702,15 +1717,7 @@ document.addEventListener('DOMContentLoaded', () => {
             adminState._allMeals = data.meals || [];
             adminState._patientTargetCalories = data.profile?.target_calories || 0;
 
-            // Ligar filtros de período
-            document.querySelectorAll('.diary-filter-btn').forEach(btn => {
-                btn.onclick = () => {
-                    document.querySelectorAll('.diary-filter-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    applyMealFilter(parseInt(btn.dataset.days));
-                };
-            });
-            // Resetar para 7 dias
+            // Resetar filtro para 7 dias e renderizar
             document.querySelectorAll('.diary-filter-btn').forEach(b => b.classList.remove('active'));
             const btn7 = document.querySelector('.diary-filter-btn[data-days="7"]');
             if (btn7) btn7.classList.add('active');
@@ -1730,7 +1737,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const cutoffMs = days > 0 ? now - days * 86400000 : 0;
 
         const filtered = cutoffMs
-            ? meals.filter(m => new Date(m.date + 'T00:00:00').getTime() >= cutoffMs)
+            ? meals.filter(m => {
+                const dateStr = String(m.date).split('T')[0]; // normaliza 'YYYY-MM-DD' ou ISO completo
+                return new Date(dateStr + 'T00:00:00').getTime() >= cutoffMs;
+            })
             : meals;
 
         // Caloric adherence
@@ -1774,7 +1784,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const fat      = totalObj.fat      !== undefined ? `${totalObj.fat}g`      : (m.fat      ? `${m.fat}g`      : '-');
             const calVal   = totalObj.calories !== undefined ? `${totalObj.calories} kcal` : (m.calories ? `${m.calories} kcal` : '-');
             tr.innerHTML = `
-                <td>${new Date(m.date + 'T00:00:00').toLocaleDateString('pt-BR')} ${m.time.substring(0,5)}</td>
+                <td>${new Date(String(m.date).split('T')[0] + 'T00:00:00').toLocaleDateString('pt-BR')} ${m.time.substring(0,5)}</td>
                 <td><strong>${m.name}</strong><br><small>${m.description || ''}</small></td>
                 <td><span class="badge-role user" style="background-color:rgba(255,255,255,0.05);color:var(--color-text);">${getMealTypeLabel(m)}</span></td>
                 <td>${calVal}</td>
