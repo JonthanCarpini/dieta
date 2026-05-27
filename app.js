@@ -1388,7 +1388,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const res = await fetch(`${API_URL}/user/exams`, {
-                headers: { 'Authorization': `Bearer ${state.token}` }
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('nutrir_token')}` }
             });
             if (!res.ok) throw new Error();
             const exams = await res.json();
@@ -1447,7 +1447,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         try {
                             const delRes = await fetch(`${API_URL}/user/exams/${examId}`, {
                                 method: 'DELETE',
-                                headers: { 'Authorization': `Bearer ${state.token}` }
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('nutrir_token')}` }
                             });
                             if (!delRes.ok) throw new Error();
                             await loadMyExamsList();
@@ -4716,7 +4716,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${state.token}`
+                            'Authorization': `Bearer ${localStorage.getItem('nutrir_token')}`
                         },
                         body: JSON.stringify({ comorbidities, intolerances, dietary_restrictions })
                     });
@@ -4779,7 +4779,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${state.token}`
+                                'Authorization': `Bearer ${localStorage.getItem('nutrir_token')}`
                             },
                             body: JSON.stringify(payload)
                         });
