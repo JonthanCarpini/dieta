@@ -20,7 +20,7 @@ import {
 } from './modules/admin-features.js';
 import { initProSchedule, loadScheduleData } from './modules/pro-schedule.js';
 import { initProPatients, loadPatientsData } from './modules/pro-patients.js';
-import { initProAppointments, loadAppointmentsData } from './modules/pro-appointments.js';
+import { loadAppointmentsData } from './modules/pro-appointments.js';
 import { initProMeals, loadMealPlansData, openMealPlanBuilder, saveMealPlan } from './modules/pro-meals.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setupEventListeners();
         initProSchedule();
         initProPatients();
-        initProAppointments();
         initProMeals();
 
         // Autentica e inicia
