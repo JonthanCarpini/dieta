@@ -85,7 +85,7 @@ Os dados do usuário são sincronizados com o PostgreSQL por meio de requisiçõ
 
 ### Tabelas Principais (`backend/schema.sql`):
 1. **`users`**: E-mail, senha hashed, plano (`trial`/`premium`), datas de expiração, cargo (`user`, `nutritionist`, `trainer`, `admin`) e percentual de comissão (`commission_percentage`).
-2. **`profiles`**: Dados de onboarding Mifflin-St Jeor e metas diárias calculadas de calorias e macros.
+2. **`profiles`**: Dados de onboarding Mifflin-St Jeor, metas diárias calculadas de calorias e macros, além de dados clínicos: `comorbidities`, `intolerances`, `dietary_restrictions` e `notes` (anotações gerais do nutricionista).
 3. **`meals`**: Registro detalhado das refeições com itens e totais em JSONB.
 4. **`water_log`**: Quantidade consumida diária de água vs meta do usuário.
 5. **`fasting_log`**: Início, objetivo e status do ciclo de jejum ativo.
@@ -117,6 +117,8 @@ Os dados do usuário são sincronizados com o PostgreSQL por meio de requisiçõ
     );
     ```
     O campo `plan_data` é JSONB com estrutura `{ days: [ { dow: 0..6, meals: { breakfast, morning_snack, lunch, afternoon_snack, dinner, supper } } ] }`. Cada refeição contém `{ items: [{name, qty, calories, protein, carbs, fat}], instructions }`.
+
+15. **`patient_exams`**: Armazena metadados de exames laboratoriais enviados pelos pacientes (`id`, `patient_id`, `file_name`, `file_path`, `mime_type`, `notes`, `created_at`). O arquivo físico correspondente fica armazenado de forma segura no disco da VPS em `backend/uploads/exams/` com controle de download autenticado JWT.
 
     > **Atenção — Migração Manual**: O `schema.sql` só é executado na criação inicial do volume Docker. Para aplicar em VPS existente, use:
     > ```bash
@@ -306,6 +308,28 @@ A tela `screen-results` exibe após análise de imagem:
 ### L. Tela Histórico
 - **Card de meta**: badge com o objetivo do usuário (`Emagrecer` / `Ganhar Massa` / `Manutenção`); macros com cores por tipo.
 - **Cards de dia**: nome do dia + data, calorias com cor semântica (verde = 85–105% da meta, azul = abaixo, vermelho = acima), barra de progresso, tags P/C/G e botão expandir para ver refeições individuais do dia com horário e macros.
+
+### M. Gestão Clínica e Particularidades do Paciente [NOVO]
+
+A plataforma evoluiu para um sistema completo de gestão clínica, permitindo acompanhar particularidades de saúde do paciente de forma integrada:
+
+1. **Particularidades do Perfil Clínico**:
+   - Pacientes informam comorbidades (ex: Diabetes, Hipertensão), intolerâncias/alergias alimentares (ex: lactose, glúten) e restrições alimentares no menu Perfil (`screen-settings`).
+   - Esses dados clínicos são persistidos na tabela `profiles`.
+2. **Envio de Exames Laboratoriais**:
+   - Pacientes de plano Premium podem fazer upload de arquivos de exames (PDF ou imagens) na tela de Meu Acompanhamento (`screen-my-professionals`).
+   - O arquivo é lido via `FileReader` como Base64 no frontend, trafegado via JSON e gravado de forma segura no disco do servidor em `backend/uploads/exams/`.
+   - Os metadados do exame são salvos na tabela `patient_exams`.
+3. **Visão Clínica do Profissional**:
+   - No prontuário do paciente (`patient-details-view`), o profissional conta com três abas de navegação:
+     - **Diário Alimentar**: Histórico detalhado de refeições com aderência calórica e filtro de período.
+     - **Ficha Clínica**: Formulário clínico editável para comorbidades, intolerâncias e notas clínicas.
+     - **Exames**: Listagem de exames do paciente com botão para download seguro e campo de notas médicas individuais por exame.
+4. **Alerta Clínico no Construtor de Cardápios**:
+   - Ao abrir o Construtor de Cardápio Semanal (`meal-plans-builder-view`), um banner de alerta clínico exibe de forma persistente as comorbidades, intolerâncias e restrições do paciente selecionado.
+5. **Integração com a IA**:
+   - As informações clínicas do paciente são injetadas no payload das requisições de geração de receitas.
+   - Os prompts do backend foram aprimorados para instruir a Inteligência Artificial a respeitar rigorosamente essas restrições ao planejar e criar receitas (ex: omitir derivados de leite para intolerantes à lactose e açúcares para diabéticos).
 
 ---
 
