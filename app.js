@@ -4281,6 +4281,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inputIntolerances) inputIntolerances.value = profile.intolerances || '';
         if (inputRestrictions) inputRestrictions.value = profile.dietary_restrictions || '';
 
+        // Se já tem dados clínicos salvos, mostrar no estado colapsado
+        const hasClinicalData = profile.comorbidities || profile.intolerances || profile.dietary_restrictions;
+        const formContent = document.getElementById('clinical-form-content');
+        const savedSummary = document.getElementById('clinical-saved-summary');
+        if (hasClinicalData && formContent && savedSummary) {
+            formContent.classList.add('hidden');
+            savedSummary.classList.remove('hidden');
+            if (window.lucide) window.lucide.createIcons();
+        } else if (formContent && savedSummary) {
+            formContent.classList.remove('hidden');
+            savedSummary.classList.add('hidden');
+        }
+
         // Renderiza o histórico de peso na Área Evolutiva
         renderWeightHistory();
      }
@@ -4707,6 +4720,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (settingsClinicalForm) {
             settingsClinicalForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
+                document.activeElement?.blur(); // fecha teclado virtual
                 const comorbidities = document.getElementById('input-settings-comorbidities').value;
                 const intolerances = document.getElementById('input-settings-intolerances').value;
                 const dietary_restrictions = document.getElementById('input-settings-restrictions').value;
@@ -4723,10 +4737,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Erro ao salvar ficha clínica.');
 
-                    const successMsg = document.getElementById('clinical-settings-success-msg');
-                    if (successMsg) {
-                        successMsg.classList.remove('hidden');
-                        setTimeout(() => successMsg.classList.add('hidden'), 3000);
+                    // Colapsa o formulário e mostra resumo de sucesso
+                    const formContent = document.getElementById('clinical-form-content');
+                    const savedSummary = document.getElementById('clinical-saved-summary');
+                    if (formContent) formContent.classList.add('hidden');
+                    if (savedSummary) {
+                        savedSummary.classList.remove('hidden');
+                        if (window.lucide) window.lucide.createIcons();
                     }
 
                     if (state.userProfile) {
@@ -4738,6 +4755,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert(err.message);
                 }
             });
+
+            // Botão "Editar" reabre o formulário
+            const btnEditClinical = document.getElementById('btn-edit-clinical');
+            if (btnEditClinical) {
+                btnEditClinical.addEventListener('click', () => {
+                    document.getElementById('clinical-form-content').classList.remove('hidden');
+                    document.getElementById('clinical-saved-summary').classList.add('hidden');
+                });
+            }
         }
 
         // Ouvinte de upload de exames laboratoriais do paciente
