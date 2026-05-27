@@ -156,7 +156,8 @@ Acesso unificado em `https://nutrir.online/admin/` para admins e profissionais:
 - **Aba Consultas (Global)**: Visualização de todas as consultas agendadas na plataforma e permissão para cancelá-las.
 
 **Profissionais**:
-- **Meus Pacientes**: Lista, diário recente e envio de feedbacks.
+- **Visão Geral (Meu Painel)**: Card de saudação personalizado + 4 métricas (pacientes ativos, consultas agendadas, slots disponíveis hoje, comissões do mês) + tabela de próximas consultas. Dados via `GET /api/admin/pro-overview`.
+- **Meus Pacientes**: Lista com barra de filtro por nome/e-mail e objetivo, contador de resultados, coluna "Objetivo". Ao abrir detalhes: gráfico de evolução de peso (Chart.js), filtro de período nas refeições (7 dias / 30 dias / Tudo) com indicador de aderência calórica, histórico completo de orientações enviadas ao paciente carregado automaticamente.
 - **Faturamento**: Comissões acumuladas e pacientes ativos.
 - **Agenda**: Grade visual interativa de disponibilidade semanal (ver seção abaixo).
 - **Aba Consultas**: Acompanhamento de todas as videochamadas agendadas por seus pacientes vinculados e opção de cancelamento.
@@ -172,18 +173,38 @@ A aba **Minha Agenda** do painel profissional usa uma grade clicável 7×28 (dia
 - **Motivo**: cada linha no banco representa exatamente 1 vaga de consulta de 30 minutos, permitindo que o frontend de agendamento exiba slots individuais diretamente.
 - **Validação de agendamento**: ao criar uma consulta, o backend normaliza os horários para `HH:MM` (`.substring(0,5)`) antes de comparar com os slots do banco — necessário porque o PostgreSQL retorna colunas `time` no formato `HH:MM:SS`.
 
-### G. Tela de Análise Nutricional (Scanner)
+### G. Dashboard do Profissional — `GET /api/admin/pro-overview`
+
+Endpoint exclusivo para nutricionistas e personal trainers (`requireRole(['nutritionist','trainer'])`). Executa 4 queries em paralelo via `Promise.all`:
+
+1. **Contagem de pacientes**: `COUNT(*)` da tabela `professional_links` pelo `professional_id`.
+2. **Próximas consultas**: até 8 agendamentos futuros (`status != 'cancelled'`) com nome do paciente.
+3. **Slots disponíveis hoje**: conta linhas em `professional_availability` para o `day_of_week` atual.
+4. **Comissões do mês**: soma de `commission_amount` em `payments` para o mês corrente.
+
+Retorna: `{ totalPatients, consultationsToday, slotsToday, commissionsMonth, nextAppointments[] }`.
+
+**Componentes front-end** (`admin/admin.js` → `loadProOverviewData()`):
+- `.pro-greeting-card` com saudação dinâmica por horário (manhã/tarde/noite).
+- 4 stat cards com ícones Lucide.
+- Tabela de próximas consultas com badge de status.
+- Filtros de pacientes: `#patient-search-input` (nome/e-mail) + `#patient-goal-filter` (objetivo) com `applyPatientFilters()` em tempo real.
+- Gráfico de peso: `renderPatientWeightChart(weights)` destrói instância anterior (`adminState._patientWeightChart`) e cria Chart.js `line` com tema escuro/âmbar.
+- Aderência calórica: `applyMealFilter(days)` calcula média de `% meta atingida por dia` e exibe em `#detail-caloric-adherence`.
+- Histórico de feedback: `loadFeedbackHistory(patientId)` chama `GET /professional/patients/:id/feedbacks` e renderiza lista `.fhi-item`.
+
+### H. Tela de Análise Nutricional (Scanner)
 A tela `screen-results` exibe após análise de imagem:
 - **Card de calorias**: Total em âmbar + barra de progresso vs meta diária (fica vermelha acima de 90%).
 - **Card de macros**: Barras horizontais para Proteína (verde), Carboidratos (azul) e Gordura (laranja) mostrando valor atual vs meta diária com percentual.
 - **Cards de alimentos**: Nome + kcal em âmbar no topo; badge de peso + tags coloridas (P/C/G/Fibra) embaixo. Clicável para edição.
 - **Compressão de imagem**: Frontend redimensiona para max 900px e comprime em JPEG 0.80 antes de enviar — câmera e upload de arquivo. Botão "Analisar" fica bloqueado com "Processando..." durante o resize (evita race condition).
 
-### H. Tela Diário (Dashboard)
+### I. Tela Diário (Dashboard)
 - **Painel de macros**: substituiu o grid de 3 colunas por um card único com 3 linhas horizontais — nome + barra de progresso + `consumido/meta g`. Todos os valores arredondados (`Math.round`).
 - **Refeições expandíveis**: clicar no cabeçalho ou no botão chevron revela a lista de alimentos individuais com peso e calorias. Tags coloridas P/C/G em cada refeição.
 
-### I. Tela Histórico
+### J. Tela Histórico
 - **Card de meta**: badge com o objetivo do usuário (`Emagrecer` / `Ganhar Massa` / `Manutenção`); macros com cores por tipo.
 - **Cards de dia**: nome do dia + data, calorias com cor semântica (verde = 85–105% da meta, azul = abaixo, vermelho = acima), barra de progresso, tags P/C/G e botão expandir para ver refeições individuais do dia com horário e macros.
 
