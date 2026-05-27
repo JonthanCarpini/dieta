@@ -6,9 +6,12 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // 0. CONFIGURAÇÃO DA API
-    const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? 'http://localhost:5000/api' 
+    const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:5000/api'
         : '/api';
+
+    let _listenersInitialized = false; // guard: setup functions run only once
+    let _googleLoginInitialized = false;
 
     // 1. ESTADO GLOBAL DA APLICAÇÃO
     const state = {
@@ -163,14 +166,17 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp();
 
     async function initApp() {
-        // Configura ouvintes globais
-        setupEventListeners();
-        setupAuthListeners();
-        setupAdminListeners();
-        setupProfessionalListeners();
-
-        // Configura ícones Lucide
-        lucide.createIcons();
+        // Setup functions run only once — prevents duplicate event listeners on re-login
+        if (!_listenersInitialized) {
+            _listenersInitialized = true;
+            setupEventListeners();
+            setupAuthListeners();
+            setupAdminListeners();
+            setupProfessionalListeners();
+            lucide.createIcons();
+            initGoogleLogin();
+            startAppointmentAlertTimer();
+        }
 
         // Verifica token e carrega estado da API
         const token = localStorage.getItem('nutrir_token');
@@ -198,16 +204,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showScreen('screen-login');
         }
 
-        // Inicia cronômetro de jejum se ativo
+        // Inicia cronômetro de jejum se ativo (pode mudar entre chamadas)
         if (state.fastingActive) {
             startFastingTimer();
         }
-
-        // Inicializa Google Login Button
-        initGoogleLogin();
-
-        // Inicia o timer de notificações de consultas (15 minutos antes)
-        startAppointmentAlertTimer();
     }
 
     // 6. CARREGAR E SALVAR ESTADOS
@@ -218,9 +218,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!profileRes.ok) {
+                // Only clear token on auth errors — network/server errors must NOT kick the user out
                 if (profileRes.status === 401 || profileRes.status === 403) {
                     localStorage.removeItem('nutrir_token');
+                    return false;
                 }
+                // 5xx or other: keep the token, retry on next app init
                 return false;
             }
             const data = await profileRes.json();
@@ -594,14 +597,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function initGoogleLogin() {
+        if (_googleLoginInitialized) return; // never re-initialize — prevents callback loop
         try {
             const configRes = await fetch(`${API_URL}/auth/config`);
             const config = await configRes.json();
             const client_id = config.googleClientId;
 
-            // Valid Google OAuth client IDs always end with .apps.googleusercontent.com
             if (!client_id || !client_id.endsWith('.apps.googleusercontent.com')) {
-                // Silently skip — Google login simply won't appear if not configured
                 return;
             }
 
@@ -610,9 +612,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            _googleLoginInitialized = true;
             google.accounts.id.initialize({
                 client_id: client_id,
-                callback: handleGoogleLoginResponse
+                callback: handleGoogleLoginResponse,
+                auto_select: false  // never auto-sign-in silently
             });
 
             google.accounts.id.renderButton(
