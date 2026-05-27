@@ -489,16 +489,16 @@
                             </div>
                         </div>
 
-                        <!-- Chave USDA FoodData Central -->
+                        <!-- Chave Spoonacular -->
                         <div class="settings-field-group">
                             <div class="field-info">
-                                <h4>USDA FoodData Central API Key</h4>
-                                <p class="description">Para busca nutricional no construtor de cardápios. Funciona sem chave (DEMO_KEY, 50 buscas/dia). Chave grátis e ilimitada em <strong>fdc.nal.usda.gov</strong></p>
+                                <h4>Spoonacular API Key</h4>
+                                <p class="description">Para busca de receitas fitness com informações nutricionais no construtor de cardápios. Chave gratuita (150 buscas/dia) em <strong>spoonacular.com/food-api</strong></p>
                             </div>
                             <div class="form-group">
                                 <div class="input-password-wrapper">
-                                    <input type="password" id="usda-api-key-input" placeholder="Opcional — deixe vazio para usar DEMO_KEY..." class="masked-input">
-                                    <button class="toggle-visibility-btn" type="button" data-target="usda-api-key-input"><i data-lucide="eye"></i></button>
+                                    <input type="password" id="spoonacular-api-key-input" placeholder="Cole aqui sua chave Spoonacular..." class="masked-input">
+                                    <button class="toggle-visibility-btn" type="button" data-target="spoonacular-api-key-input"><i data-lucide="eye"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -840,17 +840,17 @@
                         </div>
                     </div>
 
-                    <!-- Busca CalorieNinjas -->
+                    <!-- Busca Spoonacular -->
                     <div class="calorie-search-bar">
                         <div class="calorie-search-wrap">
                             <i data-lucide="search" class="calorie-search-icon"></i>
-                            <input type="text" id="calorie-search-input" placeholder="Buscar alimento (ex: 100g frango grelhado, 1 xícara arroz)..." autocomplete="off">
+                            <input type="text" id="calorie-search-input" placeholder="Buscar receita fitness (ex: frango grelhado, omelete de claras, salada caesar)..." autocomplete="off">
                             <button class="btn-primary btn-sm" id="btn-calorie-search">Buscar</button>
                         </div>
                         <div id="calorie-search-results" class="calorie-results-drop hidden"></div>
                     </div>
                     <p class="description" style="padding: 0 0 12px 0; font-size:11px;">
-                        Selecione um dia e uma refeição, depois busque alimentos para adicionar. A busca usa a API CalorieNinjas.
+                        Selecione um dia e uma refeição, depois busque receitas para adicionar. Os macros são por porção (Spoonacular).
                     </p>
 
                     <!-- Seletor de dias -->

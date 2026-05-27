@@ -1385,6 +1385,7 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
 }
 .calorie-result-item:last-child { border-bottom: none; }
 .calorie-result-name { font-weight: 600; font-size: 12px; flex: 1; min-width: 140px; text-transform: capitalize; line-height: 1.3; }
+.calorie-result-meta { font-size: 10px; color: var(--color-text-muted); width: 100%; margin: -2px 0 2px; opacity: 0.7; }
 .calorie-result-macros { font-size: 11px; color: var(--color-text-muted); flex: 2; min-width: 180px; }
 .usda-per100 { font-size: 10px; color: var(--color-primary); background: var(--color-primary-dim); padding: 1px 5px; border-radius: 3px; margin-right: 4px; }
 .calorie-result-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }

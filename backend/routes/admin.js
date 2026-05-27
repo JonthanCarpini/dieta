@@ -259,47 +259,48 @@ router.post('/appointments/:id/cancel', async (req, res) => {
 });
 
 // ==========================================
-// PROXY USDA FOODDATA CENTRAL — busca nutricional para o construtor de cardápios
-// DEMO_KEY funciona sem cadastro (30 req/h, 50/dia). Chave gratuita em fdc.nal.usda.gov
+// PROXY SPOONACULAR — busca de receitas fitness com macros para o construtor de cardápios
+// Chave gratuita em spoonacular.com/food-api (150 req/dia no plano free)
 // ==========================================
 router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']), async (req, res) => {
   const query = req.query.q || '';
   if (!query.trim()) return res.status(400).json({ error: 'Query obrigatória.' });
   try {
-    const settingsRes = await db.query("SELECT value FROM system_settings WHERE key = 'usda_api_key'");
-    const apiKey = settingsRes.rows[0]?.value?.trim() || 'DEMO_KEY';
-    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${encodeURIComponent(apiKey)}&pageSize=10`;
+    const settingsRes = await db.query("SELECT value FROM system_settings WHERE key = 'spoonacular_api_key'");
+    const apiKey = settingsRes.rows[0]?.value?.trim();
+    if (!apiKey) {
+      return res.status(503).json({ error: 'Chave Spoonacular não configurada. Adicione em Credenciais → Spoonacular API Key.' });
+    }
+    const url = `https://api.spoonacular.com/recipes/complexSearch?query=${encodeURIComponent(query)}&addRecipeNutrition=true&number=8&apiKey=${encodeURIComponent(apiKey)}`;
     const response = await fetch(url);
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
-      console.error('USDA error', response.status, errBody);
-      return res.status(502).json({ error: `Erro na API USDA (${response.status}). Tente novamente.` });
+      console.error('Spoonacular error', response.status, errBody);
+      return res.status(502).json({ error: `Erro na API Spoonacular (${response.status}). Verifique a chave em Credenciais.` });
     }
     const data = await response.json();
 
-    // Normaliza para o formato esperado pelo frontend (valores por 100g)
-    const items = (data.foods || []).slice(0, 10).map(food => {
-      const n = food.foodNutrients || [];
-      const get = (...ids) => {
-        for (const id of ids) {
-          const match = n.find(x => x.nutrientId === id);
-          if (match && match.value != null) return Math.round(match.value * 10) / 10;
-        }
-        return 0;
+    // Normaliza para o formato esperado pelo frontend (valores por porção)
+    const items = (data.results || []).map(recipe => {
+      const nutrients = recipe.nutrition?.nutrients || [];
+      const get = name => {
+        const found = nutrients.find(n => n.name === name);
+        return found ? Math.round(found.amount * 10) / 10 : 0;
       };
       return {
-        name: food.description,
-        calories:                get(1008, 2047, 2048),
-        protein_g:               get(1003),
-        carbohydrates_total_g:   get(1005),
-        fat_total_g:             get(1004),
-        serving_size_g:          100,
+        name:                    recipe.title,
+        servings:                recipe.servings || 1,
+        ready_in_minutes:        recipe.readyInMinutes || null,
+        calories:                get('Calories'),
+        protein_g:               get('Protein'),
+        carbohydrates_total_g:   get('Carbohydrates'),
+        fat_total_g:             get('Fat'),
       };
     });
     res.json({ items });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erro ao consultar banco de dados nutricional USDA.' });
+    res.status(500).json({ error: 'Erro ao consultar API de receitas Spoonacular.' });
   }
 });
 

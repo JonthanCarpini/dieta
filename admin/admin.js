@@ -1136,9 +1136,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('setting-mp-token').value    = adminState.settings.mercadopago_token || '';
             document.getElementById('setting-asaas-key').value   = adminState.settings.asaas_key || '';
 
-            const cnKeyInput = document.getElementById('usda-api-key-input');
-            if (cnKeyInput && adminState.settings.usda_api_key !== undefined) {
-                cnKeyInput.value = adminState.settings.usda_api_key || '';
+            const spoonacularInput = document.getElementById('spoonacular-api-key-input');
+            if (spoonacularInput && adminState.settings.spoonacular_api_key !== undefined) {
+                spoonacularInput.value = adminState.settings.spoonacular_api_key || '';
             }
 
             setActiveLLMCard(adminState.settings.active_llm_provider || 'gemini');
@@ -1158,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', () => {
             google_client_id:     document.getElementById('setting-google-id').value.trim(),
             mercadopago_token:    document.getElementById('setting-mp-token').value.trim(),
             asaas_key:            document.getElementById('setting-asaas-key').value.trim(),
-            usda_api_key:         document.getElementById('usda-api-key-input')?.value?.trim() || ''
+            spoonacular_api_key:  document.getElementById('spoonacular-api-key-input')?.value?.trim() || ''
         };
         const res = await fetch(`${API_URL}/admin/settings`, {
             method: 'POST',
@@ -3349,38 +3349,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultsDiv.innerHTML = '<p style="padding:8px;color:var(--color-text-muted);">Nenhum resultado encontrado.</p>';
                 return;
             }
-            // USDA retorna por 100g — mostra input de gramas para escalar os macros
-            resultsDiv.innerHTML = data.items.map((item, idx) => `
+            // Spoonacular retorna receitas completas com macros por porção
+            resultsDiv.innerHTML = data.items.map((item, idx) => {
+                const meta = [
+                    item.servings ? `${item.servings} porção(ões)` : null,
+                    item.ready_in_minutes ? `${item.ready_in_minutes} min` : null,
+                ].filter(Boolean).join(' · ');
+                return `
                 <div class="calorie-result-item" data-idx="${idx}">
                     <div class="calorie-result-name">${item.name}</div>
+                    ${meta ? `<div class="calorie-result-meta">${meta}</div>` : ''}
                     <div class="calorie-result-macros">
-                        <span class="usda-per100">por 100g:</span>
+                        <span class="usda-per100">por porção:</span>
                         ${Math.round(item.calories)} kcal ·
                         P:${Math.round(item.protein_g)}g ·
                         C:${Math.round(item.carbohydrates_total_g)}g ·
                         G:${Math.round(item.fat_total_g)}g
                     </div>
                     <div class="calorie-result-actions">
-                        <input type="number" class="calorie-qty-input" value="100" min="1" max="9999" data-idx="${idx}"> <span style="font-size:11px;color:var(--color-text-muted);">g</span>
+                        <input type="number" class="calorie-qty-input" value="1" min="1" max="99" step="0.5" data-idx="${idx}"> <span style="font-size:11px;color:var(--color-text-muted);">porção(ões)</span>
                         <button class="btn-sm btn-primary calorie-add-btn" data-idx="${idx}">+ Adicionar</button>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
             resultsDiv.querySelectorAll('.calorie-add-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const idx = parseInt(btn.dataset.idx);
                     const item = data.items[idx];
-                    const grams = parseFloat(resultsDiv.querySelector(`.calorie-qty-input[data-idx="${idx}"]`)?.value) || 100;
-                    const ratio = grams / 100;
+                    const portions = parseFloat(resultsDiv.querySelector(`.calorie-qty-input[data-idx="${idx}"]`)?.value) || 1;
                     const targetDow  = adminState._targetMealDow  ?? 1;
                     const targetType = adminState._targetMealType ?? 'cafe_da_manha';
+                    const qtyLabel = portions === 1 ? '1 porção' : `${portions} porções`;
                     addItemToPlan(targetDow, targetType, {
                         name:     item.name,
-                        qty:      `${grams}g`,
-                        calories: Math.round(item.calories * ratio * 10) / 10,
-                        protein:  Math.round(item.protein_g * ratio * 10) / 10,
-                        carbs:    Math.round(item.carbohydrates_total_g * ratio * 10) / 10,
-                        fat:      Math.round(item.fat_total_g * ratio * 10) / 10,
+                        qty:      qtyLabel,
+                        calories: Math.round(item.calories * portions * 10) / 10,
+                        protein:  Math.round(item.protein_g * portions * 10) / 10,
+                        carbs:    Math.round(item.carbohydrates_total_g * portions * 10) / 10,
+                        fat:      Math.round(item.fat_total_g * portions * 10) / 10,
                     });
                     resultsDiv.classList.add('hidden');
                     input.value = '';
