@@ -1207,7 +1207,42 @@
                 </button>
             </div>
 
-            <!-- Passo 2: Platô e Ajuste -->
+            <!-- Passo 2: Avaliação Corporal por Foto -->
+            <div class="modal-body hidden" id="weekly-step-photo">
+                <div class="mascot-speech-bubble">
+                    <div class="mascot-img-placeholder">📸</div>
+                    <div class="speech-text">Agora, que tal uma avaliação corporal rápida? Tire uma foto de roupa de banho, de frente, com os braços e pernas abertos.</div>
+                </div>
+
+                <div id="weekly-photo-upload" style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
+                    <input type="file" id="input-weekly-body-photo" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                    <button class="btn-primary w-full" id="btn-weekly-select-photo">
+                        <i data-lucide="camera" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:6px;"></i>
+                        Selecionar Foto
+                    </button>
+                    <div id="weekly-photo-filename" class="hidden" style="font-size:12px; opacity:0.6; text-align:center; padding:4px 0;"></div>
+                    <button class="btn-primary w-full hidden" id="btn-weekly-analyze-photo" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+                        <i data-lucide="sparkles" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:6px;"></i>
+                        Analisar Composição Corporal
+                    </button>
+                </div>
+
+                <div id="weekly-photo-loader" class="hidden" style="text-align:center; padding:20px 0;">
+                    <div class="ai-loader-spinner" style="margin:0 auto 10px;"></div>
+                    <p style="font-size:12px; opacity:0.6;">Analisando com IA...</p>
+                </div>
+
+                <div id="weekly-photo-results" class="hidden" style="margin-top:14px;">
+                    <div id="weekly-photo-results-inner"></div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:16px;">
+                    <button class="btn-primary w-full hidden" id="btn-weekly-photo-continue">Continuar</button>
+                    <button class="btn-secondary w-full" id="btn-weekly-skip-photo" style="font-size:12px; opacity:0.7;">Pular avaliação corporal</button>
+                </div>
+            </div>
+
+            <!-- Passo 3: Platô e Ajuste -->
             <div class="modal-body hidden" id="weekly-step-plateau">
                 <div class="mascot-speech-bubble">
                     <div class="mascot-img-placeholder">🔥</div>

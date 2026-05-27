@@ -3165,12 +3165,33 @@ document.addEventListener('DOMContentLoaded', () => {
         lucide.createIcons();
     }
 
-    // 15. AVALIAÇÃO SEMANAL (PLATEAU CHECKER)
+    // 15. AVALIAÇÃO SEMANAL (PLATEAU CHECKER + AVALIAÇÃO CORPORAL)
     const btnTriggerWeeklyReview = document.getElementById('btn-trigger-weekly-review');
     const weeklyReviewModal = document.getElementById('weekly-review-modal');
-    const weeklyStepWeight = document.getElementById('weekly-step-weight');
+    const weeklyStepWeight  = document.getElementById('weekly-step-weight');
+    const weeklyStepPhoto   = document.getElementById('weekly-step-photo');
     const weeklyStepPlateau = document.getElementById('weekly-step-plateau');
     const inputWeeklyWeight = document.getElementById('input-weekly-current-weight');
+
+    let _weeklyIsPlateau = false;
+    let _weeklyBodyImage = null;
+
+    function _weeklyShowStep(step) {
+        weeklyStepWeight.classList.add('hidden');
+        weeklyStepPhoto.classList.add('hidden');
+        weeklyStepPlateau.classList.add('hidden');
+        step.classList.remove('hidden');
+    }
+
+    function _weeklyGoToPlateau() {
+        _weeklyShowStep(weeklyStepPlateau);
+    }
+
+    function _weeklyFinishWithoutPlateau() {
+        alert("Parabéns! Suas metas estão dando resultado. Continue com a consistência!");
+        weeklyReviewModal.classList.remove('active');
+        updateDashboard();
+    }
 
     // Botão de simulação da revisão semanal ativa no dashboard (sempre visível para testes)
     btnTriggerWeeklyReview.classList.remove('hidden');
@@ -3180,8 +3201,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!profile) return;
 
         inputWeeklyWeight.value = profile.weight;
-        weeklyStepWeight.classList.remove('hidden');
-        weeklyStepPlateau.classList.add('hidden');
+        _weeklyBodyImage = null;
+        document.getElementById('weekly-photo-filename').classList.add('hidden');
+        document.getElementById('btn-weekly-analyze-photo').classList.add('hidden');
+        document.getElementById('weekly-photo-loader').classList.add('hidden');
+        document.getElementById('weekly-photo-results').classList.add('hidden');
+        document.getElementById('btn-weekly-photo-continue').classList.add('hidden');
+        document.getElementById('weekly-photo-upload').style.display = 'flex';
+        _weeklyShowStep(weeklyStepWeight);
         weeklyReviewModal.classList.add('active');
     });
 
@@ -3198,48 +3225,136 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Valida se houve estagnação/platô
-        // Se a meta é emagrecer e o peso não diminuiu em relação ao onboarding anterior
-        const targetGoal = profile.goal;
         const weightDiff = newWeight - profile.weight;
+        _weeklyIsPlateau = false;
+        if (profile.goal === 'lose' && weightDiff >= -0.1) _weeklyIsPlateau = true;
+        if (profile.goal === 'gain' && weightDiff <= 0.1)  _weeklyIsPlateau = true;
 
-        let isPlateau = false;
-        if (targetGoal === 'lose' && weightDiff >= -0.1) {
-            // Não perdeu peso de forma consistente
-            isPlateau = true;
-        } else if (targetGoal === 'gain' && weightDiff <= 0.1) {
-            // Não ganhou peso de forma consistente
-            isPlateau = true;
-        }
-
-        // Atualiza o peso atual do perfil local
         profile.weight = newWeight;
         saveProfileToLocalStorage(profile);
 
-        if (isPlateau) {
-            // Mostra tela de platô (Mascote do Slimo)
-            weeklyStepWeight.classList.add('hidden');
-            weeklyStepPlateau.classList.remove('hidden');
-        } else {
-            alert("Parabéns! Suas metas estão dando resultado. Continue com a consistência!");
-            weeklyReviewModal.classList.remove('active');
-            updateDashboard();
+        // Avança para etapa de foto corporal
+        _weeklyShowStep(weeklyStepPhoto);
+    });
+
+    // — Passo 2: Foto corporal —
+    const inputWeeklyBodyPhoto = document.getElementById('input-weekly-body-photo');
+
+    document.getElementById('btn-weekly-select-photo').addEventListener('click', () => inputWeeklyBodyPhoto.click());
+
+    inputWeeklyBodyPhoto.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const label = document.getElementById('weekly-photo-filename');
+        label.textContent = file.name;
+        label.classList.remove('hidden');
+        const btnAnalyze = document.getElementById('btn-weekly-analyze-photo');
+        btnAnalyze.setAttribute('disabled', 'true');
+        btnAnalyze.classList.remove('hidden');
+        btnAnalyze.innerHTML = 'Processando...';
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                const tmpCanvas = document.createElement('canvas');
+                tmpCanvas.width  = img.width;
+                tmpCanvas.height = img.height;
+                tmpCanvas.getContext('2d').drawImage(img, 0, 0);
+                _weeklyBodyImage = resizeImageToBase64(tmpCanvas, 1200, 0.85);
+                btnAnalyze.removeAttribute('disabled');
+                btnAnalyze.innerHTML = '<i data-lucide="sparkles" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:6px;"></i>Analisar Composição Corporal';
+                if (window.lucide) window.lucide.createIcons();
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    document.getElementById('btn-weekly-analyze-photo').addEventListener('click', async () => {
+        if (!_weeklyBodyImage) return;
+        const heightCm = state.userProfile && state.userProfile.height ? state.userProfile.height : null;
+        if (!heightCm) {
+            alert('Cadastre sua altura no perfil para usar a avaliação corporal.');
+            return;
+        }
+
+        const uploadSection = document.getElementById('weekly-photo-upload');
+        const loader        = document.getElementById('weekly-photo-loader');
+        const resultsWrap   = document.getElementById('weekly-photo-results');
+        const resultsInner  = document.getElementById('weekly-photo-results-inner');
+        const btnContinue   = document.getElementById('btn-weekly-photo-continue');
+
+        uploadSection.style.display = 'none';
+        loader.classList.remove('hidden');
+        resultsWrap.classList.add('hidden');
+        btnContinue.classList.add('hidden');
+
+        try {
+            const token  = localStorage.getItem('nutrir_token');
+            const base64 = _weeklyBodyImage.split(',')[1];
+
+            const aiRes = await fetch(`${API_URL}/ai/analyze-body`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ image: base64, height_cm: heightCm })
+            });
+            if (!aiRes.ok) { const e = await aiRes.json().catch(() => ({})); throw new Error(e.error || 'Falha na IA.'); }
+            const aiData = await aiRes.json();
+
+            // Auto-save
+            const today = new Date().toISOString().split('T')[0];
+            await fetch(`${API_URL}/user/measurements`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    measured_at:    today,
+                    height_cm:      heightCm,
+                    weight_kg:      state.userProfile.weight,
+                    body_fat_pct:   aiData.body_fat_pct,
+                    muscle_mass_kg: aiData.muscle_mass_kg,
+                    waist_cm:       aiData.waist_cm,
+                    hip_cm:         aiData.hip_cm,
+                    chest_cm:       aiData.chest_cm,
+                    arm_cm:         aiData.arm_cm,
+                    thigh_cm:       aiData.thigh_cm,
+                    notes:          `IA (confiança ${aiData.confidence}/10): ${aiData.notes || ''}`
+                })
+            }).catch(() => {});
+
+            loader.classList.add('hidden');
+            resultsInner.innerHTML = _renderBodyEvalMetrics(aiData);
+            resultsWrap.classList.remove('hidden');
+            btnContinue.classList.remove('hidden');
+            if (window.lucide) window.lucide.createIcons();
+        } catch (err) {
+            loader.classList.add('hidden');
+            uploadSection.style.display = 'flex';
+            alert('Erro na análise: ' + err.message);
         }
     });
 
+    document.getElementById('btn-weekly-photo-continue').addEventListener('click', () => {
+        if (_weeklyIsPlateau) _weeklyGoToPlateau();
+        else _weeklyFinishWithoutPlateau();
+    });
+
+    document.getElementById('btn-weekly-skip-photo').addEventListener('click', () => {
+        if (_weeklyIsPlateau) _weeklyGoToPlateau();
+        else _weeklyFinishWithoutPlateau();
+    });
+
+    // — Passo 3: Platô —
     document.getElementById('btn-weekly-confirm-adjustment').addEventListener('click', () => {
         const adjustment = document.querySelector('input[name="plateau-adjustment"]:checked').value;
         const profile = state.userProfile;
 
         if (adjustment === 'reduce') {
-            // Reduz 5% de calorias diárias
             profile.targetCalories = Math.round(profile.targetCalories * 0.95);
-            // Reajusta carboidratos mantendo proteínas e gorduras intocadas
             const proteinKcal = profile.targetProtein * 4;
             const fatKcal = profile.targetFat * 9;
             profile.targetCarbs = Math.round((profile.targetCalories - proteinKcal - fatKcal) / 4);
             if (profile.targetCarbs < 50) profile.targetCarbs = 50;
-
             saveProfileToLocalStorage(profile);
             alert("Sua meta de calorias diárias foi ajustada em -5% para quebrar o platô.");
         } else {
