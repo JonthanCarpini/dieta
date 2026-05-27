@@ -184,7 +184,7 @@ function promptDailyRecipe(mealType, cal, protein, carbs, fat, profile, recipeNa
   const tip = goalTips[profile?.goal] || goalTips.maintain;
   const recipeSpec = recipeName ? `\nO prato que você DEVE ensinar a preparar é obrigatoriamente: "${recipeName}". Ajuste as quantidades e ingredientes de forma que esse prato específico bata com precisão as calorias e macros sugeridos.` : '';
 
-  return `Você é um nutricionista e chef brasileiro. Crie UMA receita saudável e realista para ${mealLabel}.${recipeSpec}
+  return `Você é um nutricionista e chef brasileiro especialista em receitas práticas. Crie UMA receita saudável, super simples, rápida e realista para ${mealLabel}.${recipeSpec}
 ${ctx}
 PARÂMETROS DESTA REFEIÇÃO (siga com precisão):
 - Calorias: ${cal} kcal (tolerância: ±30 kcal)
@@ -193,16 +193,17 @@ PARÂMETROS DESTA REFEIÇÃO (siga com precisão):
 ORIENTAÇÃO NUTRICIONAL: ${tip}
 
 REGRAS — SIGA TODAS:
-1. Use ingredientes de supermercado brasileiro comum (frango, ovos, arroz, feijão, legumes, frutas comuns)
-2. Porção para 1 pessoa adulta — quantidades realistas (ex: máximo 200g de carne, 2-3 ovos, não 12)
-3. Tempo de preparo: máximo 30 minutos
-4. Nome criativo e apetitoso em português (pode ser baseado em "${recipeName || 'Nome da receita'}")
-5. As QUANTIDADES dos ingredientes DEVEM resultar exatamente em ${cal} kcal — calcule os pesos com precisão
-6. Modo de preparo em passos numerados (mínimo 3 passos)
-7. PROIBIDO: receitas de maromba/culturismo para objetivos de perda de peso
+1. Use ingredientes simples, básicos e acessíveis de supermercado brasileiro comum (como ovos, peito de frango, atum enlatado, pão integral, queijo branco, aveia, frutas, vegetais comuns).
+2. Simplicidade extrema: utilize no máximo 5 ou 6 ingredientes principais no total.
+3. Tempo de preparo: máximo 15 minutos (deve ser extremamente rápida e prática para o dia a dia corrido).
+4. Porção para 1 pessoa adulta — quantidades realistas (ex: máximo 200g de carne, 2-3 ovos).
+5. As QUANTIDADES dos ingredientes DEVEM resultar exatamente em ${cal} kcal — calcule os pesos com precisão.
+6. Modo de preparo em passos extremamente diretos e curtos (máximo 3 a 4 passos simples. Proibido processos demorados como forno convencional prolongado, panela de pressão ou marinadas complexas).
+7. Nome criativo, apetitoso e direto em português (pode ser baseado em "${recipeName || 'Nome da receita'}").
+8. PROIBIDO: receitas de maromba/culturismo para objetivos de perda de peso.
 
 Responda APENAS com JSON puro sem markdown. Exemplo de formato:
-{"name":"Nome da receita","time_min":20,"calories":${cal},"protein":${protein},"carbs":${carbs},"fat":${fat},"ingredients":[{"name":"Peito de frango","amount":150,"unit":"g"},{"name":"Brócolis","amount":100,"unit":"g"}],"directions":"1. Tempere o frango com sal e alho.\\n2. Grelhe por 8 minutos de cada lado.\\n3. Cozinhe o brócolis no vapor por 5 minutos."}`;
+{"name":"Nome da receita","time_min":10,"calories":${cal},"protein":${protein},"carbs":${carbs},"fat":${fat},"ingredients":[{"name":"Peito de frango","amount":150,"unit":"g"},{"name":"Brócolis","amount":100,"unit":"g"}],"directions":"1. Tempere o frango com sal e alho.\\n2. Grelhe em frigideira quente por 6 minutos de cada lado.\\n3. Cozinhe o brócolis no microondas por 3 minutos com um pouco de água."}`;
 }
 
 function promptWeeklyPlan(mealType, calPerMeal, protPerMeal, carbPerMeal, fatPerMeal, profile) {
