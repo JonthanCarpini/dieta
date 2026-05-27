@@ -268,21 +268,12 @@ router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']),
   try {
     const settingsRes = await db.query("SELECT value FROM system_settings WHERE key = 'usda_api_key'");
     const apiKey = settingsRes.rows[0]?.value?.trim() || 'DEMO_KEY';
-    const params = new URLSearchParams({
-      query,
-      api_key: apiKey,
-      pageSize: '10',
-    });
-    // Múltiplos dataType — evita parênteses na URL (Survey FNDDS causava 400)
-    params.append('dataType', 'Foundation');
-    params.append('dataType', 'SR Legacy');
-    params.append('dataType', 'Survey (FNDDS)');
-    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?${params.toString()}`;
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${encodeURIComponent(apiKey)}&pageSize=10`;
     const response = await fetch(url);
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
       console.error('USDA error', response.status, errBody);
-      return res.status(502).json({ error: `Erro na API USDA (${response.status}). Verifique a chave em Credenciais ou tente novamente.` });
+      return res.status(502).json({ error: `Erro na API USDA (${response.status}). Tente novamente.` });
     }
     const data = await response.json();
 
