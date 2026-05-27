@@ -228,7 +228,8 @@ A aba **Cardápios** (`#tab-meal-plans`, botão `#nav-meal-plans`) permite ao pr
 - **Barra superior** (`#builder-topbar`): campo de nome do plano, seletor de paciente (`#builder-patient-select`) e botão Salvar.
 - **Abas por dia** (`.plan-day-tabs`): Segunda a Domingo, cada dia com 6 tipos de refeição (Café da Manhã, Lanche da Manhã, Almoço, Lanche da Tarde, Jantar, Ceia).
 - **Cards de refeição** (`.plan-meal-card`): campo de instruções gerais + lista de itens + totais de macros calculados automaticamente.
-- **Busca Spoonacular**: campo de texto + botão buscar chamam `GET /api/admin/calorie-search?q=<termo>`. Resultados exibem nome da receita, número de porções, tempo de preparo e macros por porção. O profissional escolhe a quantidade de porções e os macros são escalados proporcionalmente antes de adicionar ao plano.
+- **Busca Spoonacular Traduzida**: campo de texto + botão buscar chamam `GET /api/admin/calorie-search?q=<termo>`. Resultados exibem nome da receita, número de porções, tempo de preparo e macros por porção. 
+- **Gerador de Receitas por IA**: Para cada item retornado na busca, o botão **Receita IA** (ícone Sparkles) abre o modal `#admin-recipe-generator-modal` e chama `POST /api/ai/generate-recipe` passando os macros, calorias e nome do prato. Ao clicar em **Usar Receita no Plano**, o item em si é adicionado à lista e os ingredientes + modo de preparo detalhados gerados pela IA são injetados nas instruções gerais da refeição automaticamente.
 
 #### Rotas backend (`backend/routes/professional.js`):
 | Rota | Método | Descrição |
@@ -241,12 +242,13 @@ A aba **Cardápios** (`#tab-meal-plans`, botão `#nav-meal-plans`) permite ao pr
 
 Todas as rotas requerem `authenticateToken` + `requireRole(['nutritionist','trainer'])`.
 
-#### Proxy Spoonacular (`backend/routes/admin.js`):
+#### Proxy Spoonacular Traduzido (`backend/routes/admin.js`):
 ```
 GET /api/admin/calorie-search?q=<termo>
 ```
 - Posicionada **antes** do middleware `requireRole(['admin'])` para que profissionais também possam acessar.
-- Lê `spoonacular_api_key` de `system_settings`. **Sem chave configurada retorna 503** — não há fallback gratuito.
+- Lê `spoonacular_api_key` de `system_settings`. **Sem chave configurada retorna 503**.
+- **Tradução Bidirecional via IA**: Se a IA estiver configurada (Gemini/OpenAI/Mistral), a rota traduz automaticamente o termo de busca em português para o inglês antes de enviar a requisição ao Spoonacular. Quando os resultados retornam do Spoonacular (em inglês), a IA é utilizada para traduzir em lote (batch) os títulos das receitas de volta para o português (Brasil) antes de enviar a resposta ao frontend.
 - Chama `https://api.spoonacular.com/recipes/complexSearch?query=...&addRecipeNutrition=true&number=8&apiKey=...`.
 - Normaliza a resposta para `{ items: [{name, servings, ready_in_minutes, calories, protein_g, carbohydrates_total_g, fat_total_g}] }`.
 - Macros são **por porção** (não por 100g). O frontend exibe um input de porções e escala os valores antes de inserir no plano.

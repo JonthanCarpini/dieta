@@ -3366,12 +3366,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         C:${Math.round(item.carbohydrates_total_g)}g ·
                         G:${Math.round(item.fat_total_g)}g
                     </div>
-                    <div class="calorie-result-actions">
+                    <div class="calorie-result-actions" style="display:flex; align-items:center; gap:8px;">
                         <input type="number" class="calorie-qty-input" value="1" min="1" max="99" step="0.5" data-idx="${idx}"> <span style="font-size:11px;color:var(--color-text-muted);">porção(ões)</span>
                         <button class="btn-sm btn-primary calorie-add-btn" data-idx="${idx}">+ Adicionar</button>
+                        <button class="btn-sm btn-secondary calorie-recipe-btn" data-idx="${idx}">
+                            <i data-lucide="sparkles" style="width:11px; height:11px; vertical-align:middle; margin-right:4px;"></i>Receita IA
+                        </button>
                     </div>
                 </div>`;
             }).join('');
+            
+            if (window.lucide) window.lucide.createIcons();
+
             resultsDiv.querySelectorAll('.calorie-add-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const idx = parseInt(btn.dataset.idx);
@@ -3392,6 +3398,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     input.value = '';
                 });
             });
+
+            resultsDiv.querySelectorAll('.calorie-recipe-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.idx);
+                    const item = data.items[idx];
+                    generateAIRecipe(item);
+                });
+            });
+
         } catch (err) {
             resultsDiv.innerHTML = `<p style="padding:8px;color:var(--color-danger);">${err.message}</p>`;
         }
@@ -3445,4 +3460,129 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Erro ao excluir cardápio.');
         }
     }
+
+    // === CONTROLE DE GERAÇÃO DE RECEITAS VIA IA ===
+    let currentGeneratedRecipe = null;
+    let currentGeneratedRecipeTarget = null;
+
+    async function generateAIRecipe(spoonacularItem) {
+        const modal = document.getElementById('admin-recipe-generator-modal');
+        const loadingDiv = document.getElementById('recipe-generator-loading');
+        const contentDiv = document.getElementById('recipe-generator-content');
+        const footerDiv = document.getElementById('recipe-generator-footer');
+        
+        if (!modal || !loadingDiv || !contentDiv || !footerDiv) return;
+
+        currentGeneratedRecipe = null;
+        currentGeneratedRecipeTarget = spoonacularItem;
+
+        modal.style.display = 'flex';
+        loadingDiv.style.display = 'flex';
+        contentDiv.style.display = 'none';
+        footerDiv.style.display = 'none';
+
+        try {
+            const payload = {
+                mealType: adminState._targetMealType || 'all',
+                cal: Math.round(spoonacularItem.calories),
+                protein: Math.round(spoonacularItem.protein_g),
+                carbs: Math.round(spoonacularItem.carbohydrates_total_g),
+                fat: Math.round(spoonacularItem.fat_total_g),
+                recipeName: spoonacularItem.name
+            };
+
+            const res = await fetch(`${API_URL}/ai/generate-recipe`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminState.token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const resData = await res.json();
+            if (!res.ok) throw new Error(resData.error || 'Erro ao gerar receita.');
+
+            const recipe = resData.recipe;
+            if (!recipe) throw new Error('Formato de resposta inválido.');
+
+            currentGeneratedRecipe = recipe;
+
+            document.getElementById('recipe-gen-title').textContent = recipe.name || spoonacularItem.name;
+            document.getElementById('recipe-gen-meta').textContent = `Tempo de Preparo: ${recipe.time_min || 20} min`;
+            document.getElementById('recipe-gen-calories').textContent = `${Math.round(recipe.calories || spoonacularItem.calories)} kcal`;
+            document.getElementById('recipe-gen-protein').textContent = `${Math.round(recipe.protein || spoonacularItem.protein_g)}g`;
+            document.getElementById('recipe-gen-carbs').textContent = `${Math.round(recipe.carbs || spoonacularItem.carbohydrates_total_g)}g`;
+            document.getElementById('recipe-gen-fat').textContent = `${Math.round(recipe.fat || spoonacularItem.fat_total_g)}g`;
+
+            const ingredientsUl = document.getElementById('recipe-gen-ingredients-list');
+            ingredientsUl.innerHTML = '';
+            if (recipe.ingredients && recipe.ingredients.length > 0) {
+                recipe.ingredients.forEach(ing => {
+                    const li = document.createElement('li');
+                    li.textContent = `${ing.amount || ''} ${ing.unit || ''} de ${ing.name}`;
+                    ingredientsUl.appendChild(li);
+                });
+            } else {
+                ingredientsUl.innerHTML = '<li>Nenhum ingrediente listado.</li>';
+            }
+
+            document.getElementById('recipe-gen-directions').textContent = recipe.directions || '';
+
+            loadingDiv.style.display = 'none';
+            contentDiv.style.display = 'flex';
+            footerDiv.style.display = 'flex';
+            
+            if (window.lucide) window.lucide.createIcons();
+
+        } catch (err) {
+            alert(`Erro ao gerar receita: ${err.message}`);
+            modal.style.display = 'none';
+        }
+    }
+
+    // Configura listeners do modal de receita
+    document.getElementById('btn-close-recipe-generator')?.addEventListener('click', () => {
+        document.getElementById('admin-recipe-generator-modal').style.display = 'none';
+    });
+    document.getElementById('btn-close-recipe-generator-footer')?.addEventListener('click', () => {
+        document.getElementById('admin-recipe-generator-modal').style.display = 'none';
+    });
+    document.getElementById('btn-apply-recipe')?.addEventListener('click', () => {
+        if (!currentGeneratedRecipe || !currentGeneratedRecipeTarget) return;
+
+        const targetDow  = adminState._targetMealDow  ?? 1;
+        const targetType = adminState._targetMealType ?? 'cafe_da_manha';
+
+        // 1. Adiciona como item da refeição usando os macros sugeridos
+        addItemToPlan(targetDow, targetType, {
+            name:     currentGeneratedRecipe.name || currentGeneratedRecipeTarget.name,
+            qty:      "1 porção (Receita IA)",
+            calories: Math.round(currentGeneratedRecipe.calories),
+            protein:  Math.round(currentGeneratedRecipe.protein),
+            carbs:    Math.round(currentGeneratedRecipe.carbs),
+            fat:      Math.round(currentGeneratedRecipe.fat),
+        });
+
+        // 2. Injeta receita formatada nas instruções gerais
+        const dayIdx = adminState._editingPlanData.days.findIndex(day => day.dow === targetDow);
+        if (dayIdx !== -1) {
+            const mealIdx = adminState._editingPlanData.days[dayIdx].meals.findIndex(m => m.type === targetType);
+            if (mealIdx !== -1) {
+                const existing = adminState._editingPlanData.days[dayIdx].meals[mealIdx].instructions || '';
+                const ingredientsText = (currentGeneratedRecipe.ingredients || []).map(ing => `- ${ing.amount || ''}${ing.unit || ''} de ${ing.name}`).join('\n');
+                const recipeText = `\n\n--- RECEITA: ${currentGeneratedRecipe.name} ---\nIngredientes:\n${ingredientsText}\n\nModo de Preparo:\n${currentGeneratedRecipe.directions}`;
+                adminState._editingPlanData.days[dayIdx].meals[mealIdx].instructions = (existing + recipeText).trim();
+            }
+        }
+
+        // 3. Limpa UI
+        document.getElementById('admin-recipe-generator-modal').style.display = 'none';
+        document.getElementById('calorie-search-results').classList.add('hidden');
+        const input = document.getElementById('calorie-search-input');
+        if (input) input.value = '';
+
+        // 4. Re-renderiza o dia
+        renderPlanDayEditor(targetDow);
+    });
 });

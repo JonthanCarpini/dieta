@@ -173,7 +173,7 @@ Responda APENAS com JSON puro (sem markdown, sem explicações):
 {"items":[{"name":"Nome do alimento","weight_g":150,"calories":210,"protein":24,"carbs":2,"fat":12,"fiber":3}],"total":{"calories":210,"protein":24,"carbs":2,"fat":12,"fiber":3}}`;
 }
 
-function promptDailyRecipe(mealType, cal, protein, carbs, fat, profile) {
+function promptDailyRecipe(mealType, cal, protein, carbs, fat, profile, recipeName = '') {
   const mealLabel = MEAL_LABELS[mealType] || mealType;
   const ctx = profileContext(profile);
   const goalTips = {
@@ -182,8 +182,9 @@ function promptDailyRecipe(mealType, cal, protein, carbs, fat, profile) {
     maintain: 'Receita equilibrada com todos os grupos nutricionais em proporção saudável.'
   };
   const tip = goalTips[profile?.goal] || goalTips.maintain;
+  const recipeSpec = recipeName ? `\nO prato que você DEVE ensinar a preparar é obrigatoriamente: "${recipeName}". Ajuste as quantidades e ingredientes de forma que esse prato específico bata com precisão as calorias e macros sugeridos.` : '';
 
-  return `Você é um nutricionista e chef brasileiro. Crie UMA receita saudável e realista para ${mealLabel}.
+  return `Você é um nutricionista e chef brasileiro. Crie UMA receita saudável e realista para ${mealLabel}.${recipeSpec}
 ${ctx}
 PARÂMETROS DESTA REFEIÇÃO (siga com precisão):
 - Calorias: ${cal} kcal (tolerância: ±30 kcal)
@@ -195,7 +196,7 @@ REGRAS — SIGA TODAS:
 1. Use ingredientes de supermercado brasileiro comum (frango, ovos, arroz, feijão, legumes, frutas comuns)
 2. Porção para 1 pessoa adulta — quantidades realistas (ex: máximo 200g de carne, 2-3 ovos, não 12)
 3. Tempo de preparo: máximo 30 minutos
-4. Nome criativo e apetitoso em português (não genérico)
+4. Nome criativo e apetitoso em português (pode ser baseado em "${recipeName || 'Nome da receita'}")
 5. As QUANTIDADES dos ingredientes DEVEM resultar exatamente em ${cal} kcal — calcule os pesos com precisão
 6. Modo de preparo em passos numerados (mínimo 3 passos)
 7. PROIBIDO: receitas de maromba/culturismo para objetivos de perda de peso
@@ -260,9 +261,9 @@ router.post('/analyze-food', authenticateToken, async (req, res) => {
 router.post('/generate-recipe', authenticateToken, async (req, res) => {
   const t0 = Date.now();
   try {
-    const { mealType = 'all', cal, protein, carbs, fat, profile } = req.body;
+    const { mealType = 'all', cal, protein, carbs, fat, profile, recipeName } = req.body;
     const cfg = await getLLMConfig();
-    const { text, provider, model } = await callLLM(cfg, promptDailyRecipe(mealType, cal, protein, carbs, fat, profile));
+    const { text, provider, model } = await callLLM(cfg, promptDailyRecipe(mealType, cal, protein, carbs, fat, profile, recipeName));
     const recipe = JSON.parse(text);
     res.json({ recipe, mealType, _meta: { provider, model, latency_ms: Date.now() - t0 } });
   } catch (err) {
@@ -307,5 +308,8 @@ router.post('/test', authenticateToken, async (req, res) => {
     res.status(502).json({ ok: false, error: err.message, latency_ms: Date.now() - t0 });
   }
 });
+
+router.getLLMConfig = getLLMConfig;
+router.callLLM = callLLM;
 
 module.exports = router;

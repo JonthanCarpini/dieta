@@ -1100,6 +1100,71 @@
             <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-top:16px;">
                 <button id="btn-close-admin-meal-details-footer" class="btn-secondary w-full" style="font-size:12px; padding:10px; border-radius:8px;">Fechar</button>
             </div>
+    <!-- Modal: Gerador de Receitas via IA (Admin/Pro) -->
+    <div class="modal-overlay" id="admin-recipe-generator-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:100000; justify-content:center; align-items:center; backdrop-filter:blur(4px);">
+        <div class="modal-card" style="max-width: 500px; background:#181d28; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; width:90%; box-sizing:border-box; display:flex; flex-direction:column; max-height:85vh;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px; margin-bottom:16px;">
+                <h3 style="margin:0; font-size:16px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="sparkles" style="width:18px; height:18px; color:var(--color-primary);"></i>
+                    Receita Sugerida pela IA
+                </h3>
+                <button class="icon-btn" id="btn-close-recipe-generator" style="background:transparent; border:none; color:#8e8e93; cursor:pointer;"><i data-lucide="x" style="width:18px; height:18px;"></i></button>
+            </div>
+            
+            <div id="recipe-generator-loading" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 20px; gap:16px;">
+                <div class="spinner" style="border:3px solid rgba(255,255,255,0.1); border-top:3px solid var(--color-primary); border-radius:50%; width:36px; height:36px; animation:spin 1s linear infinite;"></div>
+                <p style="margin:0; font-size:13px; color:var(--color-text-muted); text-align:center;">Nossa Inteligência Artificial está preparando a sua receita personalizada. Por favor, aguarde...</p>
+            </div>
+
+            <div id="recipe-generator-content" style="display:none; flex-direction:column; gap:16px; overflow-y:auto; padding-right:4px;">
+                <div>
+                    <h4 id="recipe-gen-title" style="margin:0 0 4px 0; font-size:15px; font-weight:700; color:var(--color-primary);">Nome da Receita</h4>
+                    <span id="recipe-gen-meta" style="font-size:11px; color:var(--color-text-muted);">Tempo de Preparo: 20 min</span>
+                </div>
+
+                <!-- Info de Macros -->
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:8px; padding:10px;">
+                    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; text-align:center; font-size:11px;">
+                        <div>
+                            <span style="display:block; opacity:0.5; margin-bottom:2px; font-size:9px;">CALORIAS</span>
+                            <strong id="recipe-gen-calories" style="font-weight:700; color:#fff;">-</strong>
+                        </div>
+                        <div>
+                            <span style="display:block; opacity:0.5; margin-bottom:2px; color:#22c55e; font-size:9px;">PROT</span>
+                            <strong id="recipe-gen-protein" style="font-weight:700; color:#22c55e;">-</strong>
+                        </div>
+                        <div>
+                            <span style="display:block; opacity:0.5; margin-bottom:2px; color:#3b82f6; font-size:9px;">CARBO</span>
+                            <strong id="recipe-gen-carbs" style="font-weight:700; color:#3b82f6;">-</strong>
+                        </div>
+                        <div>
+                            <span style="display:block; opacity:0.5; margin-bottom:2px; color:#f97316; font-size:9px;">GORD</span>
+                            <strong id="recipe-gen-fat" style="font-weight:700; color:#f97316;">-</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista de Ingredientes -->
+                <div>
+                    <h5 style="margin:0 0 6px 0; font-size:12.5px; font-weight:600; color:#fff;">Ingredientes</h5>
+                    <ul id="recipe-gen-ingredients-list" style="margin:0; padding-left:20px; font-size:12px; color:var(--color-text-muted); line-height:1.6;">
+                        <!-- Injetado por JS -->
+                    </ul>
+                </div>
+
+                <!-- Modo de Preparo -->
+                <div>
+                    <h5 style="margin:0 0 6px 0; font-size:12.5px; font-weight:600; color:#fff;">Modo de Preparo</h5>
+                    <div id="recipe-gen-directions" style="font-size:12px; color:var(--color-text-muted); line-height:1.6; white-space:pre-wrap;">
+                        <!-- Injetado por JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="recipe-generator-footer" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-top:16px; display:none; gap:12px;">
+                <button id="btn-apply-recipe" class="btn-primary" style="flex:1; font-size:12px; padding:10px; border-radius:8px; font-weight:600;">Usar Receita no Plano</button>
+                <button id="btn-close-recipe-generator-footer" class="btn-secondary" style="font-size:12px; padding:10px; border-radius:8px; width:100px;">Fechar</button>
+            </div>
         </div>
     </div>
 

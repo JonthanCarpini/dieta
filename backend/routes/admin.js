@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const aiRoutes = require('./ai');
 
 // Rotas administrativas exigem login JWT mínimo
 router.use(authenticateToken);
@@ -271,7 +272,35 @@ router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']),
     if (!apiKey) {
       return res.status(503).json({ error: 'Chave Spoonacular não configurada. Adicione em Credenciais → Spoonacular API Key.' });
     }
-    const url = `https://api.spoonacular.com/recipes/complexSearch?query=${encodeURIComponent(query)}&addRecipeNutrition=true&number=8&apiKey=${encodeURIComponent(apiKey)}`;
+
+    // Tenta traduzir a query do português para o inglês usando IA (se configurada)
+    let searchUrlQuery = query;
+    let cfg = null;
+    let hasAI = false;
+    try {
+      cfg = await aiRoutes.getLLMConfig();
+      hasAI = !!(cfg.gemini_api_key || cfg.openai_api_key || cfg.mistral_api_key);
+    } catch(e) {
+      console.warn("Erro ao ler config da IA para tradução de busca:", e);
+    }
+
+    if (hasAI) {
+      try {
+        const translationPrompt = `Traduza o seguinte termo de busca de alimentos ou prato de português para o inglês de forma concisa. Retorne APENAS o termo em inglês, sem pontuação, sem aspas e sem nenhuma explicação extra. Termo: "${query}"`;
+        const translationRes = await aiRoutes.callLLM(cfg, translationPrompt);
+        if (translationRes && translationRes.text) {
+          const cleanedText = translationRes.text.replace(/["'`.?!]/g, "").trim();
+          if (cleanedText) {
+            searchUrlQuery = cleanedText;
+            console.log(`Traduzido para busca: "${query}" -> "${searchUrlQuery}"`);
+          }
+        }
+      } catch(e) {
+        console.warn("Erro ao traduzir query de busca com IA, usando termo original:", e);
+      }
+    }
+
+    const url = `https://api.spoonacular.com/recipes/complexSearch?query=${encodeURIComponent(searchUrlQuery)}&addRecipeNutrition=true&number=8&apiKey=${encodeURIComponent(apiKey)}`;
     const response = await fetch(url);
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
@@ -297,6 +326,38 @@ router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']),
         fat_total_g:             get('Fat'),
       };
     });
+
+    // Se houver resultados e a IA estiver de pé, traduz os títulos de volta para o português
+    if (items.length > 0 && hasAI) {
+      try {
+        const originalTitles = items.map(it => it.name);
+        const titlesPrompt = `Você é um tradutor de cardápios especialista em culinária e nutrição. Traduza a seguinte lista de títulos de receitas do inglês para nomes de pratos apetitosos e naturais em português (Brasil).
+Lista original em inglês: ${JSON.stringify(originalTitles)}
+
+Regras de saída:
+1. Retorne APENAS um array JSON de strings contendo exatamente as traduções dos títulos no mesmo formato e ordem, exemplo: ["Salmão com Brócolis", "Frango Grelhado"].
+2. Proibido adicionar explicações, markdown ou blocos de código. A resposta deve ser apenas o array JSON válido parseável.`;
+
+        const titlesRes = await aiRoutes.callLLM(cfg, titlesPrompt);
+        if (titlesRes && titlesRes.text) {
+          const rawText = titlesRes.text.trim();
+          const match = rawText.match(/\[[\s\S]*\]/);
+          const jsonText = match ? match[0] : rawText;
+          const translatedTitles = JSON.parse(jsonText);
+          if (Array.isArray(translatedTitles)) {
+            items.forEach((item, idx) => {
+              if (translatedTitles[idx]) {
+                item.name = translatedTitles[idx].trim();
+              }
+            });
+            console.log("Títulos das receitas traduzidos para português com sucesso!");
+          }
+        }
+      } catch(e) {
+        console.warn("Erro ao traduzir títulos das receitas de volta para português:", e);
+      }
+    }
+
     res.json({ items });
   } catch (err) {
     console.error(err);
