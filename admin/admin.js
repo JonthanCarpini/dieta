@@ -1857,10 +1857,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             break;
 
                         case 'peer-left':
-                            if (statusEl) statusEl.textContent = 'O paciente saiu da sala.';
+                            if (statusEl) statusEl.textContent = 'Chamada encerrada pelo paciente.';
                             setTimeout(() => {
                                 closeVideoCall();
-                            }, 2000);
+                            }, 1000);
                             break;
 
                         case 'error':
@@ -1891,6 +1891,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (statusEl) statusEl.textContent = 'Em chamada';
                     } else if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
                         if (statusEl) statusEl.textContent = 'Conexão perdida. Reabrindo...';
+                        setTimeout(() => {
+                            if (peerConnection && (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected')) {
+                                console.log('Encerrando chamada no profissional por desconexão persistente.');
+                                closeVideoCall();
+                            }
+                        }, 5000);
                     }
                 }
             };

@@ -203,6 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Inicializa Google Login Button
         initGoogleLogin();
+
+        // Inicia o timer de notificações de consultas (15 minutos antes)
+        startAppointmentAlertTimer();
     }
 
     // 6. CARREGAR E SALVAR ESTADOS
@@ -4008,6 +4011,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnProfileLogout) {
             btnProfileLogout.addEventListener('click', () => {
                 if (confirm('Deseja sair da sua conta?')) {
+                    if (appointmentAlertInterval) {
+                        clearInterval(appointmentAlertInterval);
+                        appointmentAlertInterval = null;
+                    }
                     localStorage.removeItem('nutrir_token');
                     showScreen('screen-login');
                 }
@@ -4200,6 +4207,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isMicMuted = false;
     let isCamOff = false;
     let remoteCandidatesQueue = [];
+    let appointmentAlertInterval = null;
+    let lastAppointmentsFetchTime = 0;
 
     async function startVideoCall(link) {
         let roomName = 'nutrir-room';
@@ -4350,10 +4359,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             break;
 
                         case 'peer-left':
-                            if (statusEl) statusEl.textContent = 'O profissional saiu da sala.';
+                            if (statusEl) statusEl.textContent = 'Chamada encerrada pelo profissional.';
                             setTimeout(() => {
                                 closeVideoCall();
-                            }, 2000);
+                            }, 1000);
                             break;
 
                         case 'error':
@@ -4377,13 +4386,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-            peerConnection.onconnectionstatechange = () => {
+             peerConnection.onconnectionstatechange = () => {
                 if (peerConnection) {
                     console.log('WebRTC Connection State:', peerConnection.connectionState);
                     if (peerConnection.connectionState === 'connected') {
                         if (statusEl) statusEl.textContent = 'Em chamada';
                     } else if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
                         if (statusEl) statusEl.textContent = 'Conexão perdida. Reabrindo...';
+                        setTimeout(() => {
+                            if (peerConnection && (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected')) {
+                                console.log('Encerrando chamada por perda persistente de conexão.');
+                                closeVideoCall();
+                            }
+                        }, 5000);
                     }
                 }
             };
@@ -4502,5 +4517,142 @@ document.addEventListener('DOMContentLoaded', () => {
         remoteCandidatesQueue = [];
         showScreen('screen-my-professionals');
         renderMyProfessionalsScreen();
+    }
+
+    function startAppointmentAlertTimer() {
+        if (appointmentAlertInterval) {
+            clearInterval(appointmentAlertInterval);
+        }
+        
+        // Executa uma vez imediatamente
+        checkUpcomingAppointments();
+        
+        // Executa a cada 60 segundos
+        appointmentAlertInterval = setInterval(checkUpcomingAppointments, 60000);
+    }
+
+    async function checkUpcomingAppointments() {
+        const token = localStorage.getItem('nutrir_token');
+        if (!token) return;
+        
+        const now = new Date();
+        
+        // Atualizar silenciosamente a lista de consultas a cada 3 minutos (180000 ms)
+        if (!state.myAppointments || (now.getTime() - lastAppointmentsFetchTime > 180000)) {
+            try {
+                const appRes = await fetch(`${API_URL}/user/appointments`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (appRes.ok) {
+                    state.myAppointments = await appRes.json();
+                    lastAppointmentsFetchTime = now.getTime();
+                }
+            } catch(e) {
+                console.error("Erro silencioso ao buscar consultas para alertas:", e);
+            }
+        }
+        
+        if (!state.myAppointments || state.myAppointments.length === 0) return;
+        
+        state.myAppointments.forEach(a => {
+            if (a.status !== 'scheduled') return;
+            
+            // Combinar data e hora da consulta
+            const dateStr = a.appointment_date.split('T')[0];
+            const timeStr = a.start_time;
+            const appDateTime = new Date(`${dateStr}T${timeStr}`);
+            
+            // Diferença em milissegundos
+            const diffMs = appDateTime.getTime() - now.getTime();
+            // Diferença em minutos
+            const diffMin = Math.round(diffMs / 60000);
+            
+            // Alerta in-app se faltam exatamente 15 minutos
+            if (diffMin === 15) {
+                if (!state.alertedAppointments) {
+                    state.alertedAppointments = new Set();
+                }
+                
+                if (!state.alertedAppointments.has(a.id)) {
+                    state.alertedAppointments.add(a.id);
+                    showInAppAppointmentAlert(a);
+                }
+            }
+            
+            // Tentar agendar no alarme nativo do Android
+            if (window.AndroidApp && window.AndroidApp.scheduleNotification) {
+                // Alarme nativo dispara exatamente 15 minutos antes da consulta
+                const alarmTime = appDateTime.getTime() - (15 * 60000);
+                if (alarmTime > now.getTime()) {
+                    const title = "Consulta em breve";
+                    const roleLabel = a.professional_role === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+                    const message = `Sua consulta por vídeo com o ${roleLabel} começará em 15 minutos!`;
+                    window.AndroidApp.scheduleNotification(a.id, title, message, alarmTime);
+                }
+            }
+        });
+    }
+
+    function showInAppAppointmentAlert(a) {
+        const alertId = 'in-app-alert-' + a.id;
+        if (document.getElementById(alertId)) return;
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.id = alertId;
+        alertDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-120px);
+            background: linear-gradient(135deg, #22c55e, #10b981);
+            color: #fff;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 100000;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            width: 90%;
+            max-width: 400px;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        `;
+        
+        const roleLabel = a.professional_role === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
+        
+        alertDiv.innerHTML = `
+            <div style="background:rgba(255,255,255,0.2); border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            </div>
+            <div style="flex:1;">
+                <h4 style="margin:0; font-size:14px; font-weight:600; color:#fff;">Consulta em 15 Minutos!</h4>
+                <p style="margin:2px 0 0 0; font-size:11px; opacity:0.9; color:#fff;">Sua consulta com o ${roleLabel} começará em breve.</p>
+            </div>
+            <button class="btn-start-call" style="background:#fff; color:#10b981; border:none; padding:6px 12px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.2); flex-shrink:0;">Entrar</button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Animação de entrada
+        setTimeout(() => {
+            alertDiv.style.transform = 'translateX(-50%) translateY(0)';
+        }, 100);
+        
+        // Ação do botão
+        alertDiv.querySelector('.btn-start-call').addEventListener('click', () => {
+            alertDiv.style.transform = 'translateX(-50%) translateY(-120px)';
+            setTimeout(() => alertDiv.remove(), 500);
+            
+            // Iniciar a chamada
+            startVideoCall(a.video_link);
+        });
+        
+        // Remover automaticamente após 15 segundos
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.style.transform = 'translateX(-50%) translateY(-120px)';
+                setTimeout(() => alertDiv.remove(), 500);
+            }
+        }, 15000);
     }
 });
