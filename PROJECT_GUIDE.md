@@ -120,9 +120,14 @@ Os dados do usuário são sincronizados com o PostgreSQL por meio de requisiçõ
 
 15. **`patient_exams`**: Armazena metadados de exames laboratoriais enviados pelos pacientes (`id`, `patient_id`, `file_name`, `file_path`, `mime_type`, `notes`, `created_at`). O arquivo físico correspondente fica armazenado de forma segura no disco da VPS em `backend/uploads/exams/` com controle de download autenticado JWT.
 
-    > **Atenção — Migração Manual**: O `schema.sql` só é executado na criação inicial do volume Docker. Para aplicar em VPS existente, use:
+    > **Atenção — Migração Manual**: O `schema.sql` só é executado na criação inicial do volume Docker. Para aplicar tabelas novas em VPS existente, use:
     > ```bash
+    > # Tabela de cardápios semanais
     > docker exec nutrir_db psql -U postgres -d slimo -c "CREATE TABLE IF NOT EXISTS weekly_plans (...)"
+    > # Tabela de exames laboratoriais
+    > docker exec nutrir_db psql -U postgres -d slimo -c "CREATE TABLE IF NOT EXISTS patient_exams (...)"
+    > # Colunas clínicas na tabela profiles (se ausentes)
+    > docker exec nutrir_db psql -U postgres -d slimo -c "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS comorbidities TEXT; ADD COLUMN IF NOT EXISTS intolerances TEXT; ADD COLUMN IF NOT EXISTS dietary_restrictions TEXT; ADD COLUMN IF NOT EXISTS notes TEXT;"
     > ```
 
 ---
@@ -177,7 +182,7 @@ O frontend calcula a fração calórica adequada por tipo de refeição a partir
 - **Videoconferências Gratuitas (Jitsi Meet)**: Agendamentos geram automaticamente um link único e gratuito hospedado no Jitsi Meet no formato `https://meet.jit.si/nutrir-consultation-<patient_id>-<professional_id>-<timestamp>`, permitindo chamadas diretas pela plataforma por meio de um botão "Iniciar Chamada".
 - **Tela de Vídeo Chamada Split Screen (Profissional)**: Ao iniciar a consulta, o profissional é direcionado para a tela dividida `#screen-video-call`. A coluna da esquerda exibe o feed de vídeo (40%) e a coluna da direita (60%) atua como prontuário eletrônico em tempo real, organizado em abas:
   - **Diário Alimentar**: Exibe o diário do paciente detalhado e agrupado por dias, incluindo macros e fotos de refeições escaneadas.
-  - **Evolução de Peso [NOVO]**: Painel de acompanhamento físico do paciente com:
+  - **Evolução de Peso**: Painel de acompanhamento físico do paciente com:
     - KPIs de Peso Inicial, Peso Atual e Meta de Peso.
     - Card de conquista dinâmico (`#vc-w-achievement-card`) indicando o progresso de peso com base no objetivo (`lose`, `gain`, `maintain`).
     - Gráfico interativo de linha (`#vc-weight-chart`) renderizado via **Chart.js** comparando o histórico de pesagens com a meta.
@@ -309,27 +314,34 @@ A tela `screen-results` exibe após análise de imagem:
 - **Card de meta**: badge com o objetivo do usuário (`Emagrecer` / `Ganhar Massa` / `Manutenção`); macros com cores por tipo.
 - **Cards de dia**: nome do dia + data, calorias com cor semântica (verde = 85–105% da meta, azul = abaixo, vermelho = acima), barra de progresso, tags P/C/G e botão expandir para ver refeições individuais do dia com horário e macros.
 
-### M. Gestão Clínica e Particularidades do Paciente [NOVO]
+### M. Gestão Clínica e Particularidades do Paciente
 
 A plataforma evoluiu para um sistema completo de gestão clínica, permitindo acompanhar particularidades de saúde do paciente de forma integrada:
 
-1. **Particularidades do Perfil Clínico**:
+1. **Particularidades do Perfil Clínico** (`index.html` + `app.js` + `backend/routes/user.js`):
    - Pacientes informam comorbidades (ex: Diabetes, Hipertensão), intolerâncias/alergias alimentares (ex: lactose, glúten) e restrições alimentares no menu Perfil (`screen-settings`).
-   - Esses dados clínicos são persistidos na tabela `profiles`.
-2. **Envio de Exames Laboratoriais**:
-   - Pacientes de plano Premium podem fazer upload de arquivos de exames (PDF ou imagens) na tela de Meu Acompanhamento (`screen-my-professionals`).
-   - O arquivo é lido via `FileReader` como Base64 no frontend, trafegado via JSON e gravado de forma segura no disco do servidor em `backend/uploads/exams/`.
-   - Os metadados do exame são salvos na tabela `patient_exams`.
-3. **Visão Clínica do Profissional**:
-   - No prontuário do paciente (`patient-details-view`), o profissional conta com três abas de navegação:
-     - **Diário Alimentar**: Histórico detalhado de refeições com aderência calórica e filtro de período.
-     - **Ficha Clínica**: Formulário clínico editável para comorbidades, intolerâncias e notas clínicas.
-     - **Exames**: Listagem de exames do paciente com botão para download seguro e campo de notas médicas individuais por exame.
-4. **Alerta Clínico no Construtor de Cardápios**:
-   - Ao abrir o Construtor de Cardápio Semanal (`meal-plans-builder-view`), um banner de alerta clínico exibe de forma persistente as comorbidades, intolerâncias e restrições do paciente selecionado.
-5. **Integração com a IA**:
-   - As informações clínicas do paciente são injetadas no payload das requisições de geração de receitas.
-   - Os prompts do backend foram aprimorados para instruir a Inteligência Artificial a respeitar rigorosamente essas restrições ao planejar e criar receitas (ex: omitir derivados de leite para intolerantes à lactose e açúcares para diabéticos).
+   - Esses dados clínicos são persistidos nas colunas `comorbidities`, `intolerances`, `dietary_restrictions` e `notes` da tabela `profiles`.
+   - Rotas backend: `GET /api/user/clinical-profile` e `PUT /api/user/clinical-profile`.
+
+2. **Envio e Gestão Segura de Exames Laboratoriais** (`backend/routes/user.js` + `backend/routes/professional.js`):
+   - Pacientes Premium fazem upload de exames (PDF ou imagens) na tela Meu Acompanhamento (`screen-my-professionals`).
+   - **Fluxo de upload**: `FileReader` lê o arquivo como Base64 no frontend → JSON `{ file_name, mime_type, data_base64, notes }` enviado para `POST /api/user/exams` → backend decodifica o Base64 e grava o arquivo binário em `backend/uploads/exams/<uuid>.<ext>` → metadados persistidos em `patient_exams`.
+   - **Download autenticado**: `GET /api/user/exams/:id/download` exige JWT válido, serve o arquivo com `Content-Disposition: attachment`.
+   - **Visão do profissional**: `GET /api/professional/patients/:id/exams` lista exames; `PATCH /api/professional/patients/:id/exams/:examId/notes` salva observações médicas por exame.
+
+3. **Prontuário com Três Abas (Profissional)** (`admin/index.html` + `admin/modules/pro-patients.js`):
+   - O painel lateral do paciente (`patient-details-view`) é dividido em três abas de navegação:
+     - **Diário Alimentar**: Histórico detalhado de refeições com filtros de período (7 dias / 30 dias / Tudo), aderência calórica diária e gráfico de evolução de peso Chart.js.
+     - **Ficha Clínica**: Formulário editável em tempo real para comorbidades, intolerâncias e notas clínicas do profissional sobre o paciente. Salva via `PUT /api/professional/patients/:id/clinical`.
+     - **Exames**: Lista de exames enviados pelo paciente, botão de download seguro e textarea de observações médicas por exame.
+
+4. **Banner de Alerta Clínico no Construtor de Cardápios** (`admin/modules/pro-meals.js`):
+   - Ao selecionar um paciente no construtor, um banner fixo no topo exibe em destaque as comorbidades, intolerâncias e restrições dietéticas daquele paciente.
+   - Objetivo: lembrar o profissional das restrições de saúde durante toda a montagem do cardápio, evitando erros clínicos.
+
+5. **Integração com a IA — Restrições Clínicas** (`backend/routes/ai.js`):
+   - Quando um profissional solicita geração de receita no construtor, as informações clínicas do paciente selecionado são injetadas no payload de `POST /api/ai/generate-recipe` e `POST /api/ai/generate-weekly`.
+   - Os prompts do backend instruem a IA a respeitar rigorosamente essas restrições (ex: sem lactose, sem glúten, adaptações para diabetes) e a indicar substituições seguras nos ingredientes.
 
 ---
 
@@ -458,41 +470,63 @@ O projeto `mobile-android/` é um **WebView wrapper** que carrega `https://nutri
 Com o crescimento do painel de administração, o arquivo monolítico `admin/admin.js` original foi reestruturado para utilizar **ES6 Modules nativos** (`type="module"`), dividindo as responsabilidades em arquivos menores e focados sem necessidade de ferramentas de empacotamento adicionais (como Vite, Webpack ou Babel).
 
 ### Princípios da Arquitetura:
-1. **Sem Build Step**: Todos os submódulos são scripts JavaScript padrão carregados diretamente pelo browser via declaração `<script type="module" src="admin.js"></script>` no [index.html](file:///c:/Users/admin/Desktop/Dieta/admin/index.html).
-2. **Estado Centralizado**: Para evitar problemas de acoplamento e compartilhamento de variáveis globais, todo o estado mutável do painel é armazenado e exportado pelo arquivo [state.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/state.js).
-3. **Escopo Limpo**: Funções e variáveis internas de cada submódulo ficam protegidas sob o escopo do próprio módulo, expondo apenas o estritamente necessário através de `export`.
+1. **Sem Build Step**: Todos os submódulos são scripts JavaScript padrão carregados diretamente pelo browser via declaração `<script type="module" src="admin.js"></script>` no `admin/index.html`.
+2. **Estado Centralizado**: Todo o estado mutável do painel é armazenado e exportado pelo `state.js`. Nenhum módulo declara variáveis globais — todos importam `adminState` de `state.js`.
+3. **Escopo Limpo**: Funções e variáveis internas de cada submódulo ficam protegidas sob o escopo do próprio módulo, expondo apenas o estritamente necessário via `export`.
+4. **Entrypoint único**: `admin.js` orquestra o ciclo de vida — chama `initAuth()`, `initProSchedule()`, `initProPatients()` e `initProMeals()` no `DOMContentLoaded`, registra os listeners de navegação e delega a carga de dados de cada aba para o módulo responsável via `loadTab(tabId)`.
+
+### Estrutura de Imports (`admin/admin.js`):
+```javascript
+import { adminState } from './modules/state.js';
+import { initAuth, checkSession, showLoginScreen, handleLogin } from './modules/auth.js';
+import { initAdminFeatures, loadOverviewData, loadUsersData, loadProfessionalsData,
+         loadPlansData, loadSettingsData, loadBillingData, setupVisibilityToggles,
+         resetPlanForm, handlePlanSave, handleProRegistration, handleSettingsSave
+       } from './modules/admin-features.js';
+import { initProSchedule, loadScheduleData } from './modules/pro-schedule.js';
+import { initProPatients, loadPatientsData } from './modules/pro-patients.js';
+import { loadAppointmentsData } from './modules/pro-appointments.js';
+import { initProMeals, loadMealPlansData, openMealPlanBuilder, saveMealPlan } from './modules/pro-meals.js';
+```
 
 ### Descrição dos Submódulos (`admin/modules/`):
 
-- **[state.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/state.js)**:
-  - Centraliza a definição de `API_URL` (chaveamento local/produção).
-  - Centraliza o objeto `adminState` (tokens, chaves temporárias de edição, cache).
+- **`state.js`**:
+  - Exporta `API_URL` (detecta `localhost` para dev vs produção automaticamente).
+  - Exporta `adminState` — objeto mutável compartilhado: `token`, `user`, dados em cache de pacientes/planos/settings e referências a instâncias Chart.js ativas.
 
-- **[auth.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/auth.js)**:
-  - Lida com exibição do formulário de login e do dashboard principal de acordo com as permissões do usuário.
-  - Funções principais: `initAuth()`, `checkSession()`, `handleLogin()`.
+- **`auth.js`**:
+  - `initAuth(callback)`: verifica token salvo no `localStorage`, valida com `GET /api/auth/me` e executa o callback com o tab padrão correto (`overview` para admin, `patients` para profissional).
+  - `handleLogin(e)`: captura submit do form de login, chama `POST /api/auth/login`, armazena token e inicia dashboard.
+  - `showLoginScreen()` / `showDashboard()`: alterna visibilidade entre `#login-container` e `#admin-dashboard`.
 
-- **[admin-features.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/admin-features.js)**:
-  - Responsabilidades específicas do perfil `admin` (Administrador Geral).
-  - Inclui gerenciamento de usuários, listagem/comissões de profissionais, CRUD de planos comerciais, aba de credenciais de IA/Spoonacular/MercadoPago/Asaas, teste de latência de IA e estatísticas financeiras/faturamento geral do sistema.
+- **`admin-features.js`**:
+  - Exclusivo do perfil `admin`. Gerencia: listagem/edição de usuários, cadastro de profissionais com comissão, CRUD de planos comerciais, aba de credenciais (IA + Spoonacular + gateways de pagamento), teste de latência de IA e faturamento geral.
+  - Exporta `setupVisibilityToggles()` — inicializa botões de toggle de visibilidade em campos de senha (`.toggle-visibility-btn`) e é chamado pelo entrypoint antes da autenticação.
 
-- **[pro-schedule.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/pro-schedule.js)**:
-  - Lógica do calendário e agenda interativa dos profissionais de saúde (slots de 30 min, 07h–20h30).
-  - Converte as seleções visuais na grade para os intervalos persistidos no banco.
+- **`pro-schedule.js`**:
+  - Grade visual 7×28 de disponibilidade semanal (slots de 30 min, 07h–20h30).
+  - `initProSchedule()`: registra listeners de clique/drag na grade e nos botões de preset.
+  - `loadScheduleData()`: carrega slots salvos de `GET /api/admin/availability` e marca células ativas.
 
-- **[pro-appointments.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/pro-appointments.js)**:
-  - Exibe e gerencia consultas agendadas, permitindo o cancelamento de agendamentos e inicialização de chamadas de vídeo.
+- **`pro-appointments.js`**:
+  - `loadAppointmentsData()`: busca consultas agendadas do profissional em `GET /api/professional/appointments` e renderiza tabela com badge de status e botão cancelar/iniciar chamada.
 
-- **[pro-patients.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/pro-patients.js)**:
-  - Centraliza o prontuário de pacientes em tempo real durante teleconsultas.
-  - Renderiza gráficos físicos de evolução de peso usando **Chart.js** e calcula o card de conquistas dinâmico.
-  - Implementa a lógica cliente de sinalização WebSocket e canais WebRTC para videoconferências.
+- **`pro-patients.js`**:
+  - `initProPatients()`: registra listeners para filtros de refeição, busca de pacientes e navegação de abas do prontuário.
+  - `loadPatientsData()`: carrega lista de pacientes vinculados com filtros nome/e-mail e objetivo.
+  - `viewPatientDetails(patientId)`: carrega prontuário completo — diário alimentar (com `applyMealFilter`), gráfico de peso (Chart.js `line`), ficha clínica e exames laboratoriais nas três abas do `patient-details-view`.
+  - `renderPatientWeightChart(weights)`: destrói instância anterior (`adminState._patientWeightChart`) e recria o gráfico com tema escuro/âmbar.
 
-- **[pro-meals.js](file:///c:/Users/admin/Desktop/Dieta/admin/modules/pro-meals.js)**:
-  - Construtor visual de cardápios semanais atribuídos a pacientes.
-  - Busca integrada com o proxy traduzido do Spoonacular e fluxo interativo de receitas personalizadas com IA.
+- **`pro-meals.js`**:
+  - `initProMeals()`: registra listeners da barra de busca Spoonacular (`#btn-calorie-search`, `#calorie-search-input`) e do modal de receitas IA (`#admin-recipe-generator-modal`).
+  - `loadMealPlansData()`: busca planos de `GET /api/professional/weekly-plans` e renderiza tabela de lista.
+  - `openMealPlanBuilder(planId?)`: abre o construtor visual, exibe banner de alertas clínicos do paciente selecionado e renderiza as abas de dias com cards de refeição.
+  - `runCalorieSearch()`: chama proxy Spoonacular (`GET /api/admin/calorie-search?q=...`), renderiza resultados com porções e botões "Adicionar" / "Receita IA".
+  - `saveMealPlan()`: persiste o plano via `POST` ou `PUT /api/professional/weekly-plans/:id`.
 
 ### Diretrizes para Novas Implementações no Painel Admin:
-- **Importações**: Sempre utilize caminhos relativos completos com a extensão do arquivo (ex: `import { adminState } from './state.js';` em vez de `./state`).
-- **Registros Estáticos de Listeners**: Registre listeners para botões globais ou modais estáticos dentro das funções de inicialização dos submódulos (ex: `initProMeals()`) chamadas no `DOMContentLoaded` do entrypoint `admin.js`.
-- **Modais e Elementos DOM Dinâmicos**: Se um elemento é criado em tempo de execução (ex: botões de ações em linhas de tabelas), associe os listeners diretamente no momento da sua renderização.
+- **Importações**: Sempre use caminhos relativos com extensão completa: `import { adminState } from './state.js'` (sem omitir `.js`).
+- **Listeners estáticos**: Registre em funções `init*()` chamadas no `DOMContentLoaded` do `admin.js`. Nunca dentro de funções `load*()` que executam após chamadas à API.
+- **Listeners dinâmicos**: Se o elemento é gerado em tempo de execução (ex: botão de linha de tabela), associe o listener diretamente no momento da renderização do HTML.
+- **Novo módulo**: crie o arquivo em `admin/modules/`, exporte as funções públicas, importe no `admin.js` e adicione a chamada de init e load no fluxo de `initAdmin()` / `loadTab()`.
