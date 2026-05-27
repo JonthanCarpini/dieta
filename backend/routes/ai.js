@@ -247,6 +247,38 @@ Responda APENAS com JSON puro sem markdown — array com exatamente 7 objetos:
 [{"day":1,"name":"Nome criativo","time_min":20,"calories":${calPerMeal},"protein":${protPerMeal},"carbs":${carbPerMeal},"fat":${fatPerMeal},"ingredients":[{"name":"Ingrediente","amount":150,"unit":"g"}],"directions":"1. Passo um.\\n2. Passo dois.\\n3. Passo três."}]`;
 }
 
+function promptAnalyzeBody(heightCm) {
+  return `Você é um especialista em composição corporal e avaliação física com 20 anos de experiência clínica.
+
+Analise esta foto de avaliação corporal (posição frontal, roupa de banho, braços e pernas abertos) e estime as medidas antropométricas com base nas proporções visíveis.
+
+PARÂMETRO EXATO CONHECIDO:
+- Altura: ${heightCm} cm (use como régua de referência para calibrar TODAS as estimativas de circunferência e composição)
+
+METODOLOGIA:
+1. Use a altura como escala de referência para estimar as dimensões dos segmentos corporais
+2. Estime as circunferências com base nas proporções relativas à altura e ao desenvolvimento muscular visível
+3. Estime o percentual de gordura pela distribuição visível de gordura subcutânea (abdômen, quadril, membros)
+4. Estime a massa muscular com base no desenvolvimento muscular aparente e na estimativa de peso total
+5. Seja conservador — prefira valores médios da população quando houver incerteza visual
+
+REFERÊNCIAS ANTROPOMÉTRICAS HUMANAS (use como sanity check):
+- Cintura feminina típica: 65–90 cm; masculina: 75–100 cm
+- Quadril feminino típico: 88–110 cm; masculino: 90–108 cm
+- Braço masculino típico: 28–42 cm; feminino: 26–36 cm
+- Coxa masculina típica: 48–65 cm; feminina: 52–68 cm
+- Gordura corporal saudável: homem 10–22%, mulher 20–32%
+
+REGRAS:
+- Responda APENAS com JSON puro, sem markdown, sem explicações fora do JSON
+- Use números decimais com ponto (ex: 28.5 não "28,5")
+- Se a foto não mostrar o corpo claramente, retorne confidence: 0 e explique em "notes"
+- Todas as estimativas devem ser biologicamente plausíveis
+
+Responda com exatamente este JSON (sem campos extras):
+{"body_fat_pct":<decimal>,"waist_cm":<decimal>,"hip_cm":<decimal>,"chest_cm":<decimal>,"arm_cm":<decimal>,"thigh_cm":<decimal>,"muscle_mass_kg":<decimal>,"visual_assessment":"<ectomorfo|mesomorfo|endomorfo>","confidence":<0-10>,"notes":"<observações breves sobre precisão>"}`;
+}
+
 // ── Routes ────────────────────────────────────────────────────
 
 // POST /api/ai/analyze-food
@@ -297,6 +329,26 @@ router.post('/generate-weekly', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Erro generate-weekly:', err.message);
     res.status(502).json({ error: 'Falha ao gerar plano semanal com IA.', detail: err.message });
+  }
+});
+
+// POST /api/ai/analyze-body
+router.post('/analyze-body', authenticateToken, async (req, res) => {
+  const t0 = Date.now();
+  try {
+    const { image, height_cm } = req.body;
+    if (!image) return res.status(400).json({ error: 'Imagem base64 obrigatória.' });
+    if (!height_cm || isNaN(parseFloat(height_cm))) {
+      return res.status(400).json({ error: 'Altura em cm obrigatória para calibrar as estimativas.' });
+    }
+    const cfg = await getLLMConfig();
+    const { text, provider, model } = await callLLM(cfg, promptAnalyzeBody(parseFloat(height_cm)), image);
+    const result = JSON.parse(text);
+    result._meta = { provider, model, latency_ms: Date.now() - t0 };
+    res.json(result);
+  } catch (err) {
+    console.error('Erro analyze-body:', err.message);
+    res.status(502).json({ error: 'Falha ao analisar foto corporal com IA.', detail: err.message });
   }
 });
 

@@ -841,4 +841,43 @@ router.get('/exams/download/:filename', async (req, res) => {
   }
 });
 
+// ==========================================
+// 10. MEDIÇÕES CORPORAIS PRÓPRIAS (APK)
+// ==========================================
+
+router.get('/measurements', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM patient_measurements WHERE patient_id = $1 ORDER BY measured_at DESC, created_at DESC LIMIT 10',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar avaliações corporais.' });
+  }
+});
+
+router.post('/measurements', async (req, res) => {
+  const { measured_at, weight_kg, height_cm, body_fat_pct, muscle_mass_kg,
+          waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, notes } = req.body;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const result = await db.query(
+      `INSERT INTO patient_measurements
+         (patient_id, professional_id, measured_at, weight_kg, height_cm,
+          body_fat_pct, muscle_mass_kg, waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [req.user.id, null, measured_at || today,
+       weight_kg || null, height_cm || null, body_fat_pct || null,
+       muscle_mass_kg || null, waist_cm || null, hip_cm || null,
+       chest_cm || null, arm_cm || null, thigh_cm || null, notes || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar avaliação corporal.' });
+  }
+});
+
 module.exports = router;

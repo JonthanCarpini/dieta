@@ -1170,6 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         trialCard.classList.add('hidden');
         premiumContainer.classList.remove('hidden');
+        loadBodyEval();
 
         const token = localStorage.getItem('nutrir_token');
         try {
@@ -5141,4 +5142,221 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 15000);
     }
+
+    // ── AVALIAÇÃO CORPORAL POR IA ─────────────────────────────
+
+    let _bodyEvalListenersReady = false;
+
+    function _renderBodyEvalMetrics(data) {
+        const fmt = v => (v != null && !isNaN(v)) ? parseFloat(v).toFixed(1) : '—';
+        const assessment = data.visual_assessment || '';
+        const confidence = data.confidence != null ? data.confidence : '?';
+
+        return `
+            <span class="body-eval-assessment-badge">${assessment || 'não definido'}</span>
+            <div class="body-eval-metric-grid">
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(data.body_fat_pct)}<span style="font-size:11px;font-weight:400"> %</span></div>
+                    <div class="body-eval-metric-lbl">Gordura Corporal</div>
+                </div>
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(data.muscle_mass_kg)}<span style="font-size:11px;font-weight:400"> kg</span></div>
+                    <div class="body-eval-metric-lbl">Massa Muscular Est.</div>
+                </div>
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(data.waist_cm)}<span style="font-size:11px;font-weight:400"> cm</span></div>
+                    <div class="body-eval-metric-lbl">Cintura</div>
+                </div>
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(data.hip_cm)}<span style="font-size:11px;font-weight:400"> cm</span></div>
+                    <div class="body-eval-metric-lbl">Quadril</div>
+                </div>
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(data.chest_cm)}<span style="font-size:11px;font-weight:400"> cm</span></div>
+                    <div class="body-eval-metric-lbl">Tórax</div>
+                </div>
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(data.arm_cm)}<span style="font-size:11px;font-weight:400"> cm</span></div>
+                    <div class="body-eval-metric-lbl">Braço</div>
+                </div>
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(data.thigh_cm)}<span style="font-size:11px;font-weight:400"> cm</span></div>
+                    <div class="body-eval-metric-lbl">Coxa</div>
+                </div>
+            </div>
+            <div class="body-eval-confidence">
+                <i data-lucide="shield-check" style="width:13px;height:13px;"></i>
+                Confiança da IA: ${confidence}/10
+            </div>
+            ${data.notes ? `<p class="body-eval-notes">${data.notes}</p>` : ''}
+        `;
+    }
+
+    async function loadBodyEval() {
+        const token = localStorage.getItem('nutrir_token');
+
+        // Setup one-time event listeners
+        if (!_bodyEvalListenersReady) {
+            _bodyEvalListenersReady = true;
+
+            const inputPhoto = document.getElementById('input-body-photo');
+            const btnSelect  = document.getElementById('btn-select-body-photo');
+            const btnAnalyze = document.getElementById('btn-analyze-body-photo');
+            const fileLabel  = document.getElementById('body-eval-filename');
+            const btnNew     = document.getElementById('btn-new-body-eval');
+
+            let _capturedBodyImage = null;
+
+            btnSelect.addEventListener('click', () => inputPhoto.click());
+
+            inputPhoto.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                fileLabel.textContent = file.name;
+                fileLabel.classList.remove('hidden');
+                btnAnalyze.setAttribute('disabled', 'true');
+                btnAnalyze.classList.remove('hidden');
+                btnAnalyze.textContent = 'Processando...';
+
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const tmpCanvas = document.createElement('canvas');
+                        tmpCanvas.width  = img.width;
+                        tmpCanvas.height = img.height;
+                        tmpCanvas.getContext('2d').drawImage(img, 0, 0);
+                        _capturedBodyImage = resizeImageToBase64(tmpCanvas, 1200, 0.85);
+                        btnAnalyze.removeAttribute('disabled');
+                        btnAnalyze.innerHTML = '<i data-lucide="sparkles" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:6px;"></i>Analisar com IA';
+                        if (window.lucide) window.lucide.createIcons();
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            btnAnalyze.addEventListener('click', async () => {
+                if (!_capturedBodyImage) return;
+                const heightCm = state.userProfile && state.userProfile.height ? state.userProfile.height : null;
+                if (!heightCm) {
+                    alert('Você precisa ter sua altura cadastrada no perfil para usar este recurso.');
+                    return;
+                }
+
+                const uploadSection = document.getElementById('body-eval-upload-section');
+                const loader        = document.getElementById('body-eval-loader');
+                const resultsWrap   = document.getElementById('body-eval-results');
+                const resultsInner  = document.getElementById('body-eval-results-inner');
+
+                uploadSection.classList.add('hidden');
+                loader.classList.remove('hidden');
+                resultsWrap.classList.add('hidden');
+
+                try {
+                    const base64 = _capturedBodyImage.split(',')[1];
+                    const aiRes = await fetch(`${API_URL}/ai/analyze-body`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ image: base64, height_cm: heightCm })
+                    });
+                    if (!aiRes.ok) {
+                        const e = await aiRes.json().catch(() => ({}));
+                        throw new Error(e.error || 'Falha na análise com IA.');
+                    }
+                    const aiData = await aiRes.json();
+
+                    // Auto-save
+                    const today = new Date().toISOString().split('T')[0];
+                    await fetch(`${API_URL}/user/measurements`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            measured_at:    today,
+                            height_cm:      heightCm,
+                            body_fat_pct:   aiData.body_fat_pct,
+                            muscle_mass_kg: aiData.muscle_mass_kg,
+                            waist_cm:       aiData.waist_cm,
+                            hip_cm:         aiData.hip_cm,
+                            chest_cm:       aiData.chest_cm,
+                            arm_cm:         aiData.arm_cm,
+                            thigh_cm:       aiData.thigh_cm,
+                            notes:          `IA (confiança ${aiData.confidence}/10): ${aiData.notes || ''}`
+                        })
+                    });
+
+                    loader.classList.add('hidden');
+                    resultsInner.innerHTML = _renderBodyEvalMetrics(aiData);
+                    resultsWrap.classList.remove('hidden');
+                    if (window.lucide) window.lucide.createIcons();
+
+                    // Refresh last eval section
+                    _renderLastBodyEval([aiData]);
+
+                    if (aiData._meta) {
+                        console.group('%c[Nutrir IA] Avaliação Corporal', 'color:#a78bfa;font-weight:bold');
+                        console.log(`Provedor: ${aiData._meta.provider} | Modelo: ${aiData._meta.model}`);
+                        console.log(`Latência: ${aiData._meta.latency_ms}ms | Confiança: ${aiData.confidence}/10`);
+                        console.groupEnd();
+                    }
+                } catch (err) {
+                    loader.classList.add('hidden');
+                    uploadSection.classList.remove('hidden');
+                    alert('Erro na análise: ' + err.message);
+                }
+            });
+
+            btnNew.addEventListener('click', () => {
+                _capturedBodyImage = null;
+                inputPhoto.value = '';
+                fileLabel.textContent = '';
+                fileLabel.classList.add('hidden');
+                btnAnalyze.classList.add('hidden');
+
+                document.getElementById('body-eval-upload-section').classList.remove('hidden');
+                document.getElementById('body-eval-results').classList.add('hidden');
+            });
+        }
+
+        // Load last saved measurement
+        try {
+            const measRes = await fetch(`${API_URL}/user/measurements`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (measRes.ok) {
+                const measurements = await measRes.json();
+                _renderLastBodyEval(measurements);
+            }
+        } catch (_) {}
+    }
+
+    function _renderLastBodyEval(measurements) {
+        const container = document.getElementById('body-eval-last-content');
+        if (!container) return;
+        if (!measurements || measurements.length === 0) {
+            container.innerHTML = '<p style="font-size:11px; opacity:0.4; text-align:center;">Nenhuma avaliação realizada ainda.</p>';
+            return;
+        }
+        const m = measurements[0];
+        const fmt = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '—';
+        const date = m.measured_at ? new Date(m.measured_at + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+        container.innerHTML = `
+            <p style="font-size:11px; opacity:0.55; margin-bottom:8px;">Realizada em ${date}</p>
+            <div class="body-eval-metric-grid" style="grid-template-columns:1fr 1fr 1fr;">
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(m.body_fat_pct)}<span style="font-size:10px;font-weight:400">%</span></div>
+                    <div class="body-eval-metric-lbl">% Gordura</div>
+                </div>
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(m.waist_cm)}<span style="font-size:10px;font-weight:400">cm</span></div>
+                    <div class="body-eval-metric-lbl">Cintura</div>
+                </div>
+                <div class="body-eval-metric">
+                    <div class="body-eval-metric-val">${fmt(m.hip_cm)}<span style="font-size:10px;font-weight:400">cm</span></div>
+                    <div class="body-eval-metric-lbl">Quadril</div>
+                </div>
+            </div>
+        `;
+    }
+
 });

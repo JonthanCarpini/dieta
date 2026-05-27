@@ -924,6 +924,48 @@
                         </div>
                     </div>
 
+                    <!-- 5. AVALIAÇÃO CORPORAL POR IA -->
+                    <div class="settings-card" id="body-eval-card">
+                        <div class="card-header-icon border-gemini">
+                            <i data-lucide="scan-line" class="text-gemini"></i>
+                            <h3>Avaliação Corporal por IA</h3>
+                        </div>
+                        <p class="settings-description">Envie uma foto em roupa de banho de frente, com braços e pernas abertos. A IA estima suas medidas antropométricas usando sua altura como referência de escala.</p>
+
+                        <div id="body-eval-upload-section" style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+                            <input type="file" id="input-body-photo" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                            <button class="btn-primary w-full" id="btn-select-body-photo">
+                                <i data-lucide="camera" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:6px;"></i>
+                                Selecionar Foto
+                            </button>
+                            <div id="body-eval-filename" class="hidden" style="font-size:12px; opacity:0.65; text-align:center; padding:4px 0;"></div>
+                            <button class="btn-primary w-full hidden" id="btn-analyze-body-photo" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+                                <i data-lucide="sparkles" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:6px;"></i>
+                                Analisar com IA
+                            </button>
+                        </div>
+
+                        <div id="body-eval-loader" class="hidden" style="text-align:center; padding:24px 0;">
+                            <div class="ai-loader-spinner" style="margin:0 auto 10px;"></div>
+                            <p style="font-size:12px; opacity:0.6;">Analisando composição corporal com IA...</p>
+                        </div>
+
+                        <div id="body-eval-results" class="hidden" style="margin-top:14px;">
+                            <div id="body-eval-results-inner"></div>
+                            <button class="btn-secondary w-full" id="btn-new-body-eval" style="margin-top:12px; font-size:12px;">
+                                <i data-lucide="refresh-cw" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"></i>
+                                Nova Avaliação
+                            </button>
+                        </div>
+
+                        <div id="body-eval-last" style="margin-top:14px; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px;">
+                            <h5 style="font-size:12px; font-weight:600; margin-bottom:8px; opacity:0.7;">Última Avaliação Registrada</h5>
+                            <div id="body-eval-last-content">
+                                <p style="font-size:11px; opacity:0.4; text-align:center;">Nenhuma avaliação realizada ainda.</p>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
             </div>
