@@ -738,41 +738,6 @@
                     </button>
                 </div>
 
-                <!-- Perfil Clínico (Comorbidades e Intolerâncias) -->
-                <div class="settings-card">
-                    <div class="card-header-icon border-profile">
-                        <i data-lucide="activity" class="text-profile"></i>
-                        <h3>Perfil Clínico</h3>
-                    </div>
-                    <p class="settings-description">Informe suas particularidades de saúde e restrições alimentares. Essas informações serão compartilhadas com os profissionais de saúde vinculados e serão rigorosamente respeitadas pela nossa Inteligência Artificial ao sugerir receitas.</p>
-                    
-                    <div id="clinical-saved-summary" style="display:none; margin-top:12px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.2); border-radius:10px; padding:12px 14px; justify-content:space-between; align-items:center; gap:10px;">
-                        <div style="font-size:12px; color:rgba(255,255,255,0.7); line-height:1.5;">
-                            <i data-lucide="check-circle" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px;color:#22c55e;"></i>
-                            Dados clínicos salvos com sucesso.
-                        </div>
-                        <button id="btn-edit-clinical" class="btn-secondary" style="font-size:11px; padding:5px 12px; height:auto; white-space:nowrap;">Editar</button>
-                    </div>
-
-                    <div id="clinical-form-content">
-                        <form id="settings-clinical-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
-                            <div class="form-group">
-                                <label for="input-settings-comorbidities" style="font-size: 11px;">Comorbidades / Condições de Saúde</label>
-                                <input type="text" id="input-settings-comorbidities" placeholder="Ex: Diabetes Tipo 2, Hipertensão, Gastrite..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
-                            </div>
-                            <div class="form-group">
-                                <label for="input-settings-intolerances" style="font-size: 11px;">Intolerâncias e Alergias Alimentares</label>
-                                <input type="text" id="input-settings-intolerances" placeholder="Ex: Lactose, Glúten, Amendoim, Ovos..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
-                            </div>
-                            <div class="form-group">
-                                <label for="input-settings-restrictions" style="font-size: 11px;">Restrições Alimentares Adicionais</label>
-                                <input type="text" id="input-settings-restrictions" placeholder="Ex: Vegano, Vegetariano, Sem carne vermelha..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
-                            </div>
-                            <button type="submit" class="btn-primary w-full" style="padding: 12px; font-size: 14px;">Salvar Dados Clínicos</button>
-                        </form>
-                    </div>
-                </div>
-
                 <!-- Área Evolutiva (Histórico de Peso) -->
                 <div class="settings-card">
                     <div class="card-header-icon border-profile">
@@ -823,6 +788,53 @@
                         <i data-lucide="trash-2"></i>
                         Resetar Todos os Dados
                     </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 8.A TELA DEDICADA: PERFIL CLÍNICO          -->
+        <!-- ========================================== -->
+        <section id="screen-clinical-profile" class="screen">
+            <header class="scanner-header">
+                <div style="width: 40px;"></div>
+                <h3>Perfil Clínico</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="scrollable-content settings-content">
+                <div class="settings-card">
+                    <div class="card-header-icon border-profile">
+                        <i data-lucide="activity" class="text-profile"></i>
+                        <h3>Suas Particularidades</h3>
+                    </div>
+                    <p class="settings-description">Informe suas particularidades de saúde e restrições alimentares. Essas informações serão compartilhadas com os profissionais de saúde vinculados e serão rigorosamente respeitadas pela nossa Inteligência Artificial ao sugerir receitas.</p>
+
+                    <div id="clinical-saved-summary" style="display:none; margin-top:12px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.2); border-radius:10px; padding:12px 14px; justify-content:space-between; align-items:center; gap:10px;">
+                        <div style="font-size:12px; color:rgba(255,255,255,0.7); line-height:1.5;">
+                            <i data-lucide="check-circle" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px;color:#22c55e;"></i>
+                            Dados clínicos salvos com sucesso.
+                        </div>
+                        <button id="btn-edit-clinical" class="btn-secondary" style="font-size:11px; padding:5px 12px; height:auto; white-space:nowrap;">Editar</button>
+                    </div>
+
+                    <div id="clinical-form-content">
+                        <form id="settings-clinical-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                            <div class="form-group">
+                                <label for="input-settings-comorbidities" style="font-size: 11px;">Comorbidades / Condições de Saúde</label>
+                                <input type="text" id="input-settings-comorbidities" placeholder="Ex: Diabetes Tipo 2, Hipertensão, Gastrite..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-settings-intolerances" style="font-size: 11px;">Intolerâncias e Alergias Alimentares</label>
+                                <input type="text" id="input-settings-intolerances" placeholder="Ex: Lactose, Glúten, Amendoim, Ovos..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-settings-restrictions" style="font-size: 11px;">Restrições Alimentares Adicionais</label>
+                                <input type="text" id="input-settings-restrictions" placeholder="Ex: Vegano, Vegetariano, Sem carne vermelha..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
+                            </div>
+                            <button type="submit" class="btn-primary w-full" style="padding: 12px; font-size: 14px;">Salvar Dados Clínicos</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1079,7 +1091,7 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- NAVEGAÇÃO INFERIOR DE 5 ABAS (SLIMO STYLE) -->
+        <!-- NAVEGAÇÃO INFERIOR (SLIMO STYLE) -->
         <!-- ========================================== -->
         <nav class="bottom-nav" id="main-navigation">
             <button class="nav-item active" data-target="screen-dashboard">
@@ -1101,6 +1113,10 @@
             <button class="nav-item" data-target="screen-my-professionals">
                 <i data-lucide="users"></i>
                 <span>Profissional</span>
+            </button>
+            <button class="nav-item" data-target="screen-clinical-profile">
+                <i data-lucide="activity"></i>
+                <span>Clínico</span>
             </button>
             <button class="nav-item" data-target="screen-settings">
                 <i data-lucide="user"></i>

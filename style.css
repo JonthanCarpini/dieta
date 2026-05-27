@@ -2201,16 +2201,18 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); }
     display: flex; flex-direction: column;
     align-items: center; gap: 3px;
     cursor: pointer;
-    font-size: 9px;
+    font-size: 8px;
     font-family: 'Geist', sans-serif;
     font-weight: 500;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.02em;
     flex: 1;
+    min-width: 0;
     transition: var(--transition-smooth);
-    padding: 6px 4px 0;
+    padding: 6px 2px 0;
 }
 
-.nav-item i { width: 18px; height: 18px; }
+.nav-item i { width: 17px; height: 17px; }
+.nav-item span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 .nav-item.active { color: var(--color-primary); }
 .nav-item.active i { filter: drop-shadow(0 0 6px rgba(245,193,77,0.5)); }

@@ -1743,6 +1743,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'screen-settings') {
             renderSettingsPage();
         }
+        if (screenId === 'screen-clinical-profile') {
+            renderClinicalProfileScreen();
+        }
         if (screenId === 'screen-my-professionals') {
             renderMyProfessionalsScreen();
         }
@@ -4272,33 +4275,35 @@ document.addEventListener('DOMContentLoaded', () => {
             adminCard.style.display = (state.user && state.user.role === 'admin') ? 'block' : 'none';
         }
 
-        // Preencher perfil clínico se existir
+        // Renderiza o histórico de peso na Área Evolutiva
+        renderWeightHistory();
+     }
+
+    // 21.B PÁGINA DEDICADA: PERFIL CLÍNICO
+    function renderClinicalProfileScreen() {
+        const profile = state.userProfile;
         const inputComorbidities = document.getElementById('input-settings-comorbidities');
         const inputIntolerances = document.getElementById('input-settings-intolerances');
         const inputRestrictions = document.getElementById('input-settings-restrictions');
 
-        if (inputComorbidities) inputComorbidities.value = profile.comorbidities || '';
-        if (inputIntolerances) inputIntolerances.value = profile.intolerances || '';
-        if (inputRestrictions) inputRestrictions.value = profile.dietary_restrictions || '';
+        if (inputComorbidities) inputComorbidities.value = (profile && profile.comorbidities) || '';
+        if (inputIntolerances) inputIntolerances.value = (profile && profile.intolerances) || '';
+        if (inputRestrictions) inputRestrictions.value = (profile && profile.dietary_restrictions) || '';
 
-        // Se já tem dados clínicos salvos, mostrar no estado colapsado
-        const hasClinicalData = profile.comorbidities || profile.intolerances || profile.dietary_restrictions;
+        const hasClinicalData = profile && (profile.comorbidities || profile.intolerances || profile.dietary_restrictions);
         const formContent = document.getElementById('clinical-form-content');
         const savedSummary = document.getElementById('clinical-saved-summary');
         if (formContent && savedSummary) {
             if (hasClinicalData) {
                 formContent.style.display = 'none';
                 savedSummary.style.display = 'flex';
-                if (window.lucide) window.lucide.createIcons();
             } else {
                 formContent.style.display = '';
                 savedSummary.style.display = 'none';
             }
         }
-
-        // Renderiza o histórico de peso na Área Evolutiva
-        renderWeightHistory();
-     }
+        if (window.lucide) window.lucide.createIcons();
+    }
 
     function renderWeightHistory() {
         const historyContainer = document.getElementById('weight-history-list');
