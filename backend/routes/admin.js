@@ -268,9 +268,22 @@ router.get('/calorie-search', requireRole(['admin', 'nutritionist', 'trainer']),
   try {
     const settingsRes = await db.query("SELECT value FROM system_settings WHERE key = 'usda_api_key'");
     const apiKey = settingsRes.rows[0]?.value?.trim() || 'DEMO_KEY';
-    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${apiKey}&pageSize=10&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS)`;
+    const params = new URLSearchParams({
+      query,
+      api_key: apiKey,
+      pageSize: '10',
+    });
+    // Múltiplos dataType — evita parênteses na URL (Survey FNDDS causava 400)
+    params.append('dataType', 'Foundation');
+    params.append('dataType', 'SR Legacy');
+    params.append('dataType', 'Survey (FNDDS)');
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?${params.toString()}`;
     const response = await fetch(url);
-    if (!response.ok) return res.status(response.status).json({ error: 'Erro na API USDA FoodData Central.' });
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      console.error('USDA error', response.status, errBody);
+      return res.status(502).json({ error: `Erro na API USDA (${response.status}). Verifique a chave em Credenciais ou tente novamente.` });
+    }
     const data = await response.json();
 
     // Normaliza para o formato esperado pelo frontend (valores por 100g)
