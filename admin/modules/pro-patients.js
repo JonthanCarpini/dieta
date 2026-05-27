@@ -1700,4 +1700,3 @@ function _setupMeasFormListeners(patientId) {
         }
     });
 }
-}
