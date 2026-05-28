@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Pedometer } from 'expo-sensors';
 import { Platform } from 'react-native';
 
-export function useStepCounter(dbSteps: number = 0) {
+export function useStepCounter(dbSteps: number = 0, isTracking: boolean = false) {
   const [isPedometerAvailable, setIsPedometerAvailable] = useState<boolean>(false);
   const [permissionStatus, setPermissionStatus] = useState<string>('undetermined');
   const [steps, setSteps] = useState<number>(dbSteps);
@@ -12,6 +12,7 @@ export function useStepCounter(dbSteps: number = 0) {
   const lastSavedDatabaseStepsRef = useRef<number>(dbSteps);
   const lastSavedSensorStepsRef = useRef<number>(0);
   const currentSensorStepsRef = useRef<number>(0);
+  const subscriptionRef = useRef<Pedometer.Subscription | null>(null);
 
   // Sincroniza com alterações de dbSteps vindas de fora (como carga inicial ou ajuste manual)
   useEffect(() => {
@@ -69,7 +70,16 @@ export function useStepCounter(dbSteps: number = 0) {
     }
   };
 
+  // Gerencia a ativação/desativação da escuta física do sensor com base no toggle do usuário
   useEffect(() => {
+    if (!isTracking) {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.remove();
+        subscriptionRef.current = null;
+      }
+      return;
+    }
+
     checkPermissionAndFetchSteps();
 
     let subscription: Pedometer.Subscription | null = null;
@@ -82,14 +92,14 @@ export function useStepCounter(dbSteps: number = 0) {
           subscription = Pedometer.watchStepCount((result) => {
             currentSensorStepsRef.current = result.steps;
             if (Platform.OS === 'ios') {
-              // No iOS, atualizamos o total geral do dia via consulta
               checkPermissionAndFetchSteps();
             } else {
-              // No Android, calcula o delta de passos dados na sessão desde o último ponto de salvamento
+              // Calcula o delta de passos dados na sessão desde o último ponto de salvamento
               const delta = result.steps - lastSavedSensorStepsRef.current;
               setSteps(lastSavedDatabaseStepsRef.current + delta);
             }
           });
+          subscriptionRef.current = subscription;
         }
       } catch (e) {
         console.error('Erro ao iniciar watchStepCount:', e);
@@ -101,12 +111,13 @@ export function useStepCounter(dbSteps: number = 0) {
     return () => {
       if (subscription) {
         subscription.remove();
+        subscriptionRef.current = null;
       }
     };
-  }, []);
+  }, [isTracking]);
 
   const onSaveSuccess = (savedTotal: number) => {
-    // Atualizamos a base de comparação do banco e alinhamos o ponto de referência do sensor.
+    // Alinha a base de comparação do banco com o estado atual do sensor
     lastSavedDatabaseStepsRef.current = savedTotal;
     lastSavedSensorStepsRef.current = currentSensorStepsRef.current;
     setSteps(savedTotal);

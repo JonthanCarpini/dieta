@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Plus, Trash2, Flame, Clock, Award, Activity } from 'lucide-react-native';
+import { ChevronLeft, Plus, Trash2, Flame, Clock, Award, Activity, Play, Pause } from 'lucide-react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 import api from '../src/api/client';
 import { colors, spacing, radius, typography } from '../src/constants/theme';
@@ -83,8 +83,10 @@ export default function AtividadesScreen() {
     queryFn: () => api.get(`/user/activity?date=${today}`).then((r) => r.data),
   });
 
+  const [isTracking, setIsTracking] = useState(false);
+
   // Hook do Pedometer Nativo
-  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps, onSaveSuccess } = useStepCounter(activity?.steps ?? 0);
+  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps, onSaveSuccess } = useStepCounter(activity?.steps ?? 0, isTracking);
 
   // Busca do perfil do usuário para obter o peso
   const { data: profileData } = useQuery({
@@ -237,6 +239,26 @@ export default function AtividadesScreen() {
               </View>
             </View>
 
+            {isPedometerAvailable && (
+              <TouchableOpacity 
+                style={[styles.trackingToggleBtn, isTracking ? styles.trackingBtnActive : styles.trackingBtnInactive]} 
+                onPress={() => setIsTracking(prev => !prev)}
+                activeOpacity={0.85}
+              >
+                {isTracking ? (
+                  <>
+                    <Pause size={18} color="#EF4444" />
+                    <Text style={styles.trackingBtnTextActive}>Pausar Contagem</Text>
+                  </>
+                ) : (
+                  <>
+                    <Play size={18} color="#000" />
+                    <Text style={styles.trackingBtnTextInactive}>Iniciar Contagem</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+
             {/* Ações de Passos */}
             <View style={styles.stepsActions}>
               <TouchableOpacity style={styles.actionButton} onPress={() => {
@@ -337,40 +359,6 @@ export default function AtividadesScreen() {
               ))
             )}
           </View>
-        
-          {/* Painel de Debug */}
-          <View style={styles.debugCard}>
-            <Text style={styles.debugTitle}>🔧 Informações de Debug</Text>
-            <View style={styles.debugRow}>
-              <Text style={styles.debugLabel}>OS:</Text>
-              <Text style={styles.debugValue}>{Platform.OS} (v{Platform.Version})</Text>
-            </View>
-            <View style={styles.debugRow}>
-              <Text style={styles.debugLabel}>Pedômetro Disponível:</Text>
-              <Text style={styles.debugValue}>{isPedometerAvailable ? 'Sim' : 'Não'}</Text>
-            </View>
-            <View style={styles.debugRow}>
-              <Text style={styles.debugLabel}>Status da Permissão:</Text>
-              <Text style={styles.debugValue}>{permissionStatus}</Text>
-            </View>
-            <View style={styles.debugRow}>
-              <Text style={styles.debugLabel}>Passos do Sensor (sensorSteps):</Text>
-              <Text style={styles.debugValue}>{sensorSteps}</Text>
-            </View>
-            <View style={styles.debugRow}>
-              <Text style={styles.debugLabel}>Erro do Sensor:</Text>
-              <Text style={[styles.debugValue, sensorError ? { color: '#EF4444' } : {}]}>{sensorError || 'Nenhum'}</Text>
-            </View>
-            <View style={styles.debugRow}>
-              <Text style={styles.debugLabel}>Passos no Banco (DB):</Text>
-              <Text style={styles.debugValue}>{activity?.steps ?? 0}</Text>
-            </View>
-            <View style={styles.debugRow}>
-              <Text style={styles.debugLabel}>Calorias Passos (DB):</Text>
-              <Text style={styles.debugValue}>{activity?.steps_calories ?? 0} kcal</Text>
-            </View>
-          </View>
-
         </ScrollView>
       )}
 
@@ -643,34 +631,34 @@ const styles = StyleSheet.create({
   typeBadgeText: { ...typography.caption, color: colors.textSecondary },
   typeBadgeTextActive: { color: colors.accentGreen, fontWeight: '700' },
 
-  // Debug styles
-  debugCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+  // Tracking button styles
+  trackingToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    width: '100%',
+    paddingVertical: 12,
     borderRadius: radius.md,
-    padding: spacing.md,
-    marginTop: spacing.md,
-    gap: 8,
+    marginBottom: spacing.xs,
+    borderWidth: 1,
   },
-  debugTitle: {
+  trackingBtnInactive: {
+    backgroundColor: colors.accentGreen,
+    borderColor: colors.accentGreen,
+  },
+  trackingBtnActive: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: '#EF4444',
+  },
+  trackingBtnTextInactive: {
     ...typography.body,
     fontWeight: '700',
-    color: colors.accentYellow,
-    marginBottom: 4,
+    color: '#000',
   },
-  debugRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  debugLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
-  },
-  debugValue: {
-    ...typography.caption,
-    color: colors.textPrimary,
-    fontWeight: '600',
+  trackingBtnTextActive: {
+    ...typography.body,
+    fontWeight: '700',
+    color: '#EF4444',
   },
 });
