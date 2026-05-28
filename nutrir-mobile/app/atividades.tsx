@@ -84,7 +84,7 @@ export default function AtividadesScreen() {
   });
 
   // Hook do Pedometer Nativo
-  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps, resetBaseSteps } = useStepCounter(activity?.steps ?? 0);
+  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps, onSaveSuccess } = useStepCounter(activity?.steps ?? 0);
 
   // Busca do perfil do usuário para obter o peso
   const { data: profileData } = useQuery({
@@ -104,7 +104,7 @@ export default function AtividadesScreen() {
     onSuccess: (data, variables) => {
       refetch();
       qc.invalidateQueries({ queryKey: ['daily-summary'] });
-      resetBaseSteps(variables);
+      onSaveSuccess(variables);
     },
     onError: () => Alert.alert('Erro', 'Não foi possível salvar os passos.'),
   });

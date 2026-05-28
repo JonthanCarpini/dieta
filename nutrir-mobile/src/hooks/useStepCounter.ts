@@ -9,17 +9,16 @@ export function useStepCounter(dbSteps: number = 0) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Armazena os passos base do banco no início da sessão
-  const baseStepsRef = useRef<number>(dbSteps);
-  const hasInitializedBase = useRef<boolean>(false);
-  const subscriptionRef = useRef<Pedometer.Subscription | null>(null);
+  const lastSavedDatabaseStepsRef = useRef<number>(dbSteps);
+  const lastSavedSensorStepsRef = useRef<number>(0);
+  const currentSensorStepsRef = useRef<number>(0);
 
-  // Sincroniza os passos do banco na primeira carga
+  // Sincroniza com alterações de dbSteps vindas de fora (como carga inicial ou ajuste manual)
   useEffect(() => {
-    if (dbSteps > 0 && !hasInitializedBase.current) {
-      baseStepsRef.current = dbSteps;
+    if (dbSteps !== steps) {
+      lastSavedDatabaseStepsRef.current = dbSteps;
+      lastSavedSensorStepsRef.current = currentSensorStepsRef.current;
       setSteps(dbSteps);
-      hasInitializedBase.current = true;
     }
   }, [dbSteps]);
 
@@ -55,9 +54,9 @@ export function useStepCounter(dbSteps: number = 0) {
           const result = await Pedometer.getStepCountAsync(start, end);
           setSteps(result.steps);
         } else {
-          // Android não suporta getStepCountAsync por período na SDK do Expo Sensors.
-          // Mantemos os passos base mais os passos detectados na sessão atual
-          setSteps(baseStepsRef.current);
+          // No Android, mantemos o cálculo baseado no delta do sensor
+          const delta = currentSensorStepsRef.current - lastSavedSensorStepsRef.current;
+          setSteps(lastSavedDatabaseStepsRef.current + delta);
         }
       } else {
         setError('Permissão para atividade física não concedida.');
@@ -73,19 +72,22 @@ export function useStepCounter(dbSteps: number = 0) {
   useEffect(() => {
     checkPermissionAndFetchSteps();
 
+    let subscription: Pedometer.Subscription | null = null;
+
     const startWatching = async () => {
       try {
         const isAvailable = await Pedometer.isAvailableAsync();
         const permission = await Pedometer.getPermissionsAsync();
         if (isAvailable && permission.status === 'granted') {
-          subscriptionRef.current = Pedometer.watchStepCount((result) => {
+          subscription = Pedometer.watchStepCount((result) => {
+            currentSensorStepsRef.current = result.steps;
             if (Platform.OS === 'ios') {
               // No iOS, atualizamos o total geral do dia via consulta
               checkPermissionAndFetchSteps();
             } else {
-              // No Android, watchStepCount retorna passos a partir do início da escuta.
-              // Somamos estes passos acumulados na sessão com a base vinda do banco.
-              setSteps(baseStepsRef.current + result.steps);
+              // No Android, calcula o delta de passos dados na sessão desde o último ponto de salvamento
+              const delta = result.steps - lastSavedSensorStepsRef.current;
+              setSteps(lastSavedDatabaseStepsRef.current + delta);
             }
           });
         }
@@ -97,42 +99,17 @@ export function useStepCounter(dbSteps: number = 0) {
     startWatching();
 
     return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.remove();
-        subscriptionRef.current = null;
+      if (subscription) {
+        subscription.remove();
       }
     };
   }, []);
 
-  const resetBaseSteps = (newBase: number) => {
-    baseStepsRef.current = newBase;
-    setSteps(newBase);
-    hasInitializedBase.current = true;
-
-    // Reinicia a escuta para zerar o contador relativo da sessão
-    if (subscriptionRef.current) {
-      subscriptionRef.current.remove();
-      subscriptionRef.current = null;
-    }
-
-    const restartWatching = async () => {
-      try {
-        const isAvailable = await Pedometer.isAvailableAsync();
-        const permission = await Pedometer.getPermissionsAsync();
-        if (isAvailable && permission.status === 'granted') {
-          subscriptionRef.current = Pedometer.watchStepCount((result) => {
-            if (Platform.OS === 'ios') {
-              checkPermissionAndFetchSteps();
-            } else {
-              setSteps(baseStepsRef.current + result.steps);
-            }
-          });
-        }
-      } catch (e) {
-        console.error('Erro ao reiniciar watchStepCount:', e);
-      }
-    };
-    restartWatching();
+  const onSaveSuccess = (savedTotal: number) => {
+    // Atualizamos a base de comparação do banco e alinhamos o ponto de referência do sensor.
+    lastSavedDatabaseStepsRef.current = savedTotal;
+    lastSavedSensorStepsRef.current = currentSensorStepsRef.current;
+    setSteps(savedTotal);
   };
 
   return {
@@ -142,6 +119,6 @@ export function useStepCounter(dbSteps: number = 0) {
     isLoading,
     error,
     refetchSteps: checkPermissionAndFetchSteps,
-    resetBaseSteps,
+    onSaveSuccess,
   };
 }
