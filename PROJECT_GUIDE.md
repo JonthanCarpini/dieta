@@ -465,7 +465,266 @@ O projeto `mobile-android/` é um **WebView wrapper** que carrega `https://nutri
 
 ---
 
-## 13. Arquitetura Modular do Painel Admin (ES6 Modules)
+## 13. Plano de Migração — React Native (App Mobile Nativo)
+
+### Por que React Native?
+
+O app atual (`mobile-android/`) é um **WebView wrapper** — uma casca Android que carrega `https://nutrir.online` dentro de um navegador embutido. Isso traz limitações estruturais que impedem evoluir o produto para um nível profissional:
+
+| Limitação atual (WebView) | Solução com React Native |
+|---|---|
+| `localStorage` some entre sessões (bug já vivenciado) | `expo-secure-store` — storage nativo, permanente |
+| Push notifications via bridge manual frágil | `expo-notifications` + FCM nativo real |
+| Vídeo chamada abre browser externo (Jitsi) | SDK nativo Agora.io/ZEGOCLOUD embutido no app |
+| Maps não suportado | `react-native-maps` com Google Maps nativo |
+| Performance limitada (renderiza HTML) | Componentes compilados para nativo real |
+| iOS requer projeto Xcode separado | Um único código → Android + iOS via Expo EAS |
+| Câmera/biometria via bridges manuais | `expo-camera`, `expo-local-authentication` nativos |
+
+**Vantagem estratégica**: toda a lógica de negócio do `app.js` (chamadas de API, autenticação JWT, transformações de dados, cálculos de macros) será **reaproveitada quase integralmente** — apenas a camada de UI (HTML → componentes RN) precisará ser reescrita.
+
+---
+
+### Stack Tecnológica React Native
+
+| Camada | Tecnologia | Justificativa |
+|---|---|---|
+| **Framework** | Expo SDK 52+ (Managed Workflow) | EAS Build gera APK/IPA sem Xcode/Android Studio |
+| **Linguagem** | TypeScript | Tipagem previne bugs de runtime; autocomplete da API |
+| **Navegação** | React Navigation 7 (Stack + Bottom Tabs) | Padrão de mercado; suporta drawer, modais e deep links |
+| **Estado global** | Zustand | Substituto direto do `state` object atual; simples e sem boilerplate |
+| **Chamadas API** | TanStack Query (React Query) | Cache automático, retry, loading/error states prontos |
+| **Token/auth** | `expo-secure-store` | Keychain (iOS) + Keystore (Android) — à prova de limpeza de cache |
+| **Push nativo** | `expo-notifications` + Firebase FCM | Notificações reais em background e foreground |
+| **Scanner IA** | `expo-camera` + `expo-image-picker` | Camera e galeria nativos; envia base64 para `/api/ai/analyze-food` |
+| **Vídeo chamada** | `react-native-agora` | SDK nativo; substitui Jitsi externo; plano gratuito: 10k min/mês |
+| **Maps** | `react-native-maps` + Google Maps SDK | Para futuras funcionalidades de localização de profissionais |
+| **Gráficos** | `victory-native` ou `react-native-gifted-charts` | Substitui Chart.js; roda no thread nativo via Skia |
+| **UI/Ícones** | `lucide-react-native` | Mesmo set de ícones do web app |
+| **Build/Deploy** | EAS Build + EAS Submit | Publica direto na Google Play e App Store |
+
+---
+
+### Estrutura de Pastas Proposta
+
+```
+nutrir-mobile/
+├── app/                         # Telas (Expo Router — file-based routing)
+│   ├── (auth)/
+│   │   ├── login.tsx
+│   │   └── register.tsx
+│   ├── (tabs)/
+│   │   ├── _layout.tsx          # Bottom tab navigator (Diário, Receitas, Profissional, Clínico)
+│   │   ├── diario.tsx
+│   │   ├── receitas.tsx
+│   │   ├── profissional.tsx
+│   │   └── clinico.tsx
+│   ├── (drawer)/                # Telas acessadas via menu lateral
+│   │   ├── perfil.tsx
+│   │   ├── historico.tsx
+│   │   └── jejum.tsx
+│   ├── scanner.tsx              # Câmera IA (modal sobre o diário)
+│   ├── video-call.tsx           # Vídeo consulta (Agora)
+│   └── _layout.tsx              # Root layout + auth guard
+├── src/
+│   ├── api/                     # Camada de chamadas HTTP (reaproveitada do app.js)
+│   │   ├── client.ts            # axios instance com baseURL + interceptor JWT
+│   │   ├── auth.ts              # login, register, google
+│   │   ├── user.ts              # profile, meals, water, weight, clinical
+│   │   ├── ai.ts                # analyze-food, generate-recipe, generate-weekly
+│   │   └── professional.ts      # links, appointments, feedbacks, exams
+│   ├── store/                   # Zustand stores (equivalentes ao `state` do app.js)
+│   │   ├── authStore.ts         # token, user — persiste via SecureStore
+│   │   ├── profileStore.ts      # userProfile, weightHistory
+│   │   ├── mealsStore.ts        # mealsLog, waterConsumed
+│   │   └── fastingStore.ts      # fastingActive, fastingStart, protocol
+│   ├── components/
+│   │   ├── ui/                  # Componentes base do design system Obsidian
+│   │   │   ├── Card.tsx         # Equivalente ao .settings-card
+│   │   │   ├── Button.tsx       # btn-primary, btn-secondary, btn-danger
+│   │   │   ├── Input.tsx
+│   │   │   └── Badge.tsx
+│   │   ├── dashboard/
+│   │   ├── meals/
+│   │   ├── scanner/
+│   │   └── charts/
+│   ├── hooks/
+│   │   ├── useAuth.ts           # Guarda de autenticação
+│   │   ├── useDashboard.ts      # React Query + cálculos de macros
+│   │   └── useNotifications.ts  # Registro FCM + agendamento local
+│   ├── constants/
+│   │   └── theme.ts             # Tokens Obsidian traduzidos para RN StyleSheet
+│   └── utils/
+│       ├── macros.ts            # Cálculos nutricionais (copiados do app.js)
+│       └── imageResize.ts       # Resize antes de enviar para a IA
+├── assets/
+│   ├── icon.png
+│   └── splash.png
+├── app.json                     # Configuração Expo
+├── eas.json                     # Configuração EAS Build (dev/preview/production)
+└── package.json
+```
+
+---
+
+### Design System Obsidian — Tradução para React Native
+
+```typescript
+// src/constants/theme.ts
+export const colors = {
+  bgApp:        '#0a0a0c',
+  bgSurface:    'rgba(255,250,240,0.04)',
+  borderColor:  'rgba(255,250,240,0.08)',
+  borderHover:  'rgba(255,250,240,0.14)',
+  primary:      '#f5c14d',   // âmbar
+  primaryHover: '#e0a13a',
+  textMain:     '#f4f1ec',
+  textMuted:    'rgba(244,241,236,0.45)',
+  danger:       '#e0734a',
+  secondary:    '#60a5fa',
+};
+
+export const radii = {
+  card:   18,
+  button: 12,
+  input:  10,
+};
+```
+
+---
+
+### Mapeamento de Funcionalidades: Web → React Native
+
+| Funcionalidade web | Equivalente RN | Observação |
+|---|---|---|
+| `showScreen('screen-X')` | `router.push('/x')` (Expo Router) | Navegação declarativa por arquivo |
+| `state.userProfile` | `profileStore.userProfile` (Zustand) | Persiste via `AsyncStorage` |
+| `localStorage.getItem('nutrir_token')` | `SecureStore.getItemAsync('nutrir_token')` | Criptografado no Keychain/Keystore |
+| `lucide` icons | `lucide-react-native` | Mesmo nome de ícone |
+| `Chart.js` gráficos | `victory-native` | Roda via Skia no thread nativo |
+| Scanner câmera | `expo-camera` + `expo-image-picker` | Mesma API `/api/ai/analyze-food` |
+| Jitsi Meet (browser externo) | `react-native-agora` | Vídeo embutido no app |
+| `AlarmManager` (notificações) | `expo-notifications` (FCM) | Notificações reais em background |
+| `WebView.setWebContentsDebuggingEnabled` | Removido — não necessário | |
+| `AndroidApp.saveToken()` (bridge atual) | `SecureStore` direto | Elimina o bridge manual |
+
+---
+
+### Fases de Implementação
+
+#### Fase 1 — Fundação (Semana 1–2)
+**Meta**: App roda, faz login, exibe o dashboard com dados reais.
+
+- [ ] `npx create-expo-app nutrir-mobile --template expo-template-blank-typescript`
+- [ ] Configurar Expo Router, React Navigation (Bottom Tabs + Drawer)
+- [ ] Implementar design system Obsidian: tokens de cor, `Card`, `Button`, `Input`
+- [ ] `authStore` com Zustand + `expo-secure-store` (token persistente)
+- [ ] Telas: Login, Registro, Onboarding
+- [ ] Tela Dashboard: anel de calorias (SVG), macros, lista de refeições do dia
+- [ ] `api/client.ts` com axios — interceptor injeta Bearer token automaticamente
+
+#### Fase 2 — Core de Rastreamento (Semana 3–4)
+**Meta**: Usuário consegue registrar tudo que registra hoje no web app.
+
+- [ ] Scanner IA: `expo-camera` + compressão → `/api/ai/analyze-food`
+- [ ] Tela de resultados do scanner: cards de alimentos, adicionar ao diário
+- [ ] Busca de alimentos manual (`/api/user/food-search`)
+- [ ] Registro de água (slider nativo)
+- [ ] Tela Histórico: `victory-native` substituindo Chart.js
+- [ ] Tela Jejum: timer com `expo-background-fetch`
+
+#### Fase 3 — Receitas e Plano Nutricional (Semana 5)
+**Meta**: Receitas IA e cardápio do nutricionista funcionando.
+
+- [ ] Tela Receitas: abas (Receitas do Nutricionista, Gerar com IA)
+- [ ] Gerador de receitas: `/api/ai/generate-recipe` e `/api/ai/generate-weekly`
+- [ ] Cardápio semanal: abas por dia da semana, cards de refeição
+
+#### Fase 4 — Perfil e Dados Clínicos (Semana 6)
+**Meta**: Toda a seção de perfil funcional.
+
+- [ ] Drawer lateral (substituindo o drawer web atual)
+- [ ] Tela Perfil: hero card, plano alimentar, histórico de peso
+- [ ] Tela Perfil Clínico: formulário de comorbidades/intolerâncias
+- [ ] Upload de exames: `expo-document-picker` + `expo-file-system`
+
+#### Fase 5 — Área Profissional e Vídeo (Semana 7–8)
+**Meta**: Pacientes premium interagem com profissionais nativamente.
+
+- [ ] Tela Meu Acompanhamento: vinculação, orientações, agendamentos
+- [ ] Agendamento de consultas: calendário nativo (`react-native-calendars`)
+- [ ] **Vídeo chamada nativa** com `react-native-agora`:
+  - Substitui abertura do Jitsi no browser externo
+  - Chamada embutida no app com controles (mudo, câmera, encerrar)
+  - Backend gera `channelName` único por consulta (mesmo UUID atual)
+
+#### Fase 6 — Push Notifications (Semana 9)
+**Meta**: Notificações reais que funcionam com app fechado.
+
+- [ ] Configurar Firebase FCM: `expo-notifications` + `google-services.json`
+- [ ] Backend: rota `POST /api/notifications/send` usando Firebase Admin SDK
+- [ ] Notificações implementadas:
+  - Lembrete de registrar refeição (scheduled local)
+  - Alerta de nova consulta agendada
+  - Aviso de novo cardápio prescrito pelo profissional
+  - Lembrete de registro de peso semanal
+
+#### Fase 7 — iOS + Produção (Semana 10)
+**Meta**: App publicado nas duas lojas.
+
+- [ ] Testar tudo no simulador iOS (via EAS Build)
+- [ ] Configurar `eas.json` para perfis `development`, `preview`, `production`
+- [ ] Gerar APK/AAB para Google Play: `eas build --platform android --profile production`
+- [ ] Gerar IPA para App Store: `eas build --platform ios --profile production`
+- [ ] Submissão automática: `eas submit`
+
+---
+
+### Backend: Zero Alterações Necessárias nas Fases 1–5
+
+O backend Node.js/Express/PostgreSQL existente é 100% compatível. O app RN consome as mesmas rotas `/api/*` com os mesmos tokens JWT. Apenas na Fase 6 (push notifications) será necessário adicionar:
+
+```javascript
+// backend/routes/notifications.js (novo arquivo — Fase 6)
+// POST /api/notifications/register-token   → salva FCM token do dispositivo
+// POST /api/notifications/send             → dispara push via Firebase Admin SDK
+```
+
+E uma nova coluna no banco:
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token TEXT;
+```
+
+---
+
+### Comparação de Esforço
+
+| Abordagem | Tempo estimado | Resultado |
+|---|---|---|
+| Continuar no WebView | 0 | Limitado, bugs de storage, sem iOS real |
+| Migrar para Capacitor | 1–2 semanas | Resolve bugs, mantém web UI, sem RN |
+| **React Native (este plano)** | **8–10 semanas** | **App nativo profissional iOS + Android** |
+| Flutter | 10–14 semanas | App nativo mas reescreve tudo em Dart |
+
+---
+
+### Repositório Sugerido
+
+O projeto RN deve viver em repositório separado (`nutrir-mobile`) para não misturar com o backend/web. O backend permanece em `https://github.com/JonthanCarpini/dieta`.
+
+```bash
+# Inicializar o projeto RN
+npx create-expo-app nutrir-mobile --template expo-template-blank-typescript
+cd nutrir-mobile
+npx expo install expo-router expo-secure-store expo-camera expo-image-picker \
+  expo-notifications expo-document-picker expo-file-system \
+  react-native-maps zustand @tanstack/react-query axios \
+  lucide-react-native victory-native react-native-agora
+```
+
+---
+
+## 14. Arquitetura Modular do Painel Admin (ES6 Modules)
 
 Com o crescimento do painel de administração, o arquivo monolítico `admin/admin.js` original foi reestruturado para utilizar **ES6 Modules nativos** (`type="module"`), dividindo as responsabilidades em arquivos menores e focados sem necessidade de ferramentas de empacotamento adicionais (como Vite, Webpack ou Babel).
 
