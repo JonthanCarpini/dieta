@@ -303,7 +303,6 @@ router.post('/analyze-food', authenticateToken, async (req, res) => {
 // FileSystem.uploadAsync (OkHttp nativo), evitando passar 200KB+ base64 pelo
 // bridge JS->Native do RN, que estava causando crash do app durante a leitura
 // da resposta.
-const express = require('express');
 router.post(
   '/analyze-food-binary',
   authenticateToken,
