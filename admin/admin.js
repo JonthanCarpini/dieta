@@ -157,8 +157,6 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadScheduleData();
         } else if (tabId === 'appointments') {
             await loadAppointmentsData();
-        } else if (tabId === 'meal-plans') {
-            await loadMealPlansData();
         }
 
         if (window.lucide) window.lucide.createIcons();

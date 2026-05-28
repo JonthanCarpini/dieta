@@ -1689,8 +1689,10 @@ function _setupMeasFormListeners(patientId) {
 // ==========================================
 
 async function _loadPatientMealPlansInTab(patientId) {
-    const container = document.getElementById('patient-tab-content-meal-plan');
+    const container = document.getElementById('patient-meal-plan-list');
     if (!container) return;
+    container.style.display = '';
+    document.getElementById('meal-plans-builder-view')?.classList.add('hidden');
     container.innerHTML = '<p class="description" style="text-align:center; padding:24px;">Carregando cardápios...</p>';
 
     try {
@@ -1700,13 +1702,15 @@ async function _loadPatientMealPlansInTab(patientId) {
         if (!res.ok) throw new Error('Não foi possível carregar os cardápios.');
         const allPlans = await res.json();
         const plans = allPlans.filter(p => String(p.patient_id) === String(patientId));
-        _renderPatientPlansInTab(container, plans, patientId);
+        _renderPatientPlansInTab(plans, patientId);
     } catch (err) {
         container.innerHTML = `<p style="color:var(--color-danger); text-align:center; padding:24px;">${err.message}</p>`;
     }
 }
 
-function _renderPatientPlansInTab(container, plans, patientId) {
+function _renderPatientPlansInTab(plans, patientId) {
+    const container = document.getElementById('patient-meal-plan-list');
+    if (!container) return;
     const patient = adminState._currentPatient;
 
     const plansHtml = plans.length === 0
@@ -1763,18 +1767,15 @@ function _renderPatientPlansInTab(container, plans, patientId) {
     `;
 
     container.querySelector('#btn-new-plan-for-patient')?.addEventListener('click', () => {
-        adminState._fromPatient    = patientId;
+        adminState._fromPatient      = patientId;
         adminState._newPlanPatientId = patientId;
-        if (window.switchTab) window.switchTab('meal-plans');
-        setTimeout(() => openMealPlanBuilder(null), 200);
+        openMealPlanBuilder(null);
     });
 
     container.querySelectorAll('.btn-open-plan-from-patient').forEach(btn => {
         btn.addEventListener('click', () => {
             adminState._fromPatient = patientId;
-            const planId = parseInt(btn.dataset.planId);
-            if (window.switchTab) window.switchTab('meal-plans');
-            setTimeout(() => openMealPlanBuilder(planId), 200);
+            openMealPlanBuilder(parseInt(btn.dataset.planId));
         });
     });
 

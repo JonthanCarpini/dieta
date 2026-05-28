@@ -279,7 +279,8 @@ async function populatePlanPatientSelect() {
 
 export async function openMealPlanBuilder(planId) {
     _expandedMeal = null;
-    document.getElementById('meal-plans-list-view').classList.add('hidden');
+    const listEl = document.getElementById('patient-meal-plan-list');
+    if (listEl) listEl.style.display = 'none';
     document.getElementById('meal-plans-builder-view').classList.remove('hidden');
 
     if (planId) {
@@ -1292,23 +1293,16 @@ export async function updateBuilderClinicalBanner(patientId) {
 // ==========================================
 
 export function initProMeals() {
-    // Lista de planos
-    document.getElementById('btn-new-meal-plan')?.addEventListener('click', () => openMealPlanBuilder(null));
     document.getElementById('btn-back-to-plans')?.addEventListener('click', () => {
-        const fromPatient = adminState._fromPatient;
         adminState._fromPatient = null;
 
         document.getElementById('meal-plans-builder-view').classList.add('hidden');
-        document.getElementById('meal-plans-list-view').classList.remove('hidden');
+        const listEl = document.getElementById('patient-meal-plan-list');
+        if (listEl) listEl.style.display = '';
 
-        if (fromPatient && window.openPatientWorkspace) {
-            // Volta direto para o workspace do paciente na aba de cardápio
-            window.openPatientWorkspace('meal-plan');
-            setTimeout(() => {
-                const mealPlanTabBtn = document.querySelector('.patient-tab-btn[data-patient-tab="meal-plan"]');
-                if (mealPlanTabBtn) mealPlanTabBtn.click();
-            }, 150);
-        }
+        // Recarrega a lista de cardápios do paciente clicando na aba
+        const mealPlanTabBtn = document.querySelector('.patient-tab-btn[data-patient-tab="meal-plan"]');
+        if (mealPlanTabBtn) mealPlanTabBtn.click();
     });
     document.getElementById('btn-save-meal-plan')?.addEventListener('click', saveMealPlan);
 

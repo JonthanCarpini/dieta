@@ -74,9 +74,6 @@
                 <button class="nav-btn" data-tab="appointments" id="nav-appointments">
                     <i data-lucide="video"></i> Consultas
                 </button>
-                <button class="nav-btn" data-tab="meal-plans" id="nav-meal-plans">
-                    <i data-lucide="clipboard-list"></i> Cardápios
-                </button>
                 <button class="nav-btn" data-tab="settings" id="nav-settings">
                     <i data-lucide="key-round"></i> Credenciais
                 </button>
@@ -596,148 +593,6 @@
                     </div>
                 </section>
 
-                <!-- ABA: CARDÁPIOS (standalone) -->
-                <section id="tab-meal-plans" class="tab-content">
-                    <div id="meal-plans-list-view">
-                        <div class="admin-section-header">
-                            <div>
-                                <h2 class="section-title">Cardápios Semanais</h2>
-                                <p class="section-subtitle">Crie e gerencie planos nutricionais completos para seus pacientes.</p>
-                            </div>
-                            <button class="btn-primary" id="btn-new-meal-plan">
-                                <i data-lucide="plus"></i> Novo Cardápio
-                            </button>
-                        </div>
-                        <div class="table-wrap">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Nome do Plano</th>
-                                        <th>Paciente Vinculado</th>
-                                        <th>Atualizado</th>
-                                        <th>Status</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="meal-plans-table-body">
-                                    <tr><td colspan="5" style="text-align:center;color:var(--color-text-muted);">Nenhum cardápio criado ainda.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div id="meal-plans-builder-view" class="hidden">
-                        <div class="builder-topbar">
-                            <button class="btn-secondary btn-sm" id="btn-back-to-plans">
-                                <i data-lucide="arrow-left"></i> Voltar
-                            </button>
-                            <div class="builder-topbar-fields">
-                                <input type="text" id="plan-name-input" placeholder="Nome do cardápio..." class="input-inline">
-                                <select id="plan-patient-select" class="input-inline">
-                                    <option value="">Sem paciente (template)</option>
-                                </select>
-                            </div>
-                            <div style="display:flex;gap:8px;">
-                                <button class="btn-secondary btn-sm" id="btn-toggle-active-plan">Desativar</button>
-                                <button class="btn-primary btn-sm" id="btn-save-meal-plan">
-                                    <i data-lucide="save"></i> Salvar
-                                </button>
-                            </div>
-                        </div>
-
-                        <div id="builder-clinical-banner" class="clinical-alert-banner hidden" style="background:rgba(245,193,77,0.08);border:1px solid rgba(245,193,77,0.2);border-radius:8px;padding:12px;margin:12px 0;font-size:13px;display:flex;align-items:flex-start;gap:10px;">
-                            <i data-lucide="alert-triangle" style="color:var(--color-primary);width:18px;height:18px;flex-shrink:0;margin-top:1px;"></i>
-                            <div>
-                                <strong style="color:var(--color-primary);display:block;margin-bottom:2px;">Particularidades Clínicas do Paciente:</strong>
-                                <span id="builder-clinical-info" style="color:var(--color-text-main);">Nenhuma particularidade clínica informada.</span>
-                            </div>
-                        </div>
-
-                        <div class="plan-day-tabs">
-                            <button class="plan-day-tab active" data-dow="1">Seg</button>
-                            <button class="plan-day-tab" data-dow="2">Ter</button>
-                            <button class="plan-day-tab" data-dow="3">Qua</button>
-                            <button class="plan-day-tab" data-dow="4">Qui</button>
-                            <button class="plan-day-tab" data-dow="5">Sex</button>
-                            <button class="plan-day-tab" data-dow="6">Sáb</button>
-                            <button class="plan-day-tab" data-dow="0">Dom</button>
-                        </div>
-
-                        <div id="plan-day-content"></div>
-
-                        <!-- Modal: Busca de Alimentos -->
-                        <div id="food-search-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9990;align-items:flex-start;justify-content:center;padding-top:48px;box-sizing:border-box;">
-                            <div class="fsm-box">
-                                <div class="fsm-header">
-                                    <div>
-                                        <h3 style="margin:0;font-size:16px;font-weight:700;">Adicionar alimento</h3>
-                                        <span id="fsm-meal-label" style="font-size:12px;color:var(--color-text-muted);"></span>
-                                    </div>
-                                    <button id="btn-close-food-modal" class="fsm-close-btn">×</button>
-                                </div>
-                                <div class="fsm-tabs-bar">
-                                    <button class="fsm-tab active" data-fstab="search">Banco de Alimentos (22k)</button>
-                                    <button class="fsm-tab" data-fstab="manual">Alimento Manual</button>
-                                </div>
-                                <div id="fsm-panel-search" class="fsm-panel">
-                                    <div class="fsm-search-row">
-                                        <input type="text" id="fsm-search-input" placeholder="Buscar: arroz branco, frango, banana, feijão..." autocomplete="off">
-                                        <button id="btn-fsm-search" class="btn-primary btn-sm">Buscar</button>
-                                    </div>
-                                    <div id="fsm-results-header" class="fsm-results-header" style="display:none;">
-                                        <span style="flex:3;">Nome do alimento</span>
-                                        <span>Medida</span>
-                                        <span style="text-align:center;">Qtd</span>
-                                        <span style="text-align:right;">Ptn</span>
-                                        <span style="text-align:right;">Lip</span>
-                                        <span style="text-align:right;">CHO</span>
-                                        <span style="text-align:right;">Kcal</span>
-                                        <span></span>
-                                    </div>
-                                    <div id="fsm-results" class="fsm-results"></div>
-                                </div>
-                                <div id="fsm-panel-manual" class="fsm-panel" style="display:none;">
-                                    <div class="fsm-manual-form">
-                                        <div class="fsm-manual-row">
-                                            <div style="flex:3;"><label>Nome</label><input type="text" id="fsm-man-name" placeholder="Ex: Bolo de banana integral"></div>
-                                            <div><label>kcal/100g</label><input type="number" id="fsm-man-kcal" placeholder="250" min="0"></div>
-                                            <div><label>Ptn (g)</label><input type="number" id="fsm-man-ptn" placeholder="8" min="0" step="0.1"></div>
-                                            <div><label>Lip (g)</label><input type="number" id="fsm-man-lip" placeholder="5" min="0" step="0.1"></div>
-                                            <div><label>CHO (g)</label><input type="number" id="fsm-man-cho" placeholder="40" min="0" step="0.1"></div>
-                                            <div><label>Qtd (g)</label><input type="number" id="fsm-man-qty" value="100" min="1"></div>
-                                        </div>
-                                        <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
-                                            <button id="btn-fsm-add-manual" class="btn-primary">+ Adicionar ao cardápio</button>
-                                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
-                                                <input type="checkbox" id="fsm-man-save" style="width:auto;margin:0;"> Salvar no banco
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Modal: Micronutrientes -->
-                        <div id="micro-nutrient-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9990;align-items:flex-start;justify-content:center;padding-top:48px;box-sizing:border-box;">
-                            <div class="micro-modal-box">
-                                <div class="micro-modal-header">
-                                    <h3 style="margin:0;font-size:16px;font-weight:700;">Somatório de nutrientes — Todo o cardápio</h3>
-                                    <button id="btn-close-micro-modal" class="fsm-close-btn">×</button>
-                                </div>
-                                <div class="micro-legend-bar">
-                                    <span class="micro-leg-dot in"></span> Dentro do recomendado (± 20%)
-                                    <span class="micro-leg-dot out" style="margin-left:16px;"></span> Fora do recomendado (± 20%)
-                                </div>
-                                <div style="overflow-y:auto;flex:1;padding:0 20px 20px;">
-                                    <table class="micro-table">
-                                        <thead><tr><th>Micronutrientes</th><th>Valor atual</th><th>DRI</th><th>Adequação</th></tr></thead>
-                                        <tbody id="micro-table-body"></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
 
             </div><!-- /regular-view -->
 
@@ -1037,11 +892,128 @@
                          PAINEL 6: CARDÁPIO DO PACIENTE
                     ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel" id="patient-tab-content-meal-plan">
-                        <!-- Preenchido dinamicamente pelo JS (_loadPatientMealPlansInTab) -->
-                        <div style="display:flex;align-items:center;justify-content:center;padding:60px 20px;color:var(--text-2);">
-                            <span style="font-size:13px;">Selecione "Cardápio" na barra lateral para carregar os planos.</span>
+
+                        <!-- Lista de cardápios do paciente (preenchida pelo JS) -->
+                        <div id="patient-meal-plan-list">
+                            <div style="display:flex;align-items:center;justify-content:center;padding:60px 20px;color:var(--text-2);">
+                                <span style="font-size:13px;">Carregando cardápios do paciente...</span>
+                            </div>
                         </div>
-                    </div>
+
+                        <!-- Builder de cardápio (oculto por padrão, ativado ao criar/editar) -->
+                        <div id="meal-plans-builder-view" class="hidden">
+                            <div class="builder-topbar">
+                                <button class="btn-secondary btn-sm" id="btn-back-to-plans">
+                                    <i data-lucide="arrow-left"></i> Voltar para Cardápios
+                                </button>
+                                <div class="builder-topbar-fields">
+                                    <input type="text" id="plan-name-input" placeholder="Nome do cardápio..." class="input-inline">
+                                    <select id="plan-patient-select" class="input-inline">
+                                        <option value="">Sem paciente (template)</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex;gap:8px;">
+                                    <button class="btn-secondary btn-sm" id="btn-toggle-active-plan">Desativar</button>
+                                    <button class="btn-primary btn-sm" id="btn-save-meal-plan">
+                                        <i data-lucide="save"></i> Salvar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="builder-clinical-banner" class="clinical-alert-banner hidden" style="background:rgba(245,193,77,0.08);border:1px solid rgba(245,193,77,0.2);border-radius:8px;padding:12px;margin:12px 0;font-size:13px;display:flex;align-items:flex-start;gap:10px;">
+                                <i data-lucide="alert-triangle" style="color:var(--color-primary);width:18px;height:18px;flex-shrink:0;margin-top:1px;"></i>
+                                <div>
+                                    <strong style="color:var(--color-primary);display:block;margin-bottom:2px;">Particularidades Clínicas do Paciente:</strong>
+                                    <span id="builder-clinical-info" style="color:var(--color-text-main);">Nenhuma particularidade clínica informada.</span>
+                                </div>
+                            </div>
+
+                            <div class="plan-day-tabs">
+                                <button class="plan-day-tab active" data-dow="1">Seg</button>
+                                <button class="plan-day-tab" data-dow="2">Ter</button>
+                                <button class="plan-day-tab" data-dow="3">Qua</button>
+                                <button class="plan-day-tab" data-dow="4">Qui</button>
+                                <button class="plan-day-tab" data-dow="5">Sex</button>
+                                <button class="plan-day-tab" data-dow="6">Sáb</button>
+                                <button class="plan-day-tab" data-dow="0">Dom</button>
+                            </div>
+
+                            <div id="plan-day-content"></div>
+
+                            <!-- Modal: Busca de Alimentos -->
+                            <div id="food-search-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9990;align-items:flex-start;justify-content:center;padding-top:48px;box-sizing:border-box;">
+                                <div class="fsm-box">
+                                    <div class="fsm-header">
+                                        <div>
+                                            <h3 style="margin:0;font-size:16px;font-weight:700;">Adicionar alimento</h3>
+                                            <span id="fsm-meal-label" style="font-size:12px;color:var(--color-text-muted);"></span>
+                                        </div>
+                                        <button id="btn-close-food-modal" class="fsm-close-btn">×</button>
+                                    </div>
+                                    <div class="fsm-tabs-bar">
+                                        <button class="fsm-tab active" data-fstab="search">Banco de Alimentos (22k)</button>
+                                        <button class="fsm-tab" data-fstab="manual">Alimento Manual</button>
+                                    </div>
+                                    <div id="fsm-panel-search" class="fsm-panel">
+                                        <div class="fsm-search-row">
+                                            <input type="text" id="fsm-search-input" placeholder="Buscar: arroz branco, frango, banana, feijão..." autocomplete="off">
+                                            <button id="btn-fsm-search" class="btn-primary btn-sm">Buscar</button>
+                                        </div>
+                                        <div id="fsm-results-header" class="fsm-results-header" style="display:none;">
+                                            <span style="flex:3;">Nome do alimento</span>
+                                            <span>Medida</span>
+                                            <span style="text-align:center;">Qtd</span>
+                                            <span style="text-align:right;">Ptn</span>
+                                            <span style="text-align:right;">Lip</span>
+                                            <span style="text-align:right;">CHO</span>
+                                            <span style="text-align:right;">Kcal</span>
+                                            <span></span>
+                                        </div>
+                                        <div id="fsm-results" class="fsm-results"></div>
+                                    </div>
+                                    <div id="fsm-panel-manual" class="fsm-panel" style="display:none;">
+                                        <div class="fsm-manual-form">
+                                            <div class="fsm-manual-row">
+                                                <div style="flex:3;"><label>Nome</label><input type="text" id="fsm-man-name" placeholder="Ex: Bolo de banana integral"></div>
+                                                <div><label>kcal/100g</label><input type="number" id="fsm-man-kcal" placeholder="250" min="0"></div>
+                                                <div><label>Ptn (g)</label><input type="number" id="fsm-man-ptn" placeholder="8" min="0" step="0.1"></div>
+                                                <div><label>Lip (g)</label><input type="number" id="fsm-man-lip" placeholder="5" min="0" step="0.1"></div>
+                                                <div><label>CHO (g)</label><input type="number" id="fsm-man-cho" placeholder="40" min="0" step="0.1"></div>
+                                                <div><label>Qtd (g)</label><input type="number" id="fsm-man-qty" value="100" min="1"></div>
+                                            </div>
+                                            <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
+                                                <button id="btn-fsm-add-manual" class="btn-primary">+ Adicionar ao cardápio</button>
+                                                <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+                                                    <input type="checkbox" id="fsm-man-save" style="width:auto;margin:0;"> Salvar no banco
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Modal: Micronutrientes -->
+                            <div id="micro-nutrient-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9990;align-items:flex-start;justify-content:center;padding-top:48px;box-sizing:border-box;">
+                                <div class="micro-modal-box">
+                                    <div class="micro-modal-header">
+                                        <h3 style="margin:0;font-size:16px;font-weight:700;">Somatório de nutrientes — Todo o cardápio</h3>
+                                        <button id="btn-close-micro-modal" class="fsm-close-btn">×</button>
+                                    </div>
+                                    <div class="micro-legend-bar">
+                                        <span class="micro-leg-dot in"></span> Dentro do recomendado (± 20%)
+                                        <span class="micro-leg-dot out" style="margin-left:16px;"></span> Fora do recomendado (± 20%)
+                                    </div>
+                                    <div style="overflow-y:auto;flex:1;padding:0 20px 20px;">
+                                        <table class="micro-table">
+                                            <thead><tr><th>Micronutrientes</th><th>Valor atual</th><th>DRI</th><th>Adequação</th></tr></thead>
+                                            <tbody id="micro-table-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div><!-- /meal-plans-builder-view -->
+
+                    </div><!-- /patient-tab-content-meal-plan -->
 
                     <!-- ══════════════════════════════════════════
                          PAINEL 7: CÁLCULO ENERGÉTICO
