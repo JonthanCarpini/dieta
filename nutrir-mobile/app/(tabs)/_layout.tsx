@@ -6,27 +6,33 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 48) : insets.bottom;
   const isIOS = Platform.OS === 'ios';
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        safeAreaInsets: {
-          bottom: Platform.OS === 'android' ? 48 : (isIOS ? insets.bottom : 0),
-        },
         tabBarStyle: {
           backgroundColor: colors.tabBarBg,
           borderTopColor: colors.tabBarBorder,
           borderTopWidth: 1,
-          // Removemos height e paddingBottom manuais para deixar o React Navigation gerenciar via safeAreaInsets
+          height: Platform.OS === 'android' ? 68 + bottomInset : (isIOS ? (insets.bottom > 0 ? 56 + insets.bottom : 64) : 56),
+          paddingBottom: Platform.OS === 'android' ? 0 : (isIOS ? (insets.bottom > 0 ? insets.bottom : 12) : 8),
+          paddingTop: Platform.OS === 'android' ? 0 : 8,
         },
+        tabBarItemStyle: Platform.OS === 'android' ? {
+          height: 68 + bottomInset,
+          paddingBottom: bottomInset + 12,
+          justifyContent: 'center',
+          alignItems: 'center',
+        } : undefined,
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: Platform.OS === 'android' ? 4 : 2,
         },
       }}
     >
