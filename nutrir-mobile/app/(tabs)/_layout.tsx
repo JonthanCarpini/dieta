@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 54 : 0);
+  const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 48) : insets.bottom;
   const isIOS = Platform.OS === 'ios';
 
   return (
