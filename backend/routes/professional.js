@@ -491,4 +491,97 @@ router.post('/patients/:id/target-calories', verifyPatientAccess, async (req, re
   }
 });
 
+// ==========================================
+// HISTÓRICO DE CÁLCULO ENERGÉTICO
+// ==========================================
+
+const _ensureEnergyTable = (db) => db.query(`
+  CREATE TABLE IF NOT EXISTS energy_calculations (
+    id                   SERIAL PRIMARY KEY,
+    patient_id           INTEGER NOT NULL,
+    professional_id      INTEGER NOT NULL,
+    calculated_at        TIMESTAMPTZ DEFAULT NOW(),
+    formula_id           INTEGER,
+    formula_name         VARCHAR(120),
+    peso                 NUMERIC,
+    altura               NUMERIC,
+    idade                INTEGER,
+    genero               CHAR(1),
+    mlg                  NUMERIC,
+    fator_atividade      NUMERIC,
+    fator_atividade_desc VARCHAR(60),
+    fator_injuria        NUMERIC,
+    fator_injuria_desc   VARCHAR(120),
+    tmb                  NUMERIC,
+    get_value            NUMERIC,
+    notes                TEXT
+  )
+`);
+
+// GET /professional/patients/:id/energy-calculations
+router.get('/patients/:id/energy-calculations', verifyPatientAccess, async (req, res) => {
+  try {
+    await _ensureEnergyTable(db);
+    const result = await db.query(
+      `SELECT * FROM energy_calculations WHERE patient_id = $1 ORDER BY calculated_at DESC`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico de cálculo energético.' });
+  }
+});
+
+// POST /professional/patients/:id/energy-calculations
+router.post('/patients/:id/energy-calculations', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  const {
+    formula_id, formula_name, peso, altura, idade, genero, mlg,
+    fator_atividade, fator_atividade_desc, fator_injuria, fator_injuria_desc,
+    tmb, get_value, notes
+  } = req.body;
+
+  if (!tmb || !get_value) return res.status(400).json({ error: 'TMB e GET são obrigatórios.' });
+
+  try {
+    await _ensureEnergyTable(db);
+    const result = await db.query(
+      `INSERT INTO energy_calculations
+         (patient_id, professional_id, formula_id, formula_name, peso, altura, idade, genero, mlg,
+          fator_atividade, fator_atividade_desc, fator_injuria, fator_injuria_desc, tmb, get_value, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      [
+        patientId, req.user.id,
+        formula_id   || null, formula_name || null,
+        peso         || null, altura       || null,
+        idade        || null, genero       || null,
+        mlg          || null,
+        fator_atividade      || null, fator_atividade_desc || null,
+        fator_injuria        || null, fator_injuria_desc   || null,
+        tmb, get_value,
+        notes || null
+      ]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar cálculo energético.' });
+  }
+});
+
+// DELETE /professional/patients/:id/energy-calculations/:calcId
+router.delete('/patients/:id/energy-calculations/:calcId', verifyPatientAccess, async (req, res) => {
+  try {
+    await db.query(
+      'DELETE FROM energy_calculations WHERE id = $1 AND patient_id = $2',
+      [req.params.calcId, req.params.id]
+    );
+    res.json({ message: 'Registro excluído.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir registro.' });
+  }
+});
+
 module.exports = router;
