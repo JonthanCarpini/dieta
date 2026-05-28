@@ -506,6 +506,139 @@ export async function generateAIRecipe(spoonacularItem) {
     }
 }
 
+// ==========================================
+// BUSCA TACO — banco de alimentos brasileiro
+// ==========================================
+
+export async function runTacoSearch() {
+    const input  = document.getElementById('taco-search-input');
+    const results = document.getElementById('taco-search-results');
+    if (!input || !results) return;
+    const q = input.value.trim();
+    if (!q) return;
+    results.innerHTML = '<p style="padding:8px;color:var(--color-text-muted);">Buscando...</p>';
+    results.classList.remove('hidden');
+    try {
+        const res = await fetch(`${API_URL}/admin/food-db?q=${encodeURIComponent(q)}`, {
+            headers: { 'Authorization': `Bearer ${adminState.token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro na busca');
+        if (!data.items || data.items.length === 0) {
+            results.innerHTML = '<p style="padding:8px;color:var(--color-text-muted);">Nenhum alimento encontrado. Tente o painel "Alimento Manual".</p>';
+            return;
+        }
+        results.innerHTML = data.items.map((food, idx) => `
+            <div class="calorie-result-item" data-taco-idx="${idx}">
+                <div class="calorie-result-name">${food.name}</div>
+                <div class="calorie-result-meta">${food.category} · fonte: ${food.source}</div>
+                <div class="calorie-result-macros">
+                    <span class="usda-per100">por 100g:</span>
+                    ${Math.round(food.energy_kcal)} kcal ·
+                    P:${parseFloat(food.protein_g).toFixed(1)}g ·
+                    C:${parseFloat(food.carbs_g).toFixed(1)}g ·
+                    G:${parseFloat(food.fat_g).toFixed(1)}g
+                    ${food.fiber_g !== null ? `· Fibra:${parseFloat(food.fiber_g).toFixed(1)}g` : ''}
+                </div>
+                <div class="calorie-result-actions" style="display:flex;align-items:center;gap:8px;">
+                    <input type="number" class="calorie-qty-input" value="100" min="1" max="2000" step="5" data-taco-idx="${idx}">
+                    <span style="font-size:11px;color:var(--color-text-muted);">g</span>
+                    <button class="btn-sm btn-primary taco-add-btn" data-taco-idx="${idx}">+ Adicionar</button>
+                </div>
+            </div>
+        `).join('');
+
+        // Bind: add button
+        results.querySelectorAll('.taco-add-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx  = parseInt(btn.dataset.tacoIdx);
+                const food = data.items[idx];
+                const grams = parseFloat(results.querySelector(`.calorie-qty-input[data-taco-idx="${idx}"]`)?.value) || 100;
+                const factor = grams / 100;
+                const targetDow  = adminState._targetMealDow  ?? 1;
+                const targetType = adminState._targetMealType ?? 'cafe_da_manha';
+                addItemToPlan(targetDow, targetType, {
+                    name:     `${food.name} (${grams}g)`,
+                    qty:      `${grams}g`,
+                    calories: Math.round(food.energy_kcal * factor * 10) / 10,
+                    protein:  Math.round(food.protein_g  * factor * 10) / 10,
+                    carbs:    Math.round(food.carbs_g    * factor * 10) / 10,
+                    fat:      Math.round(food.fat_g      * factor * 10) / 10,
+                });
+                results.classList.add('hidden');
+                input.value = '';
+            });
+        });
+
+    } catch (err) {
+        results.innerHTML = `<p style="padding:8px;color:var(--color-danger);">${err.message}</p>`;
+    }
+}
+
+// Alterna abas de busca de alimentos
+function initFoodSearchTabs() {
+    const tabs = document.querySelectorAll('.food-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const key = tab.dataset.ftab;
+            document.querySelectorAll('.food-search-panel').forEach(p => p.classList.add('hidden'));
+            const panel = document.getElementById(`food-panel-${key}`);
+            if (panel) panel.classList.remove('hidden');
+            // Fechar resultados abertos da outra aba
+            document.getElementById('taco-search-results')?.classList.add('hidden');
+            document.getElementById('calorie-search-results')?.classList.add('hidden');
+        });
+    });
+}
+
+function initCustomFoodPanel() {
+    const btn = document.getElementById('btn-add-custom-food');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const name = document.getElementById('custom-food-name')?.value.trim();
+        const kcal = parseFloat(document.getElementById('custom-food-kcal')?.value) || 0;
+        const prot = parseFloat(document.getElementById('custom-food-prot')?.value) || 0;
+        const carb = parseFloat(document.getElementById('custom-food-carb')?.value) || 0;
+        const fat  = parseFloat(document.getElementById('custom-food-fat')?.value)  || 0;
+        const grams = parseFloat(document.getElementById('custom-food-qty')?.value) || 100;
+        const doSave = document.getElementById('custom-food-save')?.checked;
+
+        if (!name) { alert('Informe o nome do alimento.'); return; }
+
+        const factor = grams / 100;
+        const targetDow  = adminState._targetMealDow  ?? 1;
+        const targetType = adminState._targetMealType ?? 'cafe_da_manha';
+
+        addItemToPlan(targetDow, targetType, {
+            name:     `${name} (${grams}g)`,
+            qty:      `${grams}g`,
+            calories: Math.round(kcal * factor * 10) / 10,
+            protein:  Math.round(prot * factor * 10) / 10,
+            carbs:    Math.round(carb * factor * 10) / 10,
+            fat:      Math.round(fat  * factor * 10) / 10,
+        });
+
+        if (doSave) {
+            try {
+                await fetch(`${API_URL}/admin/food-db`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+                    body: JSON.stringify({ name, energy_kcal: kcal, protein_g: prot, carbs_g: carb, fat_g: fat })
+                });
+            } catch (e) { console.warn('Erro ao salvar alimento personalizado:', e); }
+        }
+
+        // Limpar campos
+        ['custom-food-name','custom-food-kcal','custom-food-prot','custom-food-carb','custom-food-fat'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = id === 'custom-food-qty' ? '100' : '';
+        });
+        document.getElementById('custom-food-qty').value = '100';
+    });
+}
+
 export function initProMeals() {
     // Cardápios: botão Novo Plano
     const btnNewPlan = document.getElementById('btn-new-meal-plan');
@@ -522,13 +655,23 @@ export function initProMeals() {
     const btnSavePlan = document.getElementById('btn-save-meal-plan');
     if (btnSavePlan) btnSavePlan.addEventListener('click', saveMealPlan);
 
-    // Cardápios: Busca CalorieNinjas / Spoonacular
+    // Busca TACO
+    const btnTacoSearch = document.getElementById('btn-taco-search');
+    const tacoInput = document.getElementById('taco-search-input');
+    if (btnTacoSearch) btnTacoSearch.addEventListener('click', runTacoSearch);
+    if (tacoInput) tacoInput.addEventListener('keydown', e => { if (e.key === 'Enter') runTacoSearch(); });
+
+    // Busca Spoonacular (mantida como fallback)
     const btnCalSearch = document.getElementById('btn-calorie-search');
     const calInput = document.getElementById('calorie-search-input');
     if (btnCalSearch) btnCalSearch.addEventListener('click', runCalorieSearch);
-    if (calInput) {
-        calInput.addEventListener('keydown', e => { if (e.key === 'Enter') runCalorieSearch(); });
-    }
+    if (calInput) calInput.addEventListener('keydown', e => { if (e.key === 'Enter') runCalorieSearch(); });
+
+    // Abas de busca de alimentos
+    initFoodSearchTabs();
+
+    // Painel de alimento manual
+    initCustomFoodPanel();
 
     // Cardápios: Toggle ativo/inativo
     const btnToggleActive = document.getElementById('btn-toggle-active-plan');
@@ -568,7 +711,6 @@ export function initProMeals() {
         const targetDow  = adminState._targetMealDow  ?? 1;
         const targetType = adminState._targetMealType ?? 'cafe_da_manha';
 
-        // 1. Adiciona como item da refeição usando os macros sugeridos
         addItemToPlan(targetDow, targetType, {
             name:     currentGeneratedRecipe.name || currentGeneratedRecipeTarget.name,
             qty:      "1 porção (Receita IA)",
@@ -578,7 +720,6 @@ export function initProMeals() {
             fat:      Math.round(currentGeneratedRecipe.fat),
         });
 
-        // 2. Injeta receita formatada nas instruções gerais
         const dayIdx = adminState._editingPlanData.days.findIndex(day => day.dow === targetDow);
         if (dayIdx !== -1) {
             const mealIdx = adminState._editingPlanData.days[dayIdx].meals.findIndex(m => m.type === targetType);
@@ -590,13 +731,11 @@ export function initProMeals() {
             }
         }
 
-        // 3. Limpa UI
         document.getElementById('admin-recipe-generator-modal').style.display = 'none';
         document.getElementById('calorie-search-results').classList.add('hidden');
         const input = document.getElementById('calorie-search-input');
         if (input) input.value = '';
 
-        // 4. Re-renderiza o dia
         renderPlanDayEditor(targetDow);
     });
 }

@@ -1030,18 +1030,83 @@
                         </div>
                     </div>
 
-                    <!-- Busca Spoonacular -->
-                    <div class="calorie-search-bar">
-                        <div class="calorie-search-wrap">
-                            <i data-lucide="search" class="calorie-search-icon"></i>
-                            <input type="text" id="calorie-search-input" placeholder="Buscar receita fitness (ex: frango grelhado, omelete de claras, salada caesar)..." autocomplete="off">
-                            <button class="btn-primary btn-sm" id="btn-calorie-search">Buscar</button>
+                    <!-- Busca de Alimentos: Abas TACO / Receitas -->
+                    <div class="food-search-area">
+                        <div class="food-search-tabs">
+                            <button class="food-tab active" id="food-tab-taco" data-ftab="taco">
+                                <i data-lucide="leaf" style="width:13px;height:13px;"></i> Alimentos BR (TACO)
+                            </button>
+                            <button class="food-tab" id="food-tab-spoonacular" data-ftab="spoonacular">
+                                <i data-lucide="utensils-crossed" style="width:13px;height:13px;"></i> Receitas (Spoonacular)
+                            </button>
+                            <button class="food-tab" id="food-tab-custom" data-ftab="custom">
+                                <i data-lucide="plus-circle" style="width:13px;height:13px;"></i> Alimento Manual
+                            </button>
                         </div>
-                        <div id="calorie-search-results" class="calorie-results-drop hidden"></div>
+
+                        <!-- Painel TACO -->
+                        <div id="food-panel-taco" class="food-search-panel">
+                            <div class="calorie-search-wrap">
+                                <i data-lucide="search" class="calorie-search-icon"></i>
+                                <input type="text" id="taco-search-input" placeholder="Ex: arroz branco, peito de frango, banana, feijão carioca..." autocomplete="off">
+                                <button class="btn-primary btn-sm" id="btn-taco-search">Buscar</button>
+                            </div>
+                            <div id="taco-search-results" class="calorie-results-drop hidden"></div>
+                            <p class="description" style="padding:4px 0 8px;font-size:11px;color:var(--color-text-muted);">
+                                Base TACO/TBCA — valores por 100g. Informe a quantidade em gramas ao adicionar.
+                            </p>
+                        </div>
+
+                        <!-- Painel Spoonacular -->
+                        <div id="food-panel-spoonacular" class="food-search-panel hidden">
+                            <div class="calorie-search-wrap">
+                                <i data-lucide="search" class="calorie-search-icon"></i>
+                                <input type="text" id="calorie-search-input" placeholder="Ex: frango grelhado, omelete de claras, salada caesar..." autocomplete="off">
+                                <button class="btn-primary btn-sm" id="btn-calorie-search">Buscar</button>
+                            </div>
+                            <div id="calorie-search-results" class="calorie-results-drop hidden"></div>
+                            <p class="description" style="padding:4px 0 8px;font-size:11px;color:var(--color-text-muted);">
+                                Receitas internacionais com macros por porção. Requer chave Spoonacular em Credenciais.
+                            </p>
+                        </div>
+
+                        <!-- Painel Alimento Manual -->
+                        <div id="food-panel-custom" class="food-search-panel hidden">
+                            <div class="custom-food-form">
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+                                    <div style="flex:2;min-width:140px;">
+                                        <label style="font-size:11px;color:var(--color-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Nome</label>
+                                        <input type="text" id="custom-food-name" placeholder="Ex: Bolo de banana integral" style="width:100%;margin-top:4px;">
+                                    </div>
+                                    <div style="flex:1;min-width:70px;">
+                                        <label style="font-size:11px;color:var(--color-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">kcal/100g</label>
+                                        <input type="number" id="custom-food-kcal" placeholder="250" min="0" step="1" style="width:100%;margin-top:4px;">
+                                    </div>
+                                    <div style="flex:1;min-width:60px;">
+                                        <label style="font-size:11px;color:var(--color-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Prot (g)</label>
+                                        <input type="number" id="custom-food-prot" placeholder="8" min="0" step="0.1" style="width:100%;margin-top:4px;">
+                                    </div>
+                                    <div style="flex:1;min-width:60px;">
+                                        <label style="font-size:11px;color:var(--color-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Carb (g)</label>
+                                        <input type="number" id="custom-food-carb" placeholder="40" min="0" step="0.1" style="width:100%;margin-top:4px;">
+                                    </div>
+                                    <div style="flex:1;min-width:60px;">
+                                        <label style="font-size:11px;color:var(--color-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Gord (g)</label>
+                                        <input type="number" id="custom-food-fat" placeholder="5" min="0" step="0.1" style="width:100%;margin-top:4px;">
+                                    </div>
+                                    <div style="flex:1;min-width:60px;">
+                                        <label style="font-size:11px;color:var(--color-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Qtd (g)</label>
+                                        <input type="number" id="custom-food-qty" placeholder="100" min="1" step="1" value="100" style="width:100%;margin-top:4px;">
+                                    </div>
+                                    <button class="btn-primary btn-sm" id="btn-add-custom-food" style="flex-shrink:0;align-self:flex-end;">+ Adicionar</button>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+                                    <input type="checkbox" id="custom-food-save" style="width:auto;margin:0;">
+                                    <label for="custom-food-save" style="font-size:11px;color:var(--color-text-muted);cursor:pointer;margin:0;">Salvar no banco de alimentos para uso futuro</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <p class="description" style="padding: 0 0 12px 0; font-size:11px;">
-                        Selecione um dia e uma refeição, depois busque receitas para adicionar. Os macros são por porção (Spoonacular).
-                    </p>
 
                     <!-- Seletor de dias -->
                     <div class="plan-day-tabs">

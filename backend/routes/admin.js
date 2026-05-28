@@ -378,6 +378,63 @@ Regras de saída:
   }
 });
 
+// ==========================================
+// BANCO DE ALIMENTOS TACO/TBCA (PROFISSIONAIS)
+// ==========================================
+
+// GET /admin/food-db?q=termo — busca de alimentos brasileiros
+router.get('/food-db', requireRole(['admin', 'nutritionist', 'trainer']), async (req, res) => {
+  const q = (req.query.q || '').trim();
+  const limit = Math.min(parseInt(req.query.limit) || 15, 30);
+  if (!q) return res.status(400).json({ error: 'Query obrigatória.' });
+  try {
+    const result = await db.query(
+      `SELECT id, name, category, energy_kcal, protein_g, carbs_g, fat_g, fiber_g, source
+       FROM foods
+       WHERE name ILIKE $1
+       ORDER BY
+         CASE WHEN LOWER(name) = LOWER($2) THEN 0
+              WHEN LOWER(name) LIKE LOWER($3) THEN 1
+              ELSE 2 END,
+         name ASC
+       LIMIT $4`,
+      [`%${q}%`, q, `${q}%`, limit]
+    );
+    res.json({ items: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar alimentos.' });
+  }
+});
+
+// POST /admin/food-db — adicionar alimento personalizado
+router.post('/food-db', requireRole(['admin', 'nutritionist', 'trainer']), async (req, res) => {
+  const { name, category, energy_kcal, protein_g, carbs_g, fat_g, fiber_g } = req.body;
+  if (!name || energy_kcal === undefined) {
+    return res.status(400).json({ error: 'Nome e calorias são obrigatórios.' });
+  }
+  try {
+    const result = await db.query(
+      `INSERT INTO foods (name, category, energy_kcal, protein_g, carbs_g, fat_g, fiber_g, source, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'custom', $8) RETURNING id, name, category, energy_kcal, protein_g, carbs_g, fat_g, fiber_g, source`,
+      [
+        name.trim(),
+        (category || 'Personalizado').trim(),
+        parseFloat(energy_kcal) || 0,
+        parseFloat(protein_g)  || 0,
+        parseFloat(carbs_g)    || 0,
+        parseFloat(fat_g)      || 0,
+        fiber_g !== undefined ? parseFloat(fiber_g) : null,
+        req.user.id
+      ]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao adicionar alimento.' });
+  }
+});
+
 // Exige cargo de administrador para todas as rotas abaixo
 router.use(requireRole(['admin']));
 

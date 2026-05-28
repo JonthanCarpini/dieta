@@ -234,3 +234,20 @@ CREATE TABLE IF NOT EXISTS patient_measurements (
 );
 CREATE INDEX IF NOT EXISTS idx_patient_measurements_patient ON patient_measurements(patient_id, measured_at DESC);
 
+-- 17. BANCO DE ALIMENTOS BRASILEIROS (TACO/TBCA + Personalizados)
+-- Valores nutricionais por 100g. Seed populado automaticamente via server.js na primeira inicialização.
+CREATE TABLE IF NOT EXISTS foods (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category VARCHAR(100) DEFAULT 'Geral',
+    energy_kcal DECIMAL(7,2) DEFAULT 0,    -- kcal por 100g
+    protein_g DECIMAL(6,2) DEFAULT 0,       -- proteínas por 100g
+    carbs_g DECIMAL(6,2) DEFAULT 0,         -- carboidratos por 100g
+    fat_g DECIMAL(6,2) DEFAULT 0,           -- lipídeos por 100g
+    fiber_g DECIMAL(6,2),                   -- fibras por 100g (nullable)
+    source VARCHAR(50) DEFAULT 'TACO',      -- 'TACO', 'TBCA', 'custom'
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL, -- para alimentos personalizados
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_foods_name ON foods(name);
+CREATE INDEX IF NOT EXISTS idx_foods_source ON foods(source);

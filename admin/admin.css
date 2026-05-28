@@ -1341,6 +1341,56 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     min-width: 140px;
 }
 .input-inline:focus { outline: none; border-color: var(--color-primary); }
+/* =============================================
+   FOOD SEARCH TABS (TACO / Spoonacular / Manual)
+   ============================================= */
+.food-search-area {
+    margin-bottom: 4px;
+    position: relative;
+}
+.food-search-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 8px;
+}
+.food-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+}
+.food-tab:hover { color: var(--color-text-main); background: rgba(255,255,255,0.04); }
+.food-tab.active {
+    color: var(--color-primary);
+    background: rgba(var(--color-primary-rgb, 74,222,128), 0.1);
+    border-color: rgba(var(--color-primary-rgb, 74,222,128), 0.25);
+}
+.food-search-panel { position: relative; }
+.custom-food-form input[type="text"],
+.custom-food-form input[type="number"] {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    color: var(--color-text-main);
+    font-size: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.custom-food-form input:focus { border-color: var(--color-primary); outline: none; }
+
 .calorie-search-bar {
     position: relative;
     margin-bottom: 4px;
