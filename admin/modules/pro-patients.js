@@ -107,22 +107,32 @@ export function getMealTypeLabel(meal) {
     return 'Ceia';
 }
 
+function _populatePatientSidebar(patient) {
+    const initials = (patient.name || '--').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    const el = id => document.getElementById(id);
+    if (el('ps-initials')) el('ps-initials').textContent = initials;
+    if (el('ps-name')) el('ps-name').textContent = patient.name || '--';
+    if (el('ps-email')) el('ps-email').textContent = patient.email || '--';
+
+    const planLabel = patient.plan === 'premium' ? 'Premium' : (patient.plan || 'trial');
+    const badge = el('ps-badge');
+    if (badge) { badge.textContent = planLabel; badge.className = `ps-badge ${patient.plan && patient.plan !== 'trial' ? 'premium' : 'trial'}`; }
+
+    if (el('ps-stat-weight')) el('ps-stat-weight').textContent = patient.weight ? `${patient.weight} kg` : '--';
+    if (el('ps-stat-height')) el('ps-stat-height').textContent = patient.height ? `${patient.height} cm` : '--';
+    const goalMap = { lose: 'Emagrecer', gain: 'Ganhar Massa', maintain: 'Manutenção' };
+    if (el('ps-stat-goal')) el('ps-stat-goal').textContent = goalMap[patient.goal] || patient.goal || '--';
+    if (el('ps-stat-calories')) el('ps-stat-calories').textContent = patient.target_calories ? `${patient.target_calories} kcal` : '--';
+}
+
 export async function viewPatientDetails(patient) {
     adminState._currentPatient = patient;
 
-    const listLayout = document.getElementById('patients-list-view');
-    const detailsLayout = document.getElementById('patient-details-view');
+    _populatePatientSidebar(patient);
 
-    if (listLayout) listLayout.classList.add('hidden');
-    if (detailsLayout) detailsLayout.classList.remove('hidden');
-    
-    const nameLabel = document.getElementById('detail-patient-name');
-    const emailLabel = document.getElementById('detail-patient-email');
     const hiddenId = document.getElementById('feedback-patient-id');
     const contentText = document.getElementById('feedback-content');
-    
-    if (nameLabel) nameLabel.innerText = `Paciente: ${patient.name}`;
-    if (emailLabel) emailLabel.innerText = patient.email;
+
     if (hiddenId) hiddenId.value = patient.id;
     if (contentText) contentText.value = '';
 
@@ -144,6 +154,17 @@ export async function viewPatientDetails(patient) {
     if (mealsBody) mealsBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Carregando diário...</td></tr>`;
     if (weightHistoryBody) weightHistoryBody.innerHTML = `<tr><td colspan="2" style="text-align: center; opacity: 0.5;">Carregando pesos...</td></tr>`;
 
+    // Abre o workspace do paciente na aba "overview"
+    if (window.openPatientWorkspace) window.openPatientWorkspace('overview');
+
+    const waterStatus = document.getElementById('detail-water-status');
+    const fastingStatus = document.getElementById('detail-fasting-status');
+    const mealsBody = document.getElementById('detail-meals-table-body');
+
+    if (waterStatus) waterStatus.innerText = 'Carregando...';
+    if (fastingStatus) fastingStatus.innerText = 'Carregando...';
+    if (mealsBody) mealsBody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Carregando diário...</td></tr>`;
+
     fetch(`${API_URL}/professional/patients/${patient.id}/weight-log`, {
         headers: { 'Authorization': `Bearer ${adminState.token}` }
     })
@@ -162,12 +183,14 @@ export async function viewPatientDetails(patient) {
         if (!res.ok) throw new Error('Não foi possível carregar os detalhes do diário do paciente.');
 
         const data = await res.json();
-        
+
         if (data.profile) {
-            if (weightLabel) weightLabel.innerText = data.profile.weight ? `${data.profile.weight} kg` : '-';
-            if (heightLabel) heightLabel.innerText = data.profile.height ? `${data.profile.height} cm` : '-';
-            if (goalLabel) goalLabel.innerText = data.profile.goal || '-';
-            if (caloriesLabel) caloriesLabel.innerText = data.profile.target_calories ? `${data.profile.target_calories} kcal` : '-';
+            const el = id => document.getElementById(id);
+            if (el('ps-stat-weight')) el('ps-stat-weight').textContent = data.profile.weight ? `${data.profile.weight} kg` : '--';
+            if (el('ps-stat-height')) el('ps-stat-height').textContent = data.profile.height ? `${data.profile.height} cm` : '--';
+            const goalMap = { lose: 'Emagrecer', gain: 'Ganhar Massa', maintain: 'Manutenção' };
+            if (el('ps-stat-goal')) el('ps-stat-goal').textContent = goalMap[data.profile.goal] || data.profile.goal || '--';
+            if (el('ps-stat-calories')) el('ps-stat-calories').textContent = data.profile.target_calories ? `${data.profile.target_calories} kcal` : '--';
         }
 
         if (data.water) {
@@ -196,29 +219,6 @@ export async function viewPatientDetails(patient) {
         alert(err.message);
     }
     await loadFeedbackHistory(patient.id);
-
-    // Resetar abas de paciente para a aba "Diário" por padrão ao abrir detalhes
-    const defaultTabBtn = document.querySelector('.patient-tab-btn[data-patient-tab="diary"]');
-    if (defaultTabBtn) {
-        document.querySelectorAll('.patient-tab-btn').forEach(b => {
-            b.classList.remove('active');
-            b.style.borderBottomColor = 'transparent';
-            b.style.color = 'var(--color-text-muted)';
-        });
-        defaultTabBtn.classList.add('active');
-        defaultTabBtn.style.borderBottomColor = 'var(--color-primary)';
-        defaultTabBtn.style.color = '#fff';
-        
-        document.querySelectorAll('.patient-tab-content-panel').forEach(panel => {
-            panel.classList.add('hidden');
-            panel.classList.remove('active');
-        });
-        const activePanel = document.getElementById('patient-tab-content-diary');
-        if (activePanel) {
-            activePanel.classList.remove('hidden');
-            activePanel.classList.add('active');
-        }
-    }
 
     loadPatientClinicalData(patient.id);
     loadPatientExamsData(patient.id);
@@ -1393,10 +1393,8 @@ export function initProPatients() {
     const btnBack = document.getElementById('btn-back-to-patients');
     if (btnBack) {
         btnBack.addEventListener('click', () => {
-            const detailsLayout = document.getElementById('patient-details-view');
-            const listLayout = document.getElementById('patients-list-view');
-            if (detailsLayout) detailsLayout.classList.add('hidden');
-            if (listLayout) listLayout.classList.remove('hidden');
+            // Volta para a lista de pacientes no modo regular
+            if (window.switchTab) window.switchTab('patients');
         });
     }
 
@@ -1474,29 +1472,19 @@ export function initProPatients() {
     if (patientSearch) patientSearch.addEventListener('input', applyPatientFilters);
     if (patientGoal)   patientGoal.addEventListener('change', applyPatientFilters);
 
-    // Abas de navegação interna do paciente
+    // Abas de navegação interna do paciente (patient sidebar nav)
     const patientTabButtons = document.querySelectorAll('.patient-tab-btn');
     patientTabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
-            patientTabButtons.forEach(b => {
-                b.classList.remove('active');
-                b.style.borderBottomColor = 'transparent';
-                b.style.color = 'var(--color-text-muted)';
-            });
+            patientTabButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            btn.style.borderBottomColor = 'var(--color-primary)';
-            btn.style.color = '#fff';
 
             const tabId = btn.dataset.patientTab;
             document.querySelectorAll('.patient-tab-content-panel').forEach(panel => {
-                panel.classList.add('hidden');
                 panel.classList.remove('active');
             });
             const activePanel = document.getElementById(`patient-tab-content-${tabId}`);
-            if (activePanel) {
-                activePanel.classList.remove('hidden');
-                activePanel.classList.add('active');
-            }
+            if (activePanel) activePanel.classList.add('active');
 
             const patient = adminState._currentPatient;
             if (tabId === 'meal-plan' && patient) {

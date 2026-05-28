@@ -4,13 +4,13 @@
 
 import { adminState } from './modules/state.js';
 import { initAuth, checkSession, showLoginScreen, handleLogin } from './modules/auth.js';
-import { 
+import {
     initAdminFeatures,
-    loadOverviewData, 
-    loadUsersData, 
-    loadProfessionalsData, 
-    loadPlansData, 
-    loadSettingsData, 
+    loadOverviewData,
+    loadUsersData,
+    loadProfessionalsData,
+    loadPlansData,
+    loadSettingsData,
     loadBillingData,
     setupVisibilityToggles,
     resetPlanForm,
@@ -25,20 +25,16 @@ import { initProMeals, loadMealPlansData, openMealPlanBuilder, saveMealPlan } fr
 import { initProEnergy } from './modules/pro-energy.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Inicialização
     initAdmin();
 
     async function initAdmin() {
         setupVisibilityToggles();
-        
-        // Inicializa listeners comuns dos subcomponentes
         setupEventListeners();
         initProSchedule();
         initProPatients();
         initProMeals();
         initProEnergy();
 
-        // Autentica e inicia
         await initAuth(() => {
             const defaultTab = adminState.user.role === 'admin' ? 'overview' : 'patients';
             loadTab(defaultTab);
@@ -46,18 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupEventListeners() {
-        // Navegação de abas lateral
+        // Navegação de abas no topnav
         const navButtons = document.querySelectorAll('.nav-btn');
         navButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 navButtons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                const tabId = btn.dataset.tab;
-                loadTab(tabId);
+                loadTab(btn.dataset.tab);
             });
         });
 
-        // Logout
         document.getElementById('btn-logout')?.addEventListener('click', () => {
             localStorage.removeItem('nutrir_token');
             adminState.token = '';
@@ -65,12 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showLoginScreen();
         });
 
-        // Ir para o App do Usuário
         document.getElementById('btn-back-to-app')?.addEventListener('click', () => {
             window.location.href = '/';
         });
 
-        // Busca de usuários em tempo real
         const userSearch = document.getElementById('user-search-input');
         if (userSearch) {
             userSearch.addEventListener('input', () => {
@@ -78,81 +70,75 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Formulário de Cadastro de Profissional
         const proForm = document.getElementById('pro-register-form');
-        if (proForm) {
-            proForm.addEventListener('submit', handleProRegistration);
-        }
+        if (proForm) proForm.addEventListener('submit', handleProRegistration);
 
-        // Formulário de Configuração de Plano (Criação/Edição)
         const planForm = document.getElementById('plan-config-form');
-        if (planForm) {
-            planForm.addEventListener('submit', handlePlanSave);
-        }
+        if (planForm) planForm.addEventListener('submit', handlePlanSave);
 
-        const checkHasNutri = document.getElementById('plan-has-nutritionist');
-        if (checkHasNutri) {
-            checkHasNutri.addEventListener('change', function() {
-                const group = document.getElementById('plan-max-nutritionist-group');
-                if (group) group.classList.toggle('hidden', !this.checked);
-            });
-        }
+        document.getElementById('plan-has-nutritionist')?.addEventListener('change', function() {
+            document.getElementById('plan-max-nutritionist-group')?.classList.toggle('hidden', !this.checked);
+        });
 
-        const checkHasTrainer = document.getElementById('plan-has-trainer');
-        if (checkHasTrainer) {
-            checkHasTrainer.addEventListener('change', function() {
-                const group = document.getElementById('plan-max-trainer-group');
-                if (group) group.classList.toggle('hidden', !this.checked);
-            });
-        }
+        document.getElementById('plan-has-trainer')?.addEventListener('change', function() {
+            document.getElementById('plan-max-trainer-group')?.classList.toggle('hidden', !this.checked);
+        });
 
         document.getElementById('btn-cancel-plan-edit')?.addEventListener('click', resetPlanForm);
 
-        // Formulário de Credenciais Gerais do Sistema
         const settingsForm = document.getElementById('global-settings-form');
-        if (settingsForm) {
-            settingsForm.addEventListener('submit', handleSettingsSave);
-        }
+        if (settingsForm) settingsForm.addEventListener('submit', handleSettingsSave);
     }
 
-    // Roteia o conteúdo de cada aba
+    // Abre o workspace do paciente (substitui a lógica de sub-aba dentro da tab patients)
+    window.openPatientWorkspace = function(patientTabId) {
+        const regularView = document.getElementById('regular-view');
+        const workspace = document.getElementById('patient-workspace');
+        if (regularView) regularView.classList.add('hidden');
+        if (workspace) workspace.classList.remove('hidden');
+
+        // Remove active de todos os nav-btn do topnav (nenhum fica ativo no workspace)
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+        // Ativa a aba do paciente solicitada (ou a primeira)
+        const targetTab = patientTabId || 'overview';
+        const panels = document.querySelectorAll('.patient-tab-content-panel');
+        panels.forEach(p => p.classList.remove('active'));
+        const target = document.getElementById(`patient-tab-content-${targetTab}`);
+        if (target) target.classList.add('active');
+
+        const tabBtns = document.querySelectorAll('.patient-tab-btn');
+        tabBtns.forEach(b => b.classList.remove('active'));
+        const activeBtn = document.querySelector(`.patient-tab-btn[data-patient-tab="${targetTab}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        if (window.lucide) window.lucide.createIcons();
+    };
+
+    // Permite que módulos externos naveguem para uma aba normal do dashboard
     window.switchTab = function(tabId) {
         const navBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
         if (navBtn) navBtn.click();
     };
 
     async function loadTab(tabId) {
-        // Captura e limpa o flag antes de qualquer lógica para evitar race conditions
-        const preservePatient = adminState._preservePatientDetail;
-        adminState._preservePatientDetail = false;
+        // Ao navegar para qualquer aba normal, fecha o workspace do paciente
+        const regularView = document.getElementById('regular-view');
+        const workspace = document.getElementById('patient-workspace');
+        if (regularView) regularView.classList.remove('hidden');
+        if (workspace) workspace.classList.add('hidden');
 
-        // Atualiza a classe active nos botões da sidebar
-        const navButtons = document.querySelectorAll('.nav-btn');
-        navButtons.forEach(btn => {
-            if (btn.dataset.tab === tabId) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
+        // Atualiza active nos botões de nav
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabId);
         });
 
-        // Oculta todas as telas de abas
-        const tabs = document.querySelectorAll('.tab-content');
-        tabs.forEach(t => t.classList.remove('active'));
-
-        // Mostra aba ativa
+        // Oculta todas as tab-content e mostra a ativa
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         const activeTab = document.getElementById(`tab-${tabId}`);
         if (activeTab) activeTab.classList.add('active');
 
-        // Se for a aba de pacientes, decide se mostra lista ou preserva a view de detalhes
-        if (tabId === 'patients' && !preservePatient) {
-            const listLayout = document.getElementById('patients-list-view');
-            const detailsLayout = document.getElementById('patient-details-view');
-            if (listLayout) listLayout.classList.remove('hidden');
-            if (detailsLayout) detailsLayout.classList.add('hidden');
-        }
-
-        // Carrega os dados específicos da aba
+        // Carrega dados da aba
         if (tabId === 'overview') {
             await loadOverviewData();
         } else if (tabId === 'users') {
@@ -166,10 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (tabId === 'billing') {
             await loadBillingData();
         } else if (tabId === 'patients') {
-            // Só recarrega a lista se não estamos preservando a view do paciente
-            if (!preservePatient) {
-                await loadPatientsData();
-            }
+            await loadPatientsData();
         } else if (tabId === 'schedule') {
             await loadScheduleData();
         } else if (tabId === 'appointments') {
@@ -178,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadMealPlansData();
         }
 
-        // Garante que os ícones Lucide sejam atualizados
         if (window.lucide) window.lucide.createIcons();
     }
 });

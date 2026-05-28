@@ -5,20 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Admin - Nutrir</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- CSS Estilos -->
     <link rel="stylesheet" href="admin.css">
 </head>
 <body class="dark-theme">
-    
-    <!-- 1. TELA DE LOGIN ADMIN (Caso não autenticado/admin) -->
+
+    <!-- 1. TELA DE LOGIN -->
     <div id="login-container" class="login-wrapper">
         <div class="login-card">
             <div class="login-header">
@@ -28,7 +24,6 @@
                 <h2>Nutrir Admin</h2>
                 <p>Entre com suas credenciais de administrador ou profissional</p>
             </div>
-            
             <form id="admin-login-form">
                 <div class="form-group">
                     <label for="login-email">E-mail</label>
@@ -44,15 +39,17 @@
         </div>
     </div>
 
-    <!-- 2. LAYOUT DO DASHBOARD ADMIN (Caso autenticado) -->
-    <div id="admin-dashboard" class="dashboard-layout hidden">
-        <!-- Sidebar lateral -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
+    <!-- 2. APP SHELL (autenticado) -->
+    <div id="admin-dashboard" class="app-shell hidden">
+
+        <!-- TOP NAV -->
+        <header class="app-topnav">
+            <div class="topnav-brand">
                 <i data-lucide="shield-check" class="shield-green"></i>
-                <span>Nutrir Admin</span>
+                <span>Nutrir</span>
             </div>
-            <nav class="sidebar-nav">
+
+            <nav class="topnav-nav">
                 <button class="nav-btn active" data-tab="overview" id="nav-overview">
                     <i data-lucide="layout-dashboard"></i> Visão Geral
                 </button>
@@ -84,1363 +81,1142 @@
                     <i data-lucide="key-round"></i> Credenciais
                 </button>
             </nav>
-            <div class="sidebar-footer">
-                <button id="btn-back-to-app" class="btn-secondary w-full" style="margin-bottom: 8px;">
-                    <i data-lucide="home"></i> Ir para o App
+
+            <div class="topnav-actions">
+                <span id="topnav-user-label" class="topnav-user-label"></span>
+                <button id="btn-back-to-app" class="btn-topnav" title="Ir para o App">
+                    <i data-lucide="home"></i>
                 </button>
-                <button id="btn-logout" class="btn-danger w-full">
-                    <i data-lucide="log-out"></i> Sair
+                <button id="btn-logout" class="btn-topnav-danger" title="Sair">
+                    <i data-lucide="log-out"></i>
                 </button>
             </div>
-        </aside>
+        </header>
 
-        <!-- Área de Conteúdo Principal -->
-        <main class="main-content">
-            
-            <!-- ABA: VISÃO GERAL (OVERVIEW) -->
-            <section id="tab-overview" class="tab-content active">
-                <div class="header-section">
-                    <h1 id="overview-title">Visão Geral</h1>
-                    <p id="overview-subtitle">Métricas gerais do Nutrir em tempo real</p>
-                </div>
+        <!-- BODY -->
+        <div class="app-body">
 
-                <!-- Conteúdo Admin -->
-                <div id="overview-admin-content">
+            <!-- ── REGULAR VIEW (dashboard tabs) ── -->
+            <div id="regular-view" class="regular-view">
 
-                <!-- Cards de Estatísticas -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon bg-blue"><i data-lucide="users"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Total de Usuários</span>
-                            <h3 id="stat-total-users">0</h3>
-                        </div>
+                <!-- ABA: VISÃO GERAL -->
+                <section id="tab-overview" class="tab-content active">
+                    <div class="header-section">
+                        <h1 id="overview-title">Visão Geral</h1>
+                        <p id="overview-subtitle">Métricas gerais do Nutrir em tempo real</p>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon bg-yellow"><i data-lucide="star"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Usuários Premium</span>
-                            <h3 id="stat-premium-users">0</h3>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon bg-green"><i data-lucide="heart"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Profissionais Ativos</span>
-                            <h3 id="stat-professionals">0</h3>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon bg-purple"><i data-lucide="file-key"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Chave Gemini Ativa</span>
-                            <h3 id="stat-gemini-status">Inativa</h3>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Ações rápidas -->
-                <div class="dashboard-row margin-top-lg">
-                    <div class="dashboard-card col-12">
-                        <h3>Ações Rápidas de Configuração</h3>
-                        <p class="description">Atalhos rápidos para gerenciar as partes mais cruciais do sistema.</p>
-                        <div class="quick-actions-list">
-                            <button class="quick-action-btn" onclick="switchTab('settings')">
-                                <i data-lucide="key"></i> Configurar Chaves de API
-                            </button>
-                            <button class="quick-action-btn" onclick="switchTab('plans')">
-                                <i data-lucide="plus-circle"></i> Criar Novo Plano
-                            </button>
-                            <button class="quick-action-btn" onclick="switchTab('professionals')">
-                                <i data-lucide="user-plus"></i> Cadastrar Profissional
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                </div><!-- /overview-admin-content -->
-
-                <!-- Conteúdo Profissional (injetado via JS) -->
-                <div id="overview-pro-content" class="hidden"></div>
-
-            </section>
-
-            <!-- ABA: GERENCIAMENTO DE USUÁRIOS -->
-            <section id="tab-users" class="tab-content">
-                <div class="header-section">
-                    <h1>Gerenciamento de Usuários</h1>
-                    <p>Gerencie cargos, assinaturas e contas cadastradas</p>
-                </div>
-
-                <div class="dashboard-card">
-                    <div class="table-actions">
-                        <div class="search-box">
-                            <i data-lucide="search"></i>
-                            <input type="text" id="user-search-input" placeholder="Pesquisar por nome ou e-mail...">
-                        </div>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Nome</th>
-                                    <th>E-mail</th>
-                                    <th>Cargo</th>
-                                    <th>Plano</th>
-                                    <th>Expiração do Plano</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table-body">
-                                <!-- Usuários injetados por JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ABA: CADASTRO E GERENCIAMENTO DE PROFISSIONAIS -->
-            <section id="tab-professionals" class="tab-content">
-                <div class="header-section">
-                    <h1>Profissionais de Saúde</h1>
-                    <p>Cadastre e liste nutricionistas e personal trainers da plataforma</p>
-                </div>
-
-                <div class="dashboard-row">
-                    <!-- Formulário de cadastro -->
-                    <div class="dashboard-card col-4">
-                        <h3>Registrar Profissional</h3>
-                        <form id="pro-register-form" class="margin-top-md">
-                            <div class="form-group">
-                                <label for="pro-name">Nome Completo</label>
-                                <input type="text" id="pro-name" placeholder="Ex: Dr. Marcelo Nutri" required>
+                    <div id="overview-admin-content">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon bg-blue"><i data-lucide="users"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Total de Usuários</span>
+                                    <h3 id="stat-total-users">0</h3>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="pro-email">E-mail</label>
-                                <input type="email" id="pro-email" placeholder="marcelo@nutrir.online" required>
+                            <div class="stat-card">
+                                <div class="stat-icon bg-yellow"><i data-lucide="star"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Usuários Premium</span>
+                                    <h3 id="stat-premium-users">0</h3>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="pro-password">Senha Provisória</label>
-                                <input type="password" id="pro-password" placeholder="Mínimo 6 caracteres" required>
+                            <div class="stat-card">
+                                <div class="stat-icon bg-green"><i data-lucide="heart"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Profissionais Ativos</span>
+                                    <h3 id="stat-professionals">0</h3>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="pro-role">Especialidade / Cargo</label>
-                                <select id="pro-role" required>
-                                    <option value="nutritionist">Nutricionista</option>
-                                    <option value="trainer">Personal Trainer</option>
-                                </select>
+                            <div class="stat-card">
+                                <div class="stat-icon bg-purple"><i data-lucide="file-key"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Chave Gemini Ativa</span>
+                                    <h3 id="stat-gemini-status">Inativa</h3>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="pro-commission">Comissão (%)</label>
-                                <input type="number" id="pro-commission" placeholder="Ex: 10.00" min="0" max="100" step="0.01" value="0" required>
+                        </div>
+                        <div class="dashboard-row margin-top-lg">
+                            <div class="dashboard-card col-12">
+                                <h3>Ações Rápidas de Configuração</h3>
+                                <p class="description">Atalhos rápidos para gerenciar as partes mais cruciais do sistema.</p>
+                                <div class="quick-actions-list">
+                                    <button class="quick-action-btn" onclick="switchTab('settings')">
+                                        <i data-lucide="key"></i> Configurar Chaves de API
+                                    </button>
+                                    <button class="quick-action-btn" onclick="switchTab('plans')">
+                                        <i data-lucide="plus-circle"></i> Criar Novo Plano
+                                    </button>
+                                    <button class="quick-action-btn" onclick="switchTab('professionals')">
+                                        <i data-lucide="user-plus"></i> Cadastrar Profissional
+                                    </button>
+                                </div>
                             </div>
-                            <button type="submit" class="btn-primary w-full margin-top-md">Cadastrar e Liberar Premium</button>
-                        </form>
+                        </div>
                     </div>
+                    <div id="overview-pro-content" class="hidden"></div>
+                </section>
 
-                    <!-- Lista de profissionais -->
-                    <div class="dashboard-card col-8">
-                        <h3>Profissionais Cadastrados</h3>
-                        <div class="table-responsive margin-top-md">
+                <!-- ABA: USUÁRIOS -->
+                <section id="tab-users" class="tab-content">
+                    <div class="header-section">
+                        <h1>Gerenciamento de Usuários</h1>
+                        <p>Gerencie cargos, assinaturas e contas cadastradas</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="table-actions">
+                            <div class="search-box">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="user-search-input" placeholder="Pesquisar por nome ou e-mail...">
+                            </div>
+                        </div>
+                        <div class="table-responsive">
                             <table class="data-table">
                                 <thead>
                                     <tr>
                                         <th>Nome</th>
                                         <th>E-mail</th>
                                         <th>Cargo</th>
-                                        <th>Comissão (%)</th>
+                                        <th>Plano</th>
+                                        <th>Expiração do Plano</th>
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody id="pros-table-body">
-                                    <!-- Injetado via JS -->
-                                </tbody>
+                                <tbody id="users-table-body"></tbody>
                             </table>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- ABA: PLANOS (PLAN configurator) -->
-            <section id="tab-plans" class="tab-content">
-                <div class="header-section">
-                    <h1>Configuração de Planos</h1>
-                    <p>Crie, edite e remova planos comerciais e de testes</p>
-                </div>
-
-                <div class="dashboard-row">
-                    <!-- Formulário de criar plano -->
-                    <div class="dashboard-card col-4">
-                        <h3 id="plan-form-title">Criar Novo Plano</h3>
-                        <form id="plan-config-form" class="margin-top-md">
-                            <input type="hidden" id="plan-id">
-                            <div class="form-group">
-                                <label for="plan-name">Identificador (slug)</label>
-                                <input type="text" id="plan-name" placeholder="Ex: anual" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="plan-display-name">Nome de Exibição</label>
-                                <input type="text" id="plan-display-name" placeholder="Ex: Plano Anual Premium" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="plan-price">Preço (R$)</label>
-                                <input type="number" id="plan-price" step="0.01" min="0" placeholder="Ex: 199.90" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="plan-duration">Duração (dias)</label>
-                                <input type="number" id="plan-duration" min="1" placeholder="Ex: 365" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="plan-description">Descrição</label>
-                                <textarea id="plan-description" placeholder="Breve resumo comercial..." style="height: 60px;"></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label for="plan-features">Benefícios (um por linha)</label>
-                                <textarea id="plan-features" placeholder="Ex: Receitas ilimitadas&#10;Gráficos premium&#10;Acompanhamento profissional" style="height: 90px;"></textarea>
-                            </div>
-                            
-                            <!-- Profissional Permissions & Limits -->
-                            <div class="form-group-row" style="display: flex; align-items: center; gap: 8px; margin-top: 10px; margin-bottom: 10px;">
-                                <input type="checkbox" id="plan-has-nutritionist" style="width: auto; margin: 0;">
-                                <label for="plan-has-nutritionist" style="margin: 0; font-size: 11px; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer;">Tem direito a Nutricionista</label>
-                            </div>
-                            <div class="form-group hidden" id="plan-max-nutritionist-group">
-                                <label for="plan-max-nutritionist">Limite de Consultas com Nutri / Mês</label>
-                                <input type="number" id="plan-max-nutritionist" min="0" placeholder="Ex: 4" value="0">
-                            </div>
-
-                            <div class="form-group-row" style="display: flex; align-items: center; gap: 8px; margin-top: 10px; margin-bottom: 10px;">
-                                <input type="checkbox" id="plan-has-trainer" style="width: auto; margin: 0;">
-                                <label for="plan-has-trainer" style="margin: 0; font-size: 11px; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer;">Tem direito a Personal Trainer</label>
-                            </div>
-                            <div class="form-group hidden" id="plan-max-trainer-group">
-                                <label for="plan-max-trainer">Limite de Consultas com Personal / Mês</label>
-                                <input type="number" id="plan-max-trainer" min="0" placeholder="Ex: 4" value="0">
-                            </div>
-
-                            <div class="btn-group margin-top-md">
-                                <button type="submit" class="btn-primary w-full" id="btn-save-plan">Salvar Plano</button>
-                                <button type="button" class="btn-secondary w-full hidden" id="btn-cancel-plan-edit">Cancelar</button>
-                            </div>
-                        </form>
+                <!-- ABA: PROFISSIONAIS -->
+                <section id="tab-professionals" class="tab-content">
+                    <div class="header-section">
+                        <h1>Profissionais de Saúde</h1>
+                        <p>Cadastre e liste nutricionistas e personal trainers da plataforma</p>
                     </div>
-
-                    <!-- Lista de planos -->
-                    <div class="dashboard-card col-8">
-                        <h3>Planos Disponíveis</h3>
-                        <div class="table-responsive margin-top-md">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Identificador</th>
-                                        <th>Nome</th>
-                                        <th>Preço</th>
-                                        <th>Duração (dias)</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="plans-table-body">
-                                    <!-- Injetado via JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ABA: CREDENCIAIS (SETTINGS / KEYS) -->
-            <section id="tab-settings" class="tab-content">
-                <div class="header-section">
-                    <h1>Configuração de Chaves e Credenciais</h1>
-                    <p>Gerencie as integrações globais e tokens do sistema de forma segura</p>
-                </div>
-
-                <!-- IA: Provedor e Teste -->
-                <div class="dashboard-card max-width-lg margin-top-md">
-                    <h3>Provedor de IA (LLM)</h3>
-                    <p class="description">Selecione qual modelo de linguagem será usado globalmente para geração de receitas e análise de fotos. Insira a chave do provedor escolhido e teste antes de salvar.</p>
-
-                    <!-- Seletor de provedor -->
-                    <div class="llm-provider-selector margin-top-md">
-                        <label class="llm-provider-card" id="provider-card-gemini">
-                            <input type="radio" name="active_llm_provider" value="gemini" id="provider-gemini">
-                            <div class="llm-card-inner">
-                                <span class="llm-logo llm-logo-gemini">✦</span>
-                                <div>
-                                    <strong>Google Gemini</strong>
-                                    <span class="llm-card-sub">gemini-2.5-flash · visão de imagens</span>
-                                </div>
-                            </div>
-                        </label>
-                        <label class="llm-provider-card" id="provider-card-openai">
-                            <input type="radio" name="active_llm_provider" value="openai" id="provider-openai">
-                            <div class="llm-card-inner">
-                                <span class="llm-logo llm-logo-openai">⬡</span>
-                                <div>
-                                    <strong>OpenAI</strong>
-                                    <span class="llm-card-sub">gpt-4o-mini · alta disponibilidade</span>
-                                </div>
-                            </div>
-                        </label>
-                        <label class="llm-provider-card" id="provider-card-mistral">
-                            <input type="radio" name="active_llm_provider" value="mistral" id="provider-mistral">
-                            <div class="llm-card-inner">
-                                <span class="llm-logo llm-logo-mistral">◈</span>
-                                <div>
-                                    <strong>Mistral AI</strong>
-                                    <span class="llm-card-sub">mistral-small-latest · custo baixo</span>
-                                </div>
-                            </div>
-                        </label>
-                    </div>
-
-                    <!-- Chaves de API dos provedores -->
-                    <div class="margin-top-lg" style="display:flex;flex-direction:column;gap:14px;">
-                        <div class="settings-field-group" style="border:none;padding:0;margin:0;">
-                            <div class="field-info">
-                                <h4>Google Gemini API Key</h4>
-                                <p class="description">Suporta análise de imagens (scanner). Fallback automático para gemini-1.5-flash em sobrecarga.</p>
-                            </div>
-                            <div class="form-group">
-                                <div class="input-password-wrapper">
-                                    <input type="password" id="setting-gemini-key" placeholder="AIzaSy..." class="masked-input">
-                                    <button class="toggle-visibility-btn" type="button" data-target="setting-gemini-key"><i data-lucide="eye"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="settings-field-group" style="border:none;padding:0;margin:0;">
-                            <div class="field-info">
-                                <h4>OpenAI API Key</h4>
-                                <p class="description">Usa gpt-4o-mini. Alta disponibilidade. Suporta análise de imagens.</p>
-                            </div>
-                            <div class="form-group">
-                                <div class="input-password-wrapper">
-                                    <input type="password" id="setting-openai-key" placeholder="sk-proj-..." class="masked-input">
-                                    <button class="toggle-visibility-btn" type="button" data-target="setting-openai-key"><i data-lucide="eye"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="settings-field-group" style="border:none;padding:0;margin:0;">
-                            <div class="field-info">
-                                <h4>Mistral AI API Key</h4>
-                                <p class="description">Usa mistral-small-latest. Custo baixo. Não suporta análise de imagens.</p>
-                            </div>
-                            <div class="form-group">
-                                <div class="input-password-wrapper">
-                                    <input type="password" id="setting-mistral-key" placeholder="..." class="masked-input">
-                                    <button class="toggle-visibility-btn" type="button" data-target="setting-mistral-key"><i data-lucide="eye"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Botão de teste -->
-                    <div class="llm-test-row margin-top-lg">
-                        <button type="button" class="btn-secondary" id="btn-test-llm">
-                            <i data-lucide="zap"></i> Testar provedor ativo
-                        </button>
-                        <div id="llm-test-result" class="llm-test-result hidden"></div>
-                    </div>
-                </div>
-
-                <!-- Demais credenciais -->
-                <div class="dashboard-card max-width-lg margin-top-lg">
-                    <form id="global-settings-form" style="display:flex; flex-direction:column; gap:20px;">
-
-                        <!-- Google Client ID -->
-                        <div class="settings-field-group">
-                            <div class="field-info">
-                                <h4>Google OAuth Client ID</h4>
-                                <p class="description">Chave pública para autenticar o login social dos usuários.</p>
-                            </div>
-                            <div class="form-group">
-                                <div class="input-password-wrapper">
-                                    <input type="password" id="setting-google-id" placeholder="your_client_id.apps.googleusercontent.com" class="masked-input">
-                                    <button class="toggle-visibility-btn" type="button" data-target="setting-google-id"><i data-lucide="eye"></i></button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Token do Mercado Pago -->
-                        <div class="settings-field-group">
-                            <div class="field-info">
-                                <h4>Mercado Pago Access Token</h4>
-                                <p class="description">Token de API do Mercado Pago para cobranças Pix.</p>
-                            </div>
-                            <div class="form-group">
-                                <div class="input-password-wrapper">
-                                    <input type="password" id="setting-mp-token" placeholder="APP_USR-..." class="masked-input">
-                                    <button class="toggle-visibility-btn" type="button" data-target="setting-mp-token"><i data-lucide="eye"></i></button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Chave do Asaas -->
-                        <div class="settings-field-group">
-                            <div class="field-info">
-                                <h4>Asaas API Key</h4>
-                                <p class="description">Token para automação financeira na plataforma Asaas.</p>
-                            </div>
-                            <div class="form-group">
-                                <div class="input-password-wrapper">
-                                    <input type="password" id="setting-asaas-key" placeholder="$aasaas_key_..." class="masked-input">
-                                    <button class="toggle-visibility-btn" type="button" data-target="setting-asaas-key"><i data-lucide="eye"></i></button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Chave Spoonacular -->
-                        <div class="settings-field-group">
-                            <div class="field-info">
-                                <h4>Spoonacular API Key</h4>
-                                <p class="description">Para busca de receitas fitness com informações nutricionais no construtor de cardápios. Chave gratuita (150 buscas/dia) em <strong>spoonacular.com/food-api</strong></p>
-                            </div>
-                            <div class="form-group">
-                                <div class="input-password-wrapper">
-                                    <input type="password" id="spoonacular-api-key-input" placeholder="Cole aqui sua chave Spoonacular..." class="masked-input">
-                                    <button class="toggle-visibility-btn" type="button" data-target="spoonacular-api-key-input"><i data-lucide="eye"></i></button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="margin-top-md" style="display:flex; justify-content:flex-end;">
-                            <button type="submit" class="btn-primary" style="padding: 12px 24px; font-size:14px;">Salvar Todas as Credenciais</button>
-                        </div>
-                    </form>
-                </div>
-            </section>
-
-            <!-- ABA: FATURAMENTO E COMISSÕES -->
-            <section id="tab-billing" class="tab-content">
-                <div class="header-section">
-                    <h1 id="billing-title">Faturamento & Comissões</h1>
-                    <p id="billing-desc">Acompanhe as transações financeiras e repasses de comissão da plataforma</p>
-                </div>
-
-                <!-- Cards de Estatísticas de Faturamento (Admin) -->
-                <div id="billing-stats-admin" class="stats-grid hidden">
-                    <div class="stat-card">
-                        <div class="stat-icon bg-green"><i data-lucide="dollar-sign"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Faturamento Bruto</span>
-                            <h3 id="billing-stat-gross">R$ 0,00</h3>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon bg-yellow"><i data-lucide="percent"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Comissões Pagas</span>
-                            <h3 id="billing-stat-commissions">R$ 0,00</h3>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon bg-blue"><i data-lucide="trending-up"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Faturamento Líquido</span>
-                            <h3 id="billing-stat-net">R$ 0,00</h3>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Cards de Estatísticas de Faturamento (Professional) -->
-                <div id="billing-stats-pro" class="stats-grid hidden">
-                    <div class="stat-card">
-                        <div class="stat-icon bg-green"><i data-lucide="dollar-sign"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Minhas Comissões</span>
-                            <h3 id="pro-stat-commissions">R$ 0,00</h3>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon bg-blue"><i data-lucide="users"></i></div>
-                        <div class="stat-details">
-                            <span class="stat-label">Pacientes Ativos</span>
-                            <h3 id="pro-stat-patients">0</h3>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tabela de Histórico Financeiro -->
-                <div class="dashboard-card margin-top-lg">
-                    <h3>Histórico de Transações</h3>
-                    <p class="description">Histórico dos pagamentos processados e das comissões distribuídas</p>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead id="billing-table-header">
-                                <!-- Preenchido dinamicamente via JS com base no cargo -->
-                            </thead>
-                            <tbody id="billing-table-body">
-                                <!-- Injetado via JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ABA: MEUS PACIENTES (EXCLUSIVO PROFISSIONAL) -->
-            <section id="tab-patients" class="tab-content">
-                <div class="header-section">
-                    <h1>Meus Pacientes</h1>
-                    <p>Acompanhe os dados de saúde, diários alimentares e envie orientações aos seus clientes vinculados</p>
-                </div>
-
-                <!-- Lista de Pacientes -->
-                <div id="patients-list-view" class="dashboard-card">
-                    <div class="patients-filter-bar">
-                        <div class="search-box">
-                            <i data-lucide="search"></i>
-                            <input type="text" id="patient-search-input" placeholder="Buscar por nome ou e-mail...">
-                        </div>
-                        <select id="patient-goal-filter" class="table-select">
-                            <option value="">Todos os objetivos</option>
-                            <option value="lose">Emagrecer</option>
-                            <option value="gain">Ganhar Massa</option>
-                            <option value="maintain">Manter Peso</option>
-                        </select>
-                        <span id="patients-count-label" class="patients-count-label"></span>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Nome</th>
-                                    <th>E-mail</th>
-                                    <th>Plano</th>
-                                    <th>Objetivo</th>
-                                    <th>Peso / Altura</th>
-                                    <th>Meta Calorias</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="patients-table-body">
-                                <!-- Injetado via JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Visualização de Detalhes do Paciente -->
-                <div id="patient-details-view" class="hidden">
-                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 24px;">
-                        <button id="btn-back-to-patients" class="btn-secondary">
-                            <i data-lucide="arrow-left"></i> Voltar para a lista
-                        </button>
-                        <h2 id="detail-patient-name" style="font-family: var(--font-display); font-weight:700;">Paciente: Nome</h2>
-                    </div>
-
                     <div class="dashboard-row">
-                        <!-- Perfil e Orientação/Feedback -->
                         <div class="dashboard-card col-4">
-                            <h3>Perfil de Saúde</h3>
-                            <div class="margin-top-md" style="display:flex; flex-direction:column; gap:12px; font-size:14px; border-bottom:1px solid var(--color-border); padding-bottom:16px; margin-bottom:16px;">
-                                <div style="display:flex; justify-content:space-between;">
-                                    <span style="color:var(--color-text-muted);">E-mail:</span>
-                                    <span id="detail-patient-email" style="font-weight:500;">-</span>
-                                </div>
-                                <div style="display:flex; justify-content:space-between;">
-                                    <span style="color:var(--color-text-muted);">Peso:</span>
-                                    <span id="detail-patient-weight" style="font-weight:500;">-</span>
-                                </div>
-                                <div style="display:flex; justify-content:space-between;">
-                                    <span style="color:var(--color-text-muted);">Altura:</span>
-                                    <span id="detail-patient-height" style="font-weight:500;">-</span>
-                                </div>
-                                <div style="display:flex; justify-content:space-between;">
-                                    <span style="color:var(--color-text-muted);">Objetivo:</span>
-                                    <span id="detail-patient-goal" style="font-weight:500;">-</span>
-                                </div>
-                                <div style="display:flex; justify-content:space-between;">
-                                    <span style="color:var(--color-text-muted);">Meta Calórica:</span>
-                                    <span id="detail-patient-calories" style="font-weight:500; color:var(--color-primary); font-weight:600;">-</span>
-                                </div>
-                            </div>
-
-                            <h3>Evolução de Peso</h3>
-                            <div class="weight-chart-wrap margin-top-md">
-                                <canvas id="detail-weight-chart"></canvas>
-                                <p id="detail-weight-empty" class="description" style="display:none; text-align:center; padding:16px;">Nenhum peso registrado ainda.</p>
-                            </div>
-
-                            <h3>Enviar Nova Prescrição / Feedback</h3>
-                            <p class="description">Oriente seu paciente sobre dietas, treinos ou rotinas diretamente no app dele.</p>
-                            <form id="patient-feedback-form" class="margin-top-md">
-                                <input type="hidden" id="feedback-patient-id">
+                            <h3>Registrar Profissional</h3>
+                            <form id="pro-register-form" class="margin-top-md">
                                 <div class="form-group">
-                                    <label for="feedback-content">Prescrição / Mensagem</label>
-                                    <textarea id="feedback-content" placeholder="Escreva aqui as orientações, plano alimentar ou sugestões de treino..." style="height: 150px;" required></textarea>
+                                    <label for="pro-name">Nome Completo</label>
+                                    <input type="text" id="pro-name" placeholder="Ex: Dr. Marcelo Nutri" required>
                                 </div>
-                                <button type="submit" class="btn-primary w-full">Enviar para o Painel do Paciente</button>
+                                <div class="form-group">
+                                    <label for="pro-email">E-mail</label>
+                                    <input type="email" id="pro-email" placeholder="marcelo@nutrir.online" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="pro-password">Senha Provisória</label>
+                                    <input type="password" id="pro-password" placeholder="Mínimo 6 caracteres" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="pro-role">Especialidade / Cargo</label>
+                                    <select id="pro-role" required>
+                                        <option value="nutritionist">Nutricionista</option>
+                                        <option value="trainer">Personal Trainer</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="pro-commission">Comissão (%)</label>
+                                    <input type="number" id="pro-commission" placeholder="Ex: 10.00" min="0" max="100" step="0.01" value="0" required>
+                                </div>
+                                <button type="submit" class="btn-primary w-full margin-top-md">Cadastrar e Liberar Premium</button>
                             </form>
-
-                            <!-- Histórico de orientações enviadas -->
-                            <div class="margin-top-lg" id="feedback-history-section">
-                                <div class="feedback-history-header">
-                                    <h3>Orientações Enviadas</h3>
-                                    <span id="feedback-history-count" class="feedback-history-badge"></span>
-                                </div>
-                                <div id="feedback-history-list" class="feedback-history-list margin-top-md">
-                                    <!-- injetado via JS -->
-                                </div>
-                            </div>
                         </div>
-
-                        <!-- Detalhes Expandidos (Diário, Ficha Clínica, Exames) -->
-                        <div class="dashboard-card col-8" style="display: flex; flex-direction: column;">
-                            <!-- Barra de Abas do Paciente -->
-                            <div class="patient-tabs-bar" style="display: flex; gap: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 20px; padding-bottom: 8px;">
-                                <button class="patient-tab-btn active" data-patient-tab="diary" style="background: transparent; border: none; color: #fff; font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid var(--color-primary); transition: all 0.2s;">
-                                    <i data-lucide="book-open" style="width: 14px; height: 14px;"></i> Diário Alimentar
-                                </button>
-                                <button class="patient-tab-btn" data-patient-tab="clinical" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
-                                    <i data-lucide="activity" style="width: 14px; height: 14px;"></i> Ficha Clínica
-                                </button>
-                                <button class="patient-tab-btn" data-patient-tab="exams" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
-                                    <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> Exames
-                                </button>
-                                <button class="patient-tab-btn" data-patient-tab="measurements" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
-                                    <i data-lucide="ruler" style="width: 14px; height: 14px;"></i> Antropometria
-                                </button>
-                                <button class="patient-tab-btn" data-patient-tab="meal-plan" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
-                                    <i data-lucide="clipboard-list" style="width: 14px; height: 14px;"></i> Cardápio
-                                </button>
-                                <button class="patient-tab-btn" data-patient-tab="energy" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
-                                    <i data-lucide="calculator" style="width: 14px; height: 14px;"></i> Cálculo Energético
-                                </button>
-                            </div>
-
-                            <!-- CONTEÚDO DE ABAS -->
-                            <div class="patient-tabs-content" style="flex: 1;">
-                                
-                                <!-- ABA 1: DIÁRIO ALIMENTAR -->
-                                <div class="patient-tab-content-panel active" id="patient-tab-content-diary">
-                                    <h3>Diário Recente do Paciente</h3>
-                                    <p class="description">Histórico de refeições, consumo de água e jejum intermitente</p>
-
-                                    <!-- Mini grid de status diários -->
-                                    <div class="stats-grid margin-top-md" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 24px;">
-                                        <div class="stat-card" style="padding: 14px;">
-                                            <div class="stat-icon bg-blue" style="width:36px; height:36px; font-size:16px;"><i data-lucide="droplet"></i></div>
-                                            <div class="stat-details">
-                                                <span class="stat-label">Água Consumida (Hoje)</span>
-                                                <h4 id="detail-water-status" style="font-size:16px; font-weight:600;">0 / 2500 ml</h4>
-                                            </div>
-                                        </div>
-                                        <div class="stat-card" style="padding: 14px;">
-                                            <div class="stat-icon bg-purple" style="width:36px; height:36px; font-size:16px;"><i data-lucide="timer"></i></div>
-                                            <div class="stat-details">
-                                                <span class="stat-label">Jejum Ativo</span>
-                                                <h4 id="detail-fasting-status" style="font-size:16px; font-weight:600;">Não ativo</h4>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="diary-filter-bar margin-top-md">
-                                        <span class="diary-filter-label">Período:</span>
-                                        <div class="diary-filter-btns">
-                                            <button class="diary-filter-btn active" data-days="7">7 dias</button>
-                                            <button class="diary-filter-btn" data-days="30">30 dias</button>
-                                            <button class="diary-filter-btn" data-days="0">Tudo</button>
-                                        </div>
-                                        <div class="diary-adherence-info" id="diary-adherence-info" style="display:none;">
-                                            <span>Aderência calórica:</span>
-                                            <strong id="detail-caloric-adherence">-</strong>
-                                        </div>
-                                    </div>
-                                    <h3 class="margin-top-md">Refeições Registradas</h3>
-                                    <div class="table-responsive margin-top-md" style="max-height: 400px; overflow-y: auto;">
-                                        <table class="data-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Data / Hora</th>
-                                                    <th>Refeição</th>
-                                                    <th>Tipo</th>
-                                                    <th>Calorias</th>
-                                                    <th>Macros (C/P/G)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="detail-meals-table-body">
-                                                <!-- Injetado via JS -->
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-
-                                <!-- ABA 2: FICHA CLÍNICA -->
-                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-clinical">
-                                    <h3>Ficha Clínica do Paciente</h3>
-                                    <p class="description">Histórico de comorbidades, intolerâncias alimentares e anotações médicas relevantes.</p>
-                                    
-                                    <form id="pro-patient-clinical-form" class="margin-top-md" style="display:flex; flex-direction:column; gap:16px;">
-                                        <div class="form-group">
-                                            <label for="pro-clinical-comorbidities">Comorbidades / Condições de Saúde</label>
-                                            <input type="text" id="pro-clinical-comorbidities" placeholder="Ex: Diabetes Tipo 2, Hipertensão, Gastrite..." style="width: 100%;">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="pro-clinical-intolerances">Intolerâncias e Alergias Alimentares</label>
-                                            <input type="text" id="pro-clinical-intolerances" placeholder="Ex: Lactose, Glúten, Amendoim, Frutos do mar..." style="width: 100%;">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="pro-clinical-restrictions">Restrições Alimentares / Preferências</label>
-                                            <input type="text" id="pro-clinical-restrictions" placeholder="Ex: Vegano, Vegetariano, Sem carne vermelha..." style="width: 100%;">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="pro-clinical-notes">Observações Clínicas e Anotações Gerais</label>
-                                            <textarea id="pro-clinical-notes" placeholder="Digite anotações adicionais e observações gerais sobre o estado de saúde do paciente..." style="height: 120px; resize: vertical;"></textarea>
-                                        </div>
-                                        <button type="submit" class="btn-primary w-full">
-                                            <i data-lucide="save" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
-                                            Salvar Ficha Clínica
-                                        </button>
-                                    </form>
-                                    <div id="clinical-success-msg" class="success-banner hidden" style="margin-top: 10px;">Ficha clínica salva com sucesso!</div>
-                                </div>
-
-                                <!-- ABA 4: ANTROPOMETRIA -->
-                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-measurements">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                                        <div>
-                                            <h3 style="margin:0;">Dados Antropométricos</h3>
-                                            <p class="description" style="margin:4px 0 0;">Registre e acompanhe a evolução das medidas corporais ao longo do tempo.</p>
-                                        </div>
-                                        <button class="btn-primary btn-sm" id="btn-toggle-meas-form" style="white-space:nowrap;">
-                                            <i data-lucide="plus" style="width:14px;height:14px;"></i> Nova Medição
-                                        </button>
-                                    </div>
-
-                                    <!-- Formulário de nova medição (oculto por padrão) -->
-                                    <div id="meas-form-wrap" class="hidden" style="background:rgba(255,250,240,0.03); border:1px solid rgba(255,250,240,0.08); border-radius:12px; padding:20px; margin-bottom:20px;">
-                                        <h4 style="margin:0 0 16px; font-size:13px; color:var(--color-primary); text-transform:uppercase; letter-spacing:.06em;">Nova Avaliação</h4>
-                                        <form id="patient-meas-form">
-                                            <!-- Linha 1: data + peso + altura -->
-                                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px;">
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Data da Avaliação</label>
-                                                    <input type="date" id="meas-date" required>
-                                                </div>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Peso (kg)</label>
-                                                    <input type="number" id="meas-weight" step="0.1" min="0" placeholder="Ex: 72.5">
-                                                </div>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Altura (cm)</label>
-                                                    <input type="number" id="meas-height" step="0.1" min="0" placeholder="Ex: 168">
-                                                </div>
-                                            </div>
-                                            <!-- Linha 2: % gordura + massa muscular -->
-                                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>% Gordura Corporal</label>
-                                                    <input type="number" id="meas-fat" step="0.1" min="0" max="80" placeholder="Ex: 22.5">
-                                                </div>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Massa Muscular (kg)</label>
-                                                    <input type="number" id="meas-muscle" step="0.1" min="0" placeholder="Ex: 35.2">
-                                                </div>
-                                            </div>
-                                            <!-- Linha 3: circunferências -->
-                                            <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:12px;">
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Cintura (cm)</label>
-                                                    <input type="number" id="meas-waist" step="0.1" min="0" placeholder="80">
-                                                </div>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Quadril (cm)</label>
-                                                    <input type="number" id="meas-hip" step="0.1" min="0" placeholder="95">
-                                                </div>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Tórax (cm)</label>
-                                                    <input type="number" id="meas-chest" step="0.1" min="0" placeholder="90">
-                                                </div>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Braço (cm)</label>
-                                                    <input type="number" id="meas-arm" step="0.1" min="0" placeholder="30">
-                                                </div>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label>Coxa (cm)</label>
-                                                    <input type="number" id="meas-thigh" step="0.1" min="0" placeholder="52">
-                                                </div>
-                                            </div>
-                                            <!-- Observações -->
-                                            <div class="form-group" style="margin-bottom:12px;">
-                                                <label>Observações</label>
-                                                <textarea id="meas-notes" placeholder="Anotações sobre a avaliação..." style="height:64px; resize:vertical;"></textarea>
-                                            </div>
-                                            <div style="display:flex; gap:8px; justify-content:flex-end;">
-                                                <button type="button" class="btn-secondary btn-sm" id="btn-cancel-meas-form">Cancelar</button>
-                                                <button type="submit" class="btn-primary btn-sm">
-                                                    <i data-lucide="save" style="width:13px;height:13px;"></i> Salvar Medição
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-
-                                    <!-- Histórico de medições -->
-                                    <div class="table-responsive" style="max-height:420px; overflow-y:auto;">
-                                        <table class="data-table" id="meas-history-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Data</th>
-                                                    <th>Peso</th>
-                                                    <th>IMC</th>
-                                                    <th>% Gord.</th>
-                                                    <th>M. Musc.</th>
-                                                    <th>Cintura</th>
-                                                    <th>Quadril</th>
-                                                    <th>RCQ</th>
-                                                    <th>Tórax</th>
-                                                    <th>Braço</th>
-                                                    <th>Coxa</th>
-                                                    <th></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="meas-history-body">
-                                                <tr><td colspan="12" style="text-align:center; color:var(--color-text-muted); padding:20px;">Nenhuma medição registrada.</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-
-                                <!-- ABA 3: EXAMES -->
-                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-exams">
-                                    <h3>Exames Laboratoriais</h3>
-                                    <p class="description">Visualize exames em formato PDF ou imagens enviados pelo paciente e adicione notas clínicas específicas.</p>
-                                    
-                                    <div class="table-responsive margin-top-md" style="max-height: 400px; overflow-y: auto;">
-                                        <table class="data-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Arquivo</th>
-                                                    <th>Data de Envio</th>
-                                                    <th>Anotações do Nutricionista</th>
-                                                    <th>Ações</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="pro-patient-exams-table-body">
-                                                <tr><td colspan="4" style="text-align: center; color: var(--color-text-muted); padding: 20px;">Nenhum exame enviado por este paciente.</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-
-                                <!-- ABA 5: CARDÁPIO DO PACIENTE -->
-                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-meal-plan">
-                                    <div style="text-align:center; padding:40px; color:var(--color-text-muted);">
-                                        <p style="font-size:13px;">Clique na aba Cardápio para carregar os planos alimentares deste paciente.</p>
-                                    </div>
-                                </div>
-
-                                <!-- ABA 6: CÁLCULO ENERGÉTICO -->
-                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-energy">
-                                    <div style="text-align:center; padding:40px; color:var(--color-text-muted);">
-                                        <p style="font-size:13px;">Clique na aba Cálculo Energético para abrir o calculador de TMB e GET.</p>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ABA: AGENDA DE DISPONIBILIDADE (PROFISSIONAL) -->
-            <section id="tab-schedule" class="tab-content">
-                <div class="header-section">
-                    <h1>Minha Agenda</h1>
-                    <p>Libere e bloqueie horários de atendimento com um clique</p>
-                </div>
-
-                <div class="dashboard-card">
-                    <h3>Grade de Horários</h3>
-                    <p class="description">Clique nas células para alternar entre <strong>disponível</strong> (âmbar) e <strong>bloqueado</strong> (escuro). Arraste para selecionar múltiplos horários de uma vez. Use os botões de coluna para ativar/desativar um dia inteiro.</p>
-
-                    <div class="margin-top-lg" id="schedule-days-container">
-                        <!-- Gerado via JS -->
-                    </div>
-
-                    <div class="margin-top-lg" style="display:flex; justify-content:flex-end;">
-                        <button class="btn-primary" id="btn-save-schedule" style="padding: 12px 24px; font-size:14px;">
-                            <i data-lucide="save"></i> Salvar Disponibilidade
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ABA: GERENCIAMENTO DE CONSULTAS (VIDEO CHAMADAS) -->
-            <section id="tab-appointments" class="tab-content">
-                <div class="header-section">
-                    <h1>Consultas por Vídeo</h1>
-                    <p id="appointments-tab-desc">Acompanhe e gerencie os agendamentos de videoconferência na plataforma</p>
-                </div>
-
-                <div class="dashboard-card">
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr id="appointments-table-headers">
-                                    <!-- Preenchido via JS com base na role -->
-                                </tr>
-                            </thead>
-                            <tbody id="appointments-table-body">
-                                <!-- Injetado via JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ============================= -->
-            <!-- TAB: CARDÁPIOS SEMANAIS       -->
-            <!-- ============================= -->
-            <section id="tab-meal-plans" class="tab-content">
-                <!-- Lista de Planos -->
-                <div id="meal-plans-list-view">
-                    <div class="admin-section-header">
-                        <div>
-                            <h2 class="section-title">Cardápios Semanais</h2>
-                            <p class="section-subtitle">Crie e gerencie planos nutricionais completos para seus pacientes.</p>
-                        </div>
-                        <button class="btn-primary" id="btn-new-meal-plan">
-                            <i data-lucide="plus"></i> Novo Cardápio
-                        </button>
-                    </div>
-                    <div class="table-wrap">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Nome do Plano</th>
-                                    <th>Paciente Vinculado</th>
-                                    <th>Atualizado</th>
-                                    <th>Status</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="meal-plans-table-body">
-                                <tr><td colspan="5" style="text-align:center; color:var(--color-text-muted);">Nenhum cardápio criado ainda.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Editor de Plano -->
-                <div id="meal-plans-builder-view" class="hidden">
-                    <div class="builder-topbar">
-                        <button class="btn-secondary btn-sm" id="btn-back-to-plans">
-                            <i data-lucide="arrow-left"></i> Voltar
-                        </button>
-                        <div class="builder-topbar-fields">
-                            <input type="text" id="plan-name-input" placeholder="Nome do cardápio..." class="input-inline">
-                            <select id="plan-patient-select" class="input-inline">
-                                <option value="">Sem paciente (template)</option>
-                            </select>
-                        </div>
-                        <div style="display:flex;gap:8px;">
-                            <button class="btn-secondary btn-sm" id="btn-toggle-active-plan">Desativar</button>
-                            <button class="btn-primary btn-sm" id="btn-save-meal-plan">
-                                <i data-lucide="save"></i> Salvar
-                            </button>
-                        </div>
-                    </div>
- 
-                    <!-- Banner de Alertas Clínicos (Particularidades) -->
-                    <div id="builder-clinical-banner" class="clinical-alert-banner hidden" style="background: rgba(245, 193, 77, 0.08); border: 1px solid rgba(245, 193, 77, 0.2); border-radius: 8px; padding: 12px; margin: 12px 0; font-size: 13px; display: flex; align-items: flex-start; gap: 10px;">
-                        <i data-lucide="alert-triangle" style="color: var(--color-primary); width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;"></i>
-                        <div>
-                            <strong style="color: var(--color-primary); display: block; margin-bottom: 2px;">Particularidades Clínicas do Paciente:</strong>
-                            <span id="builder-clinical-info" style="color: var(--color-text-main);">Nenhuma particularidade clínica informada.</span>
-                        </div>
-                    </div>
-
-                    <!-- Seletor de dias -->
-                    <div class="plan-day-tabs">
-                        <button class="plan-day-tab active" data-dow="1">Seg</button>
-                        <button class="plan-day-tab" data-dow="2">Ter</button>
-                        <button class="plan-day-tab" data-dow="3">Qua</button>
-                        <button class="plan-day-tab" data-dow="4">Qui</button>
-                        <button class="plan-day-tab" data-dow="5">Sex</button>
-                        <button class="plan-day-tab" data-dow="6">Sáb</button>
-                        <button class="plan-day-tab" data-dow="0">Dom</button>
-                    </div>
-
-                    <!-- Conteúdo do dia -->
-                    <div id="plan-day-content">
-                        <!-- Gerado dinamicamente por renderPlanDayEditor() -->
-                    </div>
-
-                    <!-- Modal: Busca de Alimentos -->
-                    <div id="food-search-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9990;align-items:flex-start;justify-content:center;padding-top:48px;box-sizing:border-box;">
-                        <div class="fsm-box">
-                            <div class="fsm-header">
-                                <div>
-                                    <h3 style="margin:0;font-size:16px;font-weight:700;">Adicionar alimento</h3>
-                                    <span id="fsm-meal-label" style="font-size:12px;color:var(--color-text-muted);"></span>
-                                </div>
-                                <button id="btn-close-food-modal" class="fsm-close-btn">×</button>
-                            </div>
-                            <div class="fsm-tabs-bar">
-                                <button class="fsm-tab active" data-fstab="search">Banco de Alimentos (22k)</button>
-                                <button class="fsm-tab" data-fstab="manual">Alimento Manual</button>
-                            </div>
-                            <div id="fsm-panel-search" class="fsm-panel">
-                                <div class="fsm-search-row">
-                                    <input type="text" id="fsm-search-input" placeholder="Buscar: arroz branco, frango, banana, feijão..." autocomplete="off">
-                                    <button id="btn-fsm-search" class="btn-primary btn-sm">Buscar</button>
-                                </div>
-                                <div id="fsm-results-header" class="fsm-results-header" style="display:none;">
-                                    <span style="flex:3;">Nome do alimento</span>
-                                    <span>Medida</span>
-                                    <span style="text-align:center;">Qtd</span>
-                                    <span style="text-align:right;">Ptn</span>
-                                    <span style="text-align:right;">Lip</span>
-                                    <span style="text-align:right;">CHO</span>
-                                    <span style="text-align:right;">Kcal</span>
-                                    <span></span>
-                                </div>
-                                <div id="fsm-results" class="fsm-results"></div>
-                            </div>
-                            <div id="fsm-panel-manual" class="fsm-panel" style="display:none;">
-                                <div class="fsm-manual-form">
-                                    <div class="fsm-manual-row">
-                                        <div style="flex:3;"><label>Nome</label><input type="text" id="fsm-man-name" placeholder="Ex: Bolo de banana integral"></div>
-                                        <div><label>kcal/100g</label><input type="number" id="fsm-man-kcal" placeholder="250" min="0"></div>
-                                        <div><label>Ptn (g)</label><input type="number" id="fsm-man-ptn" placeholder="8" min="0" step="0.1"></div>
-                                        <div><label>Lip (g)</label><input type="number" id="fsm-man-lip" placeholder="5" min="0" step="0.1"></div>
-                                        <div><label>CHO (g)</label><input type="number" id="fsm-man-cho" placeholder="40" min="0" step="0.1"></div>
-                                        <div><label>Qtd (g)</label><input type="number" id="fsm-man-qty" value="100" min="1"></div>
-                                    </div>
-                                    <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
-                                        <button id="btn-fsm-add-manual" class="btn-primary">+ Adicionar ao cardápio</button>
-                                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
-                                            <input type="checkbox" id="fsm-man-save" style="width:auto;margin:0;"> Salvar no banco
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Modal: Somatório de Micronutrientes -->
-                    <div id="micro-nutrient-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9990;align-items:flex-start;justify-content:center;padding-top:48px;box-sizing:border-box;">
-                        <div class="micro-modal-box">
-                            <div class="micro-modal-header">
-                                <h3 style="margin:0;font-size:16px;font-weight:700;">Somatório de nutrientes — Todo o cardápio</h3>
-                                <button id="btn-close-micro-modal" class="fsm-close-btn">×</button>
-                            </div>
-                            <div class="micro-legend-bar">
-                                <span class="micro-leg-dot in"></span> Dentro do recomendado (± 20%)
-                                <span class="micro-leg-dot out" style="margin-left:16px;"></span> Fora do recomendado (± 20%)
-                            </div>
-                            <div style="overflow-y:auto;flex:1;padding:0 20px 20px;">
-                                <table class="micro-table">
-                                    <thead><tr><th>Micronutrientes</th><th>Valor atual</th><th>DRI</th><th>Adequação</th></tr></thead>
-                                    <tbody id="micro-table-body"></tbody>
+                        <div class="dashboard-card col-8">
+                            <h3>Profissionais Cadastrados</h3>
+                            <div class="table-responsive margin-top-md">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>E-mail</th>
+                                            <th>Cargo</th>
+                                            <th>Comissão (%)</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pros-table-body"></tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-        </main>
-    </div>
-
-    <!-- Tela: Videochamada Integrada Split Screen (Nativa WebRTC) -->
-    <div class="app-screen" id="screen-video-call" style="background:#0b0f19; padding:0; display:none; flex-direction:row; height:100vh; width:100vw; position:fixed; top:0; left:0; z-index:9999; justify-content:center; align-items:center; overflow:hidden; font-family:'Inter', sans-serif;">
-        <!-- Coluna Esquerda: Vídeo Chamada (40%) -->
-        <div id="video-call-left-panel" style="width:40%; height:100%; position:relative; background:#111; display:flex; flex-direction:column; border-right:1px solid rgba(255,255,255,0.08);">
-            <div id="video-call-header" style="position:absolute; top:16px; left:16px; z-index:10000; display:flex; gap:10px; align-items:center; background:rgba(0,0,0,0.5); padding:8px 16px; border-radius:30px; backdrop-filter:blur(8px);">
-                <button class="icon-btn" id="btn-close-video-call" style="background:rgba(255,255,255,0.1); color:#fff; border-radius:50%; width:32px; height:32px; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-                    <i data-lucide="x" style="width:16px; height:16px;"></i>
-                </button>
-                <span style="color:#fff; font-size:12px; font-weight:600;">Consulta por Vídeo</span>
-            </div>
-            <div id="video-call-container" style="flex:1; width:100%; height:100%; position:relative; display:flex; justify-content:center; align-items:center;">
-                <video id="remote-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover; background:#111;"></video>
-                <video id="local-video" autoplay playsinline muted style="width:100px; height:140px; position:absolute; bottom:96px; right:16px; border-radius:12px; border:2px solid var(--color-primary); z-index:10001; background:#222; object-fit:cover; box-shadow:0 8px 24px rgba(0,0,0,0.4); transition: all 0.3s ease;"></video>
-                
-                <div id="video-call-controls" style="position:absolute; bottom:24px; left:50%; transform:translateX(-50%); z-index:10002; display:flex; gap:16px; background:rgba(0,0,0,0.6); padding:10px 20px; border-radius:40px; backdrop-filter:blur(10px); align-items:center;">
-                    <button id="btn-toggle-mic" class="icon-btn-call" style="background:#22c55e; color:#fff; border:none; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="mic" style="width:16px; height:16px;"></i></button>
-                    <button id="btn-toggle-cam" class="icon-btn-call" style="background:#22c55e; color:#fff; border:none; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="video" style="width:16px; height:16px;"></i></button>
-                    <button id="btn-hangup" class="icon-btn-call" style="background:#ef4444; color:#fff; border:none; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; outline:none;"><i data-lucide="phone-off" style="width:16px; height:16px;"></i></button>
-                </div>
-                <div id="video-call-status" style="position:absolute; top:20px; right:16px; color:#fff; background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(4px);">Aguardando paciente...</div>
-            </div>
-        </div>
-        
-        <!-- Coluna Direita: Prontuário do Paciente (60%) -->
-        <div id="video-call-right-panel" style="width:60%; height:100%; display:flex; flex-direction:column; background:#0b0f19; color:#fff; overflow-y:auto; padding:24px; box-sizing:border-box;">
-            <!-- Cabeçalho do Prontuário -->
-            <div style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:16px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <h2 id="vc-patient-name" style="margin:0; font-size:22px; font-weight:700; color:#fff;">Paciente</h2>
-                    <p id="vc-patient-email" style="margin:4px 0 0 0; font-size:13px; opacity:0.6; color:#fff;">email@paciente.com</p>
-                </div>
-                <span style="background:rgba(34, 197, 94, 0.15); color:#22c55e; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">Consulta Ativa</span>
-            </div>
-            
-            <!-- Grid de Métricas Básicas -->
-            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; margin-bottom:24px;">
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
-                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">PESO</span>
-                    <strong id="vc-patient-weight" style="font-size:14px; font-weight:700; color:#fff;">-</strong>
-                </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
-                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">ALTURA</span>
-                    <strong id="vc-patient-height" style="font-size:14px; font-weight:700; color:#fff;">-</strong>
-                </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
-                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">META</span>
-                    <strong id="vc-patient-goal" style="font-size:12px; font-weight:700; color:#fff; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">-</strong>
-                </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
-                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">META CALÓRICA</span>
-                    <strong id="vc-patient-calories" style="font-size:14px; font-weight:700; color:#fff;">-</strong>
-                </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; text-align:center;">
-                    <span style="display:block; font-size:10px; opacity:0.5; margin-bottom:4px; font-weight:500;">ÁGUA HOJE</span>
-                    <strong id="vc-patient-water" style="font-size:12px; font-weight:700; color:#fff;">-</strong>
-                </div>
-            </div>
-            
-            <!-- Seção Colapsável de Evolução de Peso -->
-            <div id="vc-weight-history-section" style="margin-bottom: 20px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden;">
-                <div id="vc-weight-history-header" style="padding: 10px 16px; background: rgba(255,255,255,0.02); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                    <span style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="trending-up" style="width: 16px; height: 16px; color: var(--color-primary);"></i>
-                        Evolução de Peso do Paciente
-                    </span>
-                    <i data-lucide="chevron-down" id="vc-weight-history-arrow" style="width: 16px; height: 16px; transition: transform 0.2s;"></i>
-                </div>
-                <div id="vc-weight-history-content" style="padding: 12px; display: none; border-top: 1px solid rgba(255,255,255,0.05); max-height: 150px; overflow-y: auto;">
-                    <table class="data-table" style="font-size: 11.5px; width: 100%;">
-                        <thead>
-                            <tr>
-                                <th style="padding: 6px 8px;">Data</th>
-                                <th style="padding: 6px 8px;">Peso (kg)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="vc-weight-history-body">
-                            <tr><td colspan="2" style="text-align:center; opacity:0.5; padding: 12px;">Nenhum peso registrado.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <!-- Barra de Abas -->
-            <div class="vc-tabs-bar">
-                <button class="vc-tab-btn active" id="vc-tab-btn-diary" data-vc-tab="diary">
-                    <i data-lucide="utensils" style="width:14px; height:14px;"></i> Diário Alimentar
-                </button>
-                <button class="vc-tab-btn" id="vc-tab-btn-weight" data-vc-tab="weight">
-                    <i data-lucide="trending-up" style="width:14px; height:14px;"></i> Evolução de Peso
-                </button>
-                <button class="vc-tab-btn" id="vc-tab-btn-feedback" data-vc-tab="feedback">
-                    <i data-lucide="file-text" style="width:14px; height:14px;"></i> Prescrições e Orientações
-                </button>
-            </div>
-
-            <!-- Contêiner de Abas -->
-            <div style="flex:1; display:flex; flex-direction:column; min-height:0; position:relative;">
-                <!-- ABA 1: Diário Alimentar -->
-                <div class="vc-tab-content active" id="vc-tab-content-diary" style="overflow-y:auto;">
-                    <div id="vc-diary-container">
-                        <!-- Acordeões de dias serão injetados via JS -->
-                        <div style="text-align:center; padding:40px; opacity:0.5; font-size:13px;">Selecione uma consulta ativa.</div>
+                <!-- ABA: PLANOS -->
+                <section id="tab-plans" class="tab-content">
+                    <div class="header-section">
+                        <h1>Configuração de Planos</h1>
+                        <p>Crie, edite e remova planos comerciais e de testes</p>
                     </div>
-                </div>
-
-                <!-- ABA 2: Evolução de Peso -->
-                <div class="vc-tab-content" id="vc-tab-content-weight" style="overflow-y:auto; padding:16px; box-sizing:border-box;">
-                    <!-- Cards de resumo de peso -->
-                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:16px;">
-                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:10px; text-align:center;">
-                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Peso Inicial</span>
-                            <strong id="vc-w-initial" style="font-size:15px; font-weight:700; color:#fff;">-</strong>
+                    <div class="dashboard-row">
+                        <div class="dashboard-card col-4">
+                            <h3 id="plan-form-title">Criar Novo Plano</h3>
+                            <form id="plan-config-form" class="margin-top-md">
+                                <input type="hidden" id="plan-id">
+                                <div class="form-group">
+                                    <label for="plan-name">Identificador (slug)</label>
+                                    <input type="text" id="plan-name" placeholder="Ex: anual" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="plan-display-name">Nome de Exibição</label>
+                                    <input type="text" id="plan-display-name" placeholder="Ex: Plano Anual Premium" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="plan-price">Preço (R$)</label>
+                                    <input type="number" id="plan-price" step="0.01" min="0" placeholder="Ex: 199.90" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="plan-duration">Duração (dias)</label>
+                                    <input type="number" id="plan-duration" min="1" placeholder="Ex: 365" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="plan-description">Descrição</label>
+                                    <textarea id="plan-description" placeholder="Breve resumo comercial..." style="height: 60px;"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="plan-features">Benefícios (um por linha)</label>
+                                    <textarea id="plan-features" placeholder="Ex: Receitas ilimitadas&#10;Gráficos premium&#10;Acompanhamento profissional" style="height: 90px;"></textarea>
+                                </div>
+                                <div class="form-group-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:10px;">
+                                    <input type="checkbox" id="plan-has-nutritionist" style="width:auto;margin:0;">
+                                    <label for="plan-has-nutritionist" style="margin:0;font-size:11px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;">Tem direito a Nutricionista</label>
+                                </div>
+                                <div class="form-group hidden" id="plan-max-nutritionist-group">
+                                    <label for="plan-max-nutritionist">Limite de Consultas com Nutri / Mês</label>
+                                    <input type="number" id="plan-max-nutritionist" min="0" placeholder="Ex: 4" value="0">
+                                </div>
+                                <div class="form-group-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:10px;">
+                                    <input type="checkbox" id="plan-has-trainer" style="width:auto;margin:0;">
+                                    <label for="plan-has-trainer" style="margin:0;font-size:11px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;">Tem direito a Personal Trainer</label>
+                                </div>
+                                <div class="form-group hidden" id="plan-max-trainer-group">
+                                    <label for="plan-max-trainer">Limite de Consultas com Personal / Mês</label>
+                                    <input type="number" id="plan-max-trainer" min="0" placeholder="Ex: 4" value="0">
+                                </div>
+                                <div class="btn-group margin-top-md">
+                                    <button type="submit" class="btn-primary w-full" id="btn-save-plan">Salvar Plano</button>
+                                    <button type="button" class="btn-secondary w-full hidden" id="btn-cancel-plan-edit">Cancelar</button>
+                                </div>
+                            </form>
                         </div>
-                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:10px; text-align:center;">
-                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Peso Atual</span>
-                            <strong id="vc-w-current" style="font-size:15px; font-weight:700; color:var(--color-primary);">-</strong>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:10px; text-align:center;">
-                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Meta de Peso</span>
-                            <strong id="vc-w-target" style="font-size:15px; font-weight:700; color:#22c55e;">-</strong>
+                        <div class="dashboard-card col-8">
+                            <h3>Planos Disponíveis</h3>
+                            <div class="table-responsive margin-top-md">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Identificador</th>
+                                            <th>Nome</th>
+                                            <th>Preço</th>
+                                            <th>Duração (dias)</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="plans-table-body"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
+                </section>
 
-                    <!-- Resumo da conquista / Resultado alcançado -->
-                    <div id="vc-w-achievement-card" style="background:rgba(254,228,64,0.05); border:1px solid rgba(254,228,64,0.15); border-radius:10px; padding:12px; margin-bottom:16px; display:flex; align-items:center; gap:10px; font-size:12.5px; color:#fee440; line-height:1.4;">
-                        <i data-lucide="award" style="width:20px; height:20px; flex-shrink:0; color:#fee440;"></i>
-                        <span id="vc-w-achievement-text">Carregando evolução...</span>
+                <!-- ABA: CREDENCIAIS -->
+                <section id="tab-settings" class="tab-content">
+                    <div class="header-section">
+                        <h1>Configuração de Chaves e Credenciais</h1>
+                        <p>Gerencie as integrações globais e tokens do sistema de forma segura</p>
                     </div>
-
-                    <!-- Gráfico -->
-                    <div style="background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:16px; margin-bottom:16px; height:240px; position:relative; box-sizing:border-box;">
-                        <h4 style="margin:0 0 12px 0; font-size:13px; font-weight:600; opacity:0.8; color:#fff;">Histórico de Evolução vs Meta</h4>
-                        <div style="width:100%; height:calc(100% - 28px); position:relative;">
-                            <canvas id="vc-weight-chart" style="width:100%; height:100%;"></canvas>
+                    <div class="dashboard-card max-width-lg margin-top-md">
+                        <h3>Provedor de IA (LLM)</h3>
+                        <p class="description">Selecione qual modelo de linguagem será usado globalmente para geração de receitas e análise de fotos. Insira a chave do provedor escolhido e teste antes de salvar.</p>
+                        <div class="llm-provider-selector margin-top-md">
+                            <label class="llm-provider-card" id="provider-card-gemini">
+                                <input type="radio" name="active_llm_provider" value="gemini" id="provider-gemini">
+                                <div class="llm-card-inner">
+                                    <span class="llm-logo llm-logo-gemini">✦</span>
+                                    <div>
+                                        <strong>Google Gemini</strong>
+                                        <span class="llm-card-sub">gemini-2.5-flash · visão de imagens</span>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="llm-provider-card" id="provider-card-openai">
+                                <input type="radio" name="active_llm_provider" value="openai" id="provider-openai">
+                                <div class="llm-card-inner">
+                                    <span class="llm-logo llm-logo-openai">⬡</span>
+                                    <div>
+                                        <strong>OpenAI</strong>
+                                        <span class="llm-card-sub">gpt-4o-mini · alta disponibilidade</span>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="llm-provider-card" id="provider-card-mistral">
+                                <input type="radio" name="active_llm_provider" value="mistral" id="provider-mistral">
+                                <div class="llm-card-inner">
+                                    <span class="llm-logo llm-logo-mistral">◈</span>
+                                    <div>
+                                        <strong>Mistral AI</strong>
+                                        <span class="llm-card-sub">mistral-small-latest · custo baixo</span>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="margin-top-lg" style="display:flex;flex-direction:column;gap:14px;">
+                            <div class="settings-field-group" style="border:none;padding:0;margin:0;">
+                                <div class="field-info">
+                                    <h4>Google Gemini API Key</h4>
+                                    <p class="description">Suporta análise de imagens (scanner). Fallback automático para gemini-1.5-flash em sobrecarga.</p>
+                                </div>
+                                <div class="form-group">
+                                    <div class="input-password-wrapper">
+                                        <input type="password" id="setting-gemini-key" placeholder="AIzaSy..." class="masked-input">
+                                        <button class="toggle-visibility-btn" type="button" data-target="setting-gemini-key"><i data-lucide="eye"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="settings-field-group" style="border:none;padding:0;margin:0;">
+                                <div class="field-info">
+                                    <h4>OpenAI API Key</h4>
+                                    <p class="description">Usa gpt-4o-mini. Alta disponibilidade. Suporta análise de imagens.</p>
+                                </div>
+                                <div class="form-group">
+                                    <div class="input-password-wrapper">
+                                        <input type="password" id="setting-openai-key" placeholder="sk-proj-..." class="masked-input">
+                                        <button class="toggle-visibility-btn" type="button" data-target="setting-openai-key"><i data-lucide="eye"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="settings-field-group" style="border:none;padding:0;margin:0;">
+                                <div class="field-info">
+                                    <h4>Mistral AI API Key</h4>
+                                    <p class="description">Usa mistral-small-latest. Custo baixo. Não suporta análise de imagens.</p>
+                                </div>
+                                <div class="form-group">
+                                    <div class="input-password-wrapper">
+                                        <input type="password" id="setting-mistral-key" placeholder="..." class="masked-input">
+                                        <button class="toggle-visibility-btn" type="button" data-target="setting-mistral-key"><i data-lucide="eye"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="llm-test-row margin-top-lg">
+                            <button type="button" class="btn-secondary" id="btn-test-llm">
+                                <i data-lucide="zap"></i> Testar provedor ativo
+                            </button>
+                            <div id="llm-test-result" class="llm-test-result hidden"></div>
                         </div>
                     </div>
+                    <div class="dashboard-card max-width-lg margin-top-lg">
+                        <form id="global-settings-form" style="display:flex;flex-direction:column;gap:20px;">
+                            <div class="settings-field-group">
+                                <div class="field-info">
+                                    <h4>Google OAuth Client ID</h4>
+                                    <p class="description">Chave pública para autenticar o login social dos usuários.</p>
+                                </div>
+                                <div class="form-group">
+                                    <div class="input-password-wrapper">
+                                        <input type="password" id="setting-google-id" placeholder="your_client_id.apps.googleusercontent.com" class="masked-input">
+                                        <button class="toggle-visibility-btn" type="button" data-target="setting-google-id"><i data-lucide="eye"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="settings-field-group">
+                                <div class="field-info">
+                                    <h4>Mercado Pago Access Token</h4>
+                                    <p class="description">Token de API do Mercado Pago para cobranças Pix.</p>
+                                </div>
+                                <div class="form-group">
+                                    <div class="input-password-wrapper">
+                                        <input type="password" id="setting-mp-token" placeholder="APP_USR-..." class="masked-input">
+                                        <button class="toggle-visibility-btn" type="button" data-target="setting-mp-token"><i data-lucide="eye"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="settings-field-group">
+                                <div class="field-info">
+                                    <h4>Asaas API Key</h4>
+                                    <p class="description">Token para automação financeira na plataforma Asaas.</p>
+                                </div>
+                                <div class="form-group">
+                                    <div class="input-password-wrapper">
+                                        <input type="password" id="setting-asaas-key" placeholder="$aasaas_key_..." class="masked-input">
+                                        <button class="toggle-visibility-btn" type="button" data-target="setting-asaas-key"><i data-lucide="eye"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="settings-field-group">
+                                <div class="field-info">
+                                    <h4>Spoonacular API Key</h4>
+                                    <p class="description">Para busca de receitas fitness com informações nutricionais no construtor de cardápios. Chave gratuita (150 buscas/dia) em <strong>spoonacular.com/food-api</strong></p>
+                                </div>
+                                <div class="form-group">
+                                    <div class="input-password-wrapper">
+                                        <input type="password" id="spoonacular-api-key-input" placeholder="Cole aqui sua chave Spoonacular..." class="masked-input">
+                                        <button class="toggle-visibility-btn" type="button" data-target="spoonacular-api-key-input"><i data-lucide="eye"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="margin-top-md" style="display:flex;justify-content:flex-end;">
+                                <button type="submit" class="btn-primary" style="padding:12px 24px;font-size:14px;">Salvar Todas as Credenciais</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
 
-                    <!-- Tabela de Novas Medições -->
-                    <div>
-                        <h4 style="margin:0 0 8px 0; font-size:13px; font-weight:600; opacity:0.8; color:#fff;">Histórico de Medições</h4>
-                        <div class="table-responsive" style="max-height:180px; overflow-y:auto; border:1px solid rgba(255,255,255,0.05); border-radius:8px; background:rgba(0,0,0,0.1);">
-                            <table class="data-table" style="font-size:12px; width:100%;">
+                <!-- ABA: FATURAMENTO -->
+                <section id="tab-billing" class="tab-content">
+                    <div class="header-section">
+                        <h1 id="billing-title">Faturamento & Comissões</h1>
+                        <p id="billing-desc">Acompanhe as transações financeiras e repasses de comissão da plataforma</p>
+                    </div>
+                    <div id="billing-stats-admin" class="stats-grid hidden">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-green"><i data-lucide="dollar-sign"></i></div>
+                            <div class="stat-details">
+                                <span class="stat-label">Faturamento Bruto</span>
+                                <h3 id="billing-stat-gross">R$ 0,00</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon bg-yellow"><i data-lucide="percent"></i></div>
+                            <div class="stat-details">
+                                <span class="stat-label">Comissões Pagas</span>
+                                <h3 id="billing-stat-commissions">R$ 0,00</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon bg-blue"><i data-lucide="trending-up"></i></div>
+                            <div class="stat-details">
+                                <span class="stat-label">Faturamento Líquido</span>
+                                <h3 id="billing-stat-net">R$ 0,00</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="billing-stats-pro" class="stats-grid hidden">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-green"><i data-lucide="dollar-sign"></i></div>
+                            <div class="stat-details">
+                                <span class="stat-label">Minhas Comissões</span>
+                                <h3 id="pro-stat-commissions">R$ 0,00</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon bg-blue"><i data-lucide="users"></i></div>
+                            <div class="stat-details">
+                                <span class="stat-label">Pacientes Ativos</span>
+                                <h3 id="pro-stat-patients">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dashboard-card margin-top-lg">
+                        <h3>Histórico de Transações</h3>
+                        <p class="description">Histórico dos pagamentos processados e das comissões distribuídas</p>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead id="billing-table-header"></thead>
+                                <tbody id="billing-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA: MEUS PACIENTES (lista apenas) -->
+                <section id="tab-patients" class="tab-content">
+                    <div class="header-section">
+                        <h1>Meus Pacientes</h1>
+                        <p>Selecione um paciente para abrir o prontuário completo</p>
+                    </div>
+                    <div id="patients-list-view" class="dashboard-card">
+                        <div class="patients-filter-bar">
+                            <div class="search-box">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="patient-search-input" placeholder="Buscar por nome ou e-mail...">
+                            </div>
+                            <select id="patient-goal-filter" class="table-select">
+                                <option value="">Todos os objetivos</option>
+                                <option value="lose">Emagrecer</option>
+                                <option value="gain">Ganhar Massa</option>
+                                <option value="maintain">Manter Peso</option>
+                            </select>
+                            <span id="patients-count-label" class="patients-count-label"></span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th style="padding: 6px 8px;">Data</th>
-                                        <th style="padding: 6px 8px;">Peso (kg)</th>
-                                        <th style="padding: 6px 8px; text-align:right;">Alteração</th>
+                                        <th>Nome</th>
+                                        <th>E-mail</th>
+                                        <th>Plano</th>
+                                        <th>Objetivo</th>
+                                        <th>Peso / Altura</th>
+                                        <th>Meta Calorias</th>
+                                        <th>Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody id="vc-tab-weight-history-body">
-                                    <tr><td colspan="3" style="text-align:center; opacity:0.5; padding:12px;">Nenhum peso registrado.</td></tr>
+                                <tbody id="patients-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA: AGENDA -->
+                <section id="tab-schedule" class="tab-content">
+                    <div class="header-section">
+                        <h1>Minha Agenda</h1>
+                        <p>Libere e bloqueie horários de atendimento com um clique</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>Grade de Horários</h3>
+                        <p class="description">Clique nas células para alternar entre <strong>disponível</strong> (âmbar) e <strong>bloqueado</strong> (escuro). Arraste para selecionar múltiplos horários de uma vez. Use os botões de coluna para ativar/desativar um dia inteiro.</p>
+                        <div class="margin-top-lg" id="schedule-days-container"></div>
+                        <div class="margin-top-lg" style="display:flex;justify-content:flex-end;">
+                            <button class="btn-primary" id="btn-save-schedule" style="padding:12px 24px;font-size:14px;">
+                                <i data-lucide="save"></i> Salvar Disponibilidade
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA: CONSULTAS -->
+                <section id="tab-appointments" class="tab-content">
+                    <div class="header-section">
+                        <h1>Consultas por Vídeo</h1>
+                        <p id="appointments-tab-desc">Acompanhe e gerencie os agendamentos de videoconferência na plataforma</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr id="appointments-table-headers"></tr>
+                                </thead>
+                                <tbody id="appointments-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA: CARDÁPIOS (standalone) -->
+                <section id="tab-meal-plans" class="tab-content">
+                    <div id="meal-plans-list-view">
+                        <div class="admin-section-header">
+                            <div>
+                                <h2 class="section-title">Cardápios Semanais</h2>
+                                <p class="section-subtitle">Crie e gerencie planos nutricionais completos para seus pacientes.</p>
+                            </div>
+                            <button class="btn-primary" id="btn-new-meal-plan">
+                                <i data-lucide="plus"></i> Novo Cardápio
+                            </button>
+                        </div>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Nome do Plano</th>
+                                        <th>Paciente Vinculado</th>
+                                        <th>Atualizado</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="meal-plans-table-body">
+                                    <tr><td colspan="5" style="text-align:center;color:var(--color-text-muted);">Nenhum cardápio criado ainda.</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </div>
 
-                <!-- ABA 3: Prescrições e Orientações -->
-                <div class="vc-tab-content" id="vc-tab-content-feedback">
-                    <div style="display:flex; flex-direction:column; flex:1; min-height:0;">
-                        <!-- Enviar nova orientação -->
-                        <div style="background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; box-sizing:border-box; margin-bottom:16px;">
-                            <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:600;">Nova Prescrição / Orientação</h4>
-                            <textarea id="vc-feedback-content" placeholder="Digite aqui as orientações, plano de treino ou dieta acordados com o paciente..." style="height:100px; width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; color:#fff; font-size:12.5px; line-height:1.5; resize:none; outline:none; box-sizing:border-box; margin-bottom:10px;"></textarea>
-                            <button id="vc-btn-save-feedback" class="btn-primary" style="width:100%; font-size:12px; padding:10px; font-weight:600; border-radius:8px;">Enviar Orientação</button>
+                    <div id="meal-plans-builder-view" class="hidden">
+                        <div class="builder-topbar">
+                            <button class="btn-secondary btn-sm" id="btn-back-to-plans">
+                                <i data-lucide="arrow-left"></i> Voltar
+                            </button>
+                            <div class="builder-topbar-fields">
+                                <input type="text" id="plan-name-input" placeholder="Nome do cardápio..." class="input-inline">
+                                <select id="plan-patient-select" class="input-inline">
+                                    <option value="">Sem paciente (template)</option>
+                                </select>
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <button class="btn-secondary btn-sm" id="btn-toggle-active-plan">Desativar</button>
+                                <button class="btn-primary btn-sm" id="btn-save-meal-plan">
+                                    <i data-lucide="save"></i> Salvar
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Histórico de Prescrições -->
-                        <div class="vc-feedback-history-container">
-                            <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px;"><i data-lucide="history" style="width:16px; height:16px; color:var(--color-primary);"></i> Histórico de Orientações Enviadas</h4>
-                            <div class="vc-feedback-history-list" id="vc-feedback-history-list">
-                                <div style="text-align:center; padding:20px; opacity:0.5; font-size:12px;">Carregando histórico...</div>
+                        <div id="builder-clinical-banner" class="clinical-alert-banner hidden" style="background:rgba(245,193,77,0.08);border:1px solid rgba(245,193,77,0.2);border-radius:8px;padding:12px;margin:12px 0;font-size:13px;display:flex;align-items:flex-start;gap:10px;">
+                            <i data-lucide="alert-triangle" style="color:var(--color-primary);width:18px;height:18px;flex-shrink:0;margin-top:1px;"></i>
+                            <div>
+                                <strong style="color:var(--color-primary);display:block;margin-bottom:2px;">Particularidades Clínicas do Paciente:</strong>
+                                <span id="builder-clinical-info" style="color:var(--color-text-main);">Nenhuma particularidade clínica informada.</span>
+                            </div>
+                        </div>
+
+                        <div class="plan-day-tabs">
+                            <button class="plan-day-tab active" data-dow="1">Seg</button>
+                            <button class="plan-day-tab" data-dow="2">Ter</button>
+                            <button class="plan-day-tab" data-dow="3">Qua</button>
+                            <button class="plan-day-tab" data-dow="4">Qui</button>
+                            <button class="plan-day-tab" data-dow="5">Sex</button>
+                            <button class="plan-day-tab" data-dow="6">Sáb</button>
+                            <button class="plan-day-tab" data-dow="0">Dom</button>
+                        </div>
+
+                        <div id="plan-day-content"></div>
+
+                        <!-- Modal: Busca de Alimentos -->
+                        <div id="food-search-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9990;align-items:flex-start;justify-content:center;padding-top:48px;box-sizing:border-box;">
+                            <div class="fsm-box">
+                                <div class="fsm-header">
+                                    <div>
+                                        <h3 style="margin:0;font-size:16px;font-weight:700;">Adicionar alimento</h3>
+                                        <span id="fsm-meal-label" style="font-size:12px;color:var(--color-text-muted);"></span>
+                                    </div>
+                                    <button id="btn-close-food-modal" class="fsm-close-btn">×</button>
+                                </div>
+                                <div class="fsm-tabs-bar">
+                                    <button class="fsm-tab active" data-fstab="search">Banco de Alimentos (22k)</button>
+                                    <button class="fsm-tab" data-fstab="manual">Alimento Manual</button>
+                                </div>
+                                <div id="fsm-panel-search" class="fsm-panel">
+                                    <div class="fsm-search-row">
+                                        <input type="text" id="fsm-search-input" placeholder="Buscar: arroz branco, frango, banana, feijão..." autocomplete="off">
+                                        <button id="btn-fsm-search" class="btn-primary btn-sm">Buscar</button>
+                                    </div>
+                                    <div id="fsm-results-header" class="fsm-results-header" style="display:none;">
+                                        <span style="flex:3;">Nome do alimento</span>
+                                        <span>Medida</span>
+                                        <span style="text-align:center;">Qtd</span>
+                                        <span style="text-align:right;">Ptn</span>
+                                        <span style="text-align:right;">Lip</span>
+                                        <span style="text-align:right;">CHO</span>
+                                        <span style="text-align:right;">Kcal</span>
+                                        <span></span>
+                                    </div>
+                                    <div id="fsm-results" class="fsm-results"></div>
+                                </div>
+                                <div id="fsm-panel-manual" class="fsm-panel" style="display:none;">
+                                    <div class="fsm-manual-form">
+                                        <div class="fsm-manual-row">
+                                            <div style="flex:3;"><label>Nome</label><input type="text" id="fsm-man-name" placeholder="Ex: Bolo de banana integral"></div>
+                                            <div><label>kcal/100g</label><input type="number" id="fsm-man-kcal" placeholder="250" min="0"></div>
+                                            <div><label>Ptn (g)</label><input type="number" id="fsm-man-ptn" placeholder="8" min="0" step="0.1"></div>
+                                            <div><label>Lip (g)</label><input type="number" id="fsm-man-lip" placeholder="5" min="0" step="0.1"></div>
+                                            <div><label>CHO (g)</label><input type="number" id="fsm-man-cho" placeholder="40" min="0" step="0.1"></div>
+                                            <div><label>Qtd (g)</label><input type="number" id="fsm-man-qty" value="100" min="1"></div>
+                                        </div>
+                                        <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
+                                            <button id="btn-fsm-add-manual" class="btn-primary">+ Adicionar ao cardápio</button>
+                                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+                                                <input type="checkbox" id="fsm-man-save" style="width:auto;margin:0;"> Salvar no banco
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Modal: Micronutrientes -->
+                        <div id="micro-nutrient-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9990;align-items:flex-start;justify-content:center;padding-top:48px;box-sizing:border-box;">
+                            <div class="micro-modal-box">
+                                <div class="micro-modal-header">
+                                    <h3 style="margin:0;font-size:16px;font-weight:700;">Somatório de nutrientes — Todo o cardápio</h3>
+                                    <button id="btn-close-micro-modal" class="fsm-close-btn">×</button>
+                                </div>
+                                <div class="micro-legend-bar">
+                                    <span class="micro-leg-dot in"></span> Dentro do recomendado (± 20%)
+                                    <span class="micro-leg-dot out" style="margin-left:16px;"></span> Fora do recomendado (± 20%)
+                                </div>
+                                <div style="overflow-y:auto;flex:1;padding:0 20px 20px;">
+                                    <table class="micro-table">
+                                        <thead><tr><th>Micronutrientes</th><th>Valor atual</th><th>DRI</th><th>Adequação</th></tr></thead>
+                                        <tbody id="micro-table-body"></tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-        </div>
-    </div>
-    </div>
+                </section>
 
-    <!-- Modal: Detalhes de Refeição (Admin/Pro) -->
-    <div class="modal-overlay" id="admin-meal-details-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:100000; justify-content:center; align-items:center;">
-        <div class="modal-card" style="max-width: 420px; background:#181d28; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; width:90%; box-sizing:border-box;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px; margin-bottom:16px;">
-                <h3 id="admin-meal-detail-title" style="margin:0; font-size:16px; font-weight:700; color:#fff;">Detalhes da Refeição</h3>
-                <button class="icon-btn" id="btn-close-admin-meal-details" style="background:transparent; border:none; color:#8e8e93; cursor:pointer;"><i data-lucide="x" style="width:18px; height:18px;"></i></button>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:16px; max-height:60vh; overflow-y:auto; padding-right:4px;">
-                <!-- Imagem se escaneada -->
-                <div id="admin-meal-detail-image-wrapper" style="display:none; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.05); position:relative;">
-                    <img id="admin-meal-detail-photo" src="" alt="Foto do Prato" style="width:100%; height:auto; object-fit:cover; display:block; max-height:200px;">
-                    <div style="position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.6); color:#fee440; padding:4px 8px; border-radius:12px; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;"><i data-lucide="scan" style="width:10px; height:10px; vertical-align:middle; margin-right:2px;"></i> Escaneado</div>
-                </div>
+            </div><!-- /regular-view -->
 
-                <!-- Resumo dos Macros -->
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:12px;">
-                    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; text-align:center;">
-                        <div>
-                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:2px;">CALORIAS</span>
-                            <strong id="admin-meal-detail-calories" style="font-size:12px; font-weight:700; color:#fff;">-</strong>
+            <!-- ── PATIENT WORKSPACE ── -->
+            <div id="patient-workspace" class="patient-workspace hidden">
+
+                <!-- Sidebar do Paciente -->
+                <aside class="patient-sidebar">
+                    <div class="ps-back">
+                        <button id="btn-back-to-patients" class="ps-back-btn">
+                            <i data-lucide="arrow-left"></i> Todos os Pacientes
+                        </button>
+                    </div>
+
+                    <div class="ps-hero">
+                        <div class="ps-avatar">
+                            <span class="ps-initials" id="ps-initials">--</span>
                         </div>
-                        <div>
-                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:2px; color:#22c55e;">PROT</span>
-                            <strong id="admin-meal-detail-protein" style="font-size:12px; font-weight:700; color:#22c55e;">-</strong>
+                        <div class="ps-name" id="ps-name">Paciente</div>
+                        <div class="ps-email" id="ps-email">--</div>
+                        <span class="ps-badge" id="ps-badge">--</span>
+                    </div>
+
+                    <div class="ps-stats">
+                        <div class="ps-stat-item">
+                            <span class="ps-stat-label">Peso</span>
+                            <span class="ps-stat-val" id="ps-stat-weight">--</span>
                         </div>
-                        <div>
-                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:2px; color:#3b82f6;">CARBO</span>
-                            <strong id="admin-meal-detail-carbs" style="font-size:12px; font-weight:700; color:#3b82f6;">-</strong>
+                        <div class="ps-stat-item">
+                            <span class="ps-stat-label">Altura</span>
+                            <span class="ps-stat-val" id="ps-stat-height">--</span>
                         </div>
-                        <div>
-                            <span style="display:block; font-size:9px; opacity:0.5; margin-bottom:2px; color:#f97316;">GORD</span>
-                            <strong id="admin-meal-detail-fat" style="font-size:12px; font-weight:700; color:#f97316;">-</strong>
+                        <div class="ps-stat-item">
+                            <span class="ps-stat-label">Objetivo</span>
+                            <span class="ps-stat-val" id="ps-stat-goal">--</span>
+                        </div>
+                        <div class="ps-stat-item">
+                            <span class="ps-stat-label">Meta Kcal</span>
+                            <span class="ps-stat-val accent" id="ps-stat-calories">--</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Lista de Alimentos -->
+                    <nav class="patient-sidebar-nav">
+                        <button class="patient-tab-btn active" data-patient-tab="overview">
+                            <i data-lucide="bar-chart-2"></i> Visão Geral
+                        </button>
+                        <button class="patient-tab-btn" data-patient-tab="diary">
+                            <i data-lucide="book-open"></i> Diário Alimentar
+                        </button>
+                        <button class="patient-tab-btn" data-patient-tab="clinical">
+                            <i data-lucide="activity"></i> Ficha Clínica
+                        </button>
+                        <button class="patient-tab-btn" data-patient-tab="exams">
+                            <i data-lucide="file-text"></i> Exames
+                        </button>
+                        <button class="patient-tab-btn" data-patient-tab="measurements">
+                            <i data-lucide="ruler"></i> Antropometria
+                        </button>
+                        <button class="patient-tab-btn" data-patient-tab="meal-plan">
+                            <i data-lucide="clipboard-list"></i> Cardápio
+                        </button>
+                        <button class="patient-tab-btn" data-patient-tab="energy">
+                            <i data-lucide="calculator"></i> Cálculo Energético
+                        </button>
+                        <button class="patient-tab-btn" data-patient-tab="feedback">
+                            <i data-lucide="message-square"></i> Prescrições
+                        </button>
+                    </nav>
+                </aside>
+
+                <!-- Área principal do paciente -->
+                <main class="patient-main">
+
+                    <!-- PAINEL: VISÃO GERAL -->
+                    <div class="patient-tab-content-panel active" id="patient-tab-content-overview">
+                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Visão Geral</h2>
+                        <p class="description" style="margin-bottom:24px;">Evolução de peso e status atual do paciente</p>
+
+                        <div class="weight-chart-wrap" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;">
+                            <h3 style="margin:0 0 16px;font-size:14px;font-weight:600;color:var(--text-muted);">EVOLUÇÃO DE PESO</h3>
+                            <canvas id="detail-weight-chart"></canvas>
+                            <p id="detail-weight-empty" class="description" style="display:none;text-align:center;padding:16px;">Nenhum peso registrado ainda.</p>
+                        </div>
+
+                        <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);">
+                            <div class="stat-card" style="padding:14px;">
+                                <div class="stat-icon bg-blue" style="width:36px;height:36px;font-size:16px;"><i data-lucide="droplet"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Água (Hoje)</span>
+                                    <h4 id="detail-water-status" style="font-size:16px;font-weight:600;margin:0;">0 / 2500 ml</h4>
+                                </div>
+                            </div>
+                            <div class="stat-card" style="padding:14px;">
+                                <div class="stat-icon bg-purple" style="width:36px;height:36px;font-size:16px;"><i data-lucide="timer"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Jejum Ativo</span>
+                                    <h4 id="detail-fasting-status" style="font-size:16px;font-weight:600;margin:0;">Não ativo</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PAINEL: DIÁRIO ALIMENTAR -->
+                    <div class="patient-tab-content-panel" id="patient-tab-content-diary">
+                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Diário Alimentar</h2>
+                        <p class="description" style="margin-bottom:24px;">Histórico de refeições, consumo de água e jejum intermitente</p>
+
+                        <div class="diary-filter-bar margin-top-md">
+                            <span class="diary-filter-label">Período:</span>
+                            <div class="diary-filter-btns">
+                                <button class="diary-filter-btn active" data-days="7">7 dias</button>
+                                <button class="diary-filter-btn" data-days="30">30 dias</button>
+                                <button class="diary-filter-btn" data-days="0">Tudo</button>
+                            </div>
+                            <div class="diary-adherence-info" id="diary-adherence-info" style="display:none;">
+                                <span>Aderência calórica:</span>
+                                <strong id="detail-caloric-adherence">-</strong>
+                            </div>
+                        </div>
+
+                        <h3 class="margin-top-md">Refeições Registradas</h3>
+                        <div class="table-responsive margin-top-md" style="max-height:400px;overflow-y:auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data / Hora</th>
+                                        <th>Refeição</th>
+                                        <th>Tipo</th>
+                                        <th>Calorias</th>
+                                        <th>Macros (C/P/G)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-meals-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- PAINEL: FICHA CLÍNICA -->
+                    <div class="patient-tab-content-panel" id="patient-tab-content-clinical">
+                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Ficha Clínica</h2>
+                        <p class="description" style="margin-bottom:24px;">Comorbidades, intolerâncias alimentares e anotações médicas relevantes</p>
+
+                        <form id="pro-patient-clinical-form" style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+                            <div class="form-group">
+                                <label for="pro-clinical-comorbidities">Comorbidades / Condições de Saúde</label>
+                                <input type="text" id="pro-clinical-comorbidities" placeholder="Ex: Diabetes Tipo 2, Hipertensão, Gastrite...">
+                            </div>
+                            <div class="form-group">
+                                <label for="pro-clinical-intolerances">Intolerâncias e Alergias Alimentares</label>
+                                <input type="text" id="pro-clinical-intolerances" placeholder="Ex: Lactose, Glúten, Amendoim, Frutos do mar...">
+                            </div>
+                            <div class="form-group">
+                                <label for="pro-clinical-restrictions">Restrições Alimentares / Preferências</label>
+                                <input type="text" id="pro-clinical-restrictions" placeholder="Ex: Vegano, Vegetariano, Sem carne vermelha...">
+                            </div>
+                            <div class="form-group">
+                                <label for="pro-clinical-notes">Observações Clínicas e Anotações Gerais</label>
+                                <textarea id="pro-clinical-notes" placeholder="Digite anotações adicionais..." style="height:120px;resize:vertical;"></textarea>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn-primary">
+                                    <i data-lucide="save" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"></i>
+                                    Salvar Ficha Clínica
+                                </button>
+                            </div>
+                        </form>
+                        <div id="clinical-success-msg" class="success-banner hidden" style="margin-top:10px;">Ficha clínica salva com sucesso!</div>
+                    </div>
+
+                    <!-- PAINEL: EXAMES -->
+                    <div class="patient-tab-content-panel" id="patient-tab-content-exams">
+                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Exames Laboratoriais</h2>
+                        <p class="description" style="margin-bottom:24px;">Visualize exames enviados pelo paciente e adicione notas clínicas específicas</p>
+
+                        <div class="table-responsive" style="max-height:400px;overflow-y:auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Arquivo</th>
+                                        <th>Data de Envio</th>
+                                        <th>Anotações do Nutricionista</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pro-patient-exams-table-body">
+                                    <tr><td colspan="4" style="text-align:center;color:var(--color-text-muted);padding:20px;">Nenhum exame enviado por este paciente.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- PAINEL: ANTROPOMETRIA -->
+                    <div class="patient-tab-content-panel" id="patient-tab-content-measurements">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                            <div>
+                                <h2 style="margin:0;font-size:20px;font-weight:700;">Antropometria</h2>
+                                <p class="description" style="margin:4px 0 0;">Evolução das medidas corporais ao longo do tempo</p>
+                            </div>
+                            <button class="btn-primary btn-sm" id="btn-toggle-meas-form" style="white-space:nowrap;">
+                                <i data-lucide="plus" style="width:14px;height:14px;"></i> Nova Medição
+                            </button>
+                        </div>
+
+                        <div id="meas-form-wrap" class="hidden" style="background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">
+                            <h4 style="margin:0 0 16px;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;">Nova Avaliação</h4>
+                            <form id="patient-meas-form">
+                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+                                    <div class="form-group" style="margin:0;">
+                                        <label>Data da Avaliação</label>
+                                        <input type="date" id="meas-date" required>
+                                    </div>
+                                    <div class="form-group" style="margin:0;">
+                                        <label>Peso (kg)</label>
+                                        <input type="number" id="meas-weight" step="0.1" min="0" placeholder="Ex: 72.5">
+                                    </div>
+                                    <div class="form-group" style="margin:0;">
+                                        <label>Altura (cm)</label>
+                                        <input type="number" id="meas-height" step="0.1" min="0" placeholder="Ex: 168">
+                                    </div>
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                                    <div class="form-group" style="margin:0;">
+                                        <label>% Gordura Corporal</label>
+                                        <input type="number" id="meas-fat" step="0.1" min="0" max="80" placeholder="Ex: 22.5">
+                                    </div>
+                                    <div class="form-group" style="margin:0;">
+                                        <label>Massa Muscular (kg)</label>
+                                        <input type="number" id="meas-muscle" step="0.1" min="0" placeholder="Ex: 35.2">
+                                    </div>
+                                </div>
+                                <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px;">
+                                    <div class="form-group" style="margin:0;"><label>Cintura (cm)</label><input type="number" id="meas-waist" step="0.1" min="0" placeholder="80"></div>
+                                    <div class="form-group" style="margin:0;"><label>Quadril (cm)</label><input type="number" id="meas-hip" step="0.1" min="0" placeholder="95"></div>
+                                    <div class="form-group" style="margin:0;"><label>Tórax (cm)</label><input type="number" id="meas-chest" step="0.1" min="0" placeholder="90"></div>
+                                    <div class="form-group" style="margin:0;"><label>Braço (cm)</label><input type="number" id="meas-arm" step="0.1" min="0" placeholder="30"></div>
+                                    <div class="form-group" style="margin:0;"><label>Coxa (cm)</label><input type="number" id="meas-thigh" step="0.1" min="0" placeholder="52"></div>
+                                </div>
+                                <div class="form-group" style="margin-bottom:12px;">
+                                    <label>Observações</label>
+                                    <textarea id="meas-notes" placeholder="Anotações sobre a avaliação..." style="height:64px;resize:vertical;"></textarea>
+                                </div>
+                                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                                    <button type="button" class="btn-secondary btn-sm" id="btn-cancel-meas-form">Cancelar</button>
+                                    <button type="submit" class="btn-primary btn-sm">
+                                        <i data-lucide="save" style="width:13px;height:13px;"></i> Salvar Medição
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="table-responsive" style="max-height:420px;overflow-y:auto;">
+                            <table class="data-table" id="meas-history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th><th>Peso</th><th>IMC</th><th>% Gord.</th>
+                                        <th>M. Musc.</th><th>Cintura</th><th>Quadril</th>
+                                        <th>RCQ</th><th>Tórax</th><th>Braço</th><th>Coxa</th><th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="meas-history-body">
+                                    <tr><td colspan="12" style="text-align:center;color:var(--color-text-muted);padding:20px;">Nenhuma medição registrada.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- PAINEL: CARDÁPIO DO PACIENTE -->
+                    <div class="patient-tab-content-panel" id="patient-tab-content-meal-plan">
+                        <div style="text-align:center;padding:40px;color:var(--color-text-muted);">
+                            <p style="font-size:13px;">Carregando planos alimentares do paciente...</p>
+                        </div>
+                    </div>
+
+                    <!-- PAINEL: CÁLCULO ENERGÉTICO -->
+                    <div class="patient-tab-content-panel" id="patient-tab-content-energy">
+                        <div style="text-align:center;padding:40px;color:var(--color-text-muted);">
+                            <p style="font-size:13px;">Carregando calculador de TMB e GET...</p>
+                        </div>
+                    </div>
+
+                    <!-- PAINEL: PRESCRIÇÕES / FEEDBACK -->
+                    <div class="patient-tab-content-panel" id="patient-tab-content-feedback">
+                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Prescrições e Orientações</h2>
+                        <p class="description" style="margin-bottom:24px;">Envie orientações diretamente para o app do paciente</p>
+
+                        <form id="patient-feedback-form" style="max-width:720px;margin-bottom:32px;">
+                            <input type="hidden" id="feedback-patient-id">
+                            <div class="form-group">
+                                <label for="feedback-content">Nova Prescrição / Mensagem</label>
+                                <textarea id="feedback-content" placeholder="Escreva aqui as orientações, plano alimentar ou sugestões de treino..." style="height:150px;" required></textarea>
+                            </div>
+                            <button type="submit" class="btn-primary">Enviar para o Painel do Paciente</button>
+                        </form>
+
+                        <div id="feedback-history-section">
+                            <div class="feedback-history-header">
+                                <h3>Orientações Enviadas</h3>
+                                <span id="feedback-history-count" class="feedback-history-badge"></span>
+                            </div>
+                            <div id="feedback-history-list" class="feedback-history-list margin-top-md"></div>
+                        </div>
+                    </div>
+
+                </main><!-- /patient-main -->
+            </div><!-- /patient-workspace -->
+
+        </div><!-- /app-body -->
+    </div><!-- /admin-dashboard -->
+
+    <!-- Tela de Videochamada -->
+    <div class="app-screen" id="screen-video-call" style="background:#0b0f19;padding:0;display:none;flex-direction:row;height:100vh;width:100vw;position:fixed;top:0;left:0;z-index:9999;justify-content:center;align-items:center;overflow:hidden;font-family:'Inter',sans-serif;">
+        <div id="video-call-left-panel" style="width:40%;height:100%;position:relative;background:#111;display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,0.08);">
+            <div id="video-call-header" style="position:absolute;top:16px;left:16px;z-index:10000;display:flex;gap:10px;align-items:center;background:rgba(0,0,0,0.5);padding:8px 16px;border-radius:30px;">
+                <button class="icon-btn" id="btn-close-video-call" style="background:rgba(255,255,255,0.1);color:#fff;border-radius:50%;width:32px;height:32px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+                <span style="color:#fff;font-size:12px;font-weight:600;">Consulta por Vídeo</span>
+            </div>
+            <div id="video-call-container" style="flex:1;width:100%;height:100%;position:relative;display:flex;justify-content:center;align-items:center;">
+                <video id="remote-video" autoplay playsinline style="width:100%;height:100%;object-fit:cover;background:#111;"></video>
+                <video id="local-video" autoplay playsinline muted style="width:100px;height:140px;position:absolute;bottom:96px;right:16px;border-radius:12px;border:2px solid var(--color-primary);z-index:10001;background:#222;object-fit:cover;box-shadow:0 8px 24px rgba(0,0,0,0.4);transition:all 0.3s ease;"></video>
+                <div id="video-call-controls" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:10002;display:flex;gap:16px;background:rgba(0,0,0,0.6);padding:10px 20px;border-radius:40px;align-items:center;">
+                    <button id="btn-toggle-mic" class="icon-btn-call" style="background:#22c55e;color:#fff;border:none;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-lucide="mic" style="width:16px;height:16px;"></i></button>
+                    <button id="btn-toggle-cam" class="icon-btn-call" style="background:#22c55e;color:#fff;border:none;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-lucide="video" style="width:16px;height:16px;"></i></button>
+                    <button id="btn-hangup" class="icon-btn-call" style="background:#ef4444;color:#fff;border:none;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-lucide="phone-off" style="width:16px;height:16px;"></i></button>
+                </div>
+                <div id="video-call-status" style="position:absolute;top:20px;right:16px;color:#fff;background:rgba(0,0,0,0.5);padding:6px 12px;border-radius:20px;font-size:10px;font-weight:500;">Aguardando paciente...</div>
+            </div>
+        </div>
+        <div id="video-call-right-panel" style="width:60%;height:100%;display:flex;flex-direction:column;background:#0b0f19;color:#fff;overflow-y:auto;padding:24px;box-sizing:border-box;">
+            <div style="border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
                 <div>
-                    <h4 style="margin:0 0 8px 0; font-size:12.5px; font-weight:600; opacity:0.8; color:#fff;">Alimentos Identificados</h4>
-                    <div id="admin-meal-detail-items" style="display:flex; flex-direction:column; gap:8px;">
-                        <!-- Injetado por JS -->
+                    <h2 id="vc-patient-name" style="margin:0;font-size:22px;font-weight:700;color:#fff;">Paciente</h2>
+                    <p id="vc-patient-email" style="margin:4px 0 0;font-size:13px;opacity:0.6;color:#fff;">email@paciente.com</p>
+                </div>
+                <span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">Consulta Ativa</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;">
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:10px;text-align:center;"><span style="display:block;font-size:10px;opacity:0.5;margin-bottom:4px;font-weight:500;">PESO</span><strong id="vc-patient-weight" style="font-size:14px;font-weight:700;color:#fff;">-</strong></div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:10px;text-align:center;"><span style="display:block;font-size:10px;opacity:0.5;margin-bottom:4px;font-weight:500;">ALTURA</span><strong id="vc-patient-height" style="font-size:14px;font-weight:700;color:#fff;">-</strong></div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:10px;text-align:center;"><span style="display:block;font-size:10px;opacity:0.5;margin-bottom:4px;font-weight:500;">META</span><strong id="vc-patient-goal" style="font-size:12px;font-weight:700;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">-</strong></div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:10px;text-align:center;"><span style="display:block;font-size:10px;opacity:0.5;margin-bottom:4px;font-weight:500;">META CALÓRICA</span><strong id="vc-patient-calories" style="font-size:14px;font-weight:700;color:#fff;">-</strong></div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:10px;text-align:center;"><span style="display:block;font-size:10px;opacity:0.5;margin-bottom:4px;font-weight:500;">ÁGUA HOJE</span><strong id="vc-patient-water" style="font-size:12px;font-weight:700;color:#fff;">-</strong></div>
+            </div>
+            <div id="vc-weight-history-section" style="margin-bottom:20px;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.05);border-radius:10px;overflow:hidden;">
+                <div id="vc-weight-history-header" style="padding:10px 16px;background:rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
+                    <span style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;"><i data-lucide="trending-up" style="width:16px;height:16px;color:var(--color-primary);"></i> Evolução de Peso do Paciente</span>
+                    <i data-lucide="chevron-down" id="vc-weight-history-arrow" style="width:16px;height:16px;transition:transform 0.2s;"></i>
+                </div>
+                <div id="vc-weight-history-content" style="padding:12px;display:none;border-top:1px solid rgba(255,255,255,0.05);max-height:150px;overflow-y:auto;">
+                    <table class="data-table" style="font-size:11.5px;width:100%;">
+                        <thead><tr><th style="padding:6px 8px;">Data</th><th style="padding:6px 8px;">Peso (kg)</th></tr></thead>
+                        <tbody id="vc-weight-history-body"><tr><td colspan="2" style="text-align:center;opacity:0.5;padding:12px;">Nenhum peso registrado.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="vc-tabs-bar">
+                <button class="vc-tab-btn active" id="vc-tab-btn-diary" data-vc-tab="diary"><i data-lucide="utensils" style="width:14px;height:14px;"></i> Diário Alimentar</button>
+                <button class="vc-tab-btn" id="vc-tab-btn-weight" data-vc-tab="weight"><i data-lucide="trending-up" style="width:14px;height:14px;"></i> Evolução de Peso</button>
+                <button class="vc-tab-btn" id="vc-tab-btn-feedback" data-vc-tab="feedback"><i data-lucide="file-text" style="width:14px;height:14px;"></i> Prescrições e Orientações</button>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;min-height:0;position:relative;">
+                <div class="vc-tab-content active" id="vc-tab-content-diary" style="overflow-y:auto;">
+                    <div id="vc-diary-container"><div style="text-align:center;padding:40px;opacity:0.5;font-size:13px;">Selecione uma consulta ativa.</div></div>
+                </div>
+                <div class="vc-tab-content" id="vc-tab-content-weight" style="overflow-y:auto;padding:16px;box-sizing:border-box;">
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+                        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:10px;border-radius:10px;text-align:center;"><span style="display:block;font-size:9px;opacity:0.5;margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Peso Inicial</span><strong id="vc-w-initial" style="font-size:15px;font-weight:700;color:#fff;">-</strong></div>
+                        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:10px;border-radius:10px;text-align:center;"><span style="display:block;font-size:9px;opacity:0.5;margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Peso Atual</span><strong id="vc-w-current" style="font-size:15px;font-weight:700;color:var(--color-primary);">-</strong></div>
+                        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:10px;border-radius:10px;text-align:center;"><span style="display:block;font-size:9px;opacity:0.5;margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Meta de Peso</span><strong id="vc-w-target" style="font-size:15px;font-weight:700;color:#22c55e;">-</strong></div>
+                    </div>
+                    <div id="vc-w-achievement-card" style="background:rgba(254,228,64,0.05);border:1px solid rgba(254,228,64,0.15);border-radius:10px;padding:12px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:12.5px;color:#fee440;line-height:1.4;">
+                        <i data-lucide="award" style="width:20px;height:20px;flex-shrink:0;color:#fee440;"></i>
+                        <span id="vc-w-achievement-text">Carregando evolução...</span>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:16px;margin-bottom:16px;height:240px;position:relative;box-sizing:border-box;">
+                        <h4 style="margin:0 0 12px;font-size:13px;font-weight:600;opacity:0.8;color:#fff;">Histórico de Evolução vs Meta</h4>
+                        <div style="width:100%;height:calc(100% - 28px);position:relative;"><canvas id="vc-weight-chart" style="width:100%;height:100%;"></canvas></div>
+                    </div>
+                    <div>
+                        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;opacity:0.8;color:#fff;">Histórico de Medições</h4>
+                        <div class="table-responsive" style="max-height:180px;overflow-y:auto;border:1px solid rgba(255,255,255,0.05);border-radius:8px;background:rgba(0,0,0,0.1);">
+                            <table class="data-table" style="font-size:12px;width:100%;">
+                                <thead><tr><th style="padding:6px 8px;">Data</th><th style="padding:6px 8px;">Peso (kg)</th><th style="padding:6px 8px;text-align:right;">Alteração</th></tr></thead>
+                                <tbody id="vc-tab-weight-history-body"><tr><td colspan="3" style="text-align:center;opacity:0.5;padding:12px;">Nenhum peso registrado.</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="vc-tab-content" id="vc-tab-content-feedback">
+                    <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
+                        <div style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:16px;box-sizing:border-box;margin-bottom:16px;">
+                            <h4 style="margin:0 0 10px;font-size:14px;font-weight:600;">Nova Prescrição / Orientação</h4>
+                            <textarea id="vc-feedback-content" placeholder="Digite aqui as orientações acordadas com o paciente..." style="height:100px;width:100%;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px;color:#fff;font-size:12.5px;line-height:1.5;resize:none;outline:none;box-sizing:border-box;margin-bottom:10px;"></textarea>
+                            <button id="vc-btn-save-feedback" class="btn-primary" style="width:100%;font-size:12px;padding:10px;font-weight:600;border-radius:8px;">Enviar Orientação</button>
+                        </div>
+                        <div class="vc-feedback-history-container">
+                            <h4 style="margin:0 0 8px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;"><i data-lucide="history" style="width:16px;height:16px;color:var(--color-primary);"></i> Histórico de Orientações Enviadas</h4>
+                            <div class="vc-feedback-history-list" id="vc-feedback-history-list"><div style="text-align:center;padding:20px;opacity:0.5;font-size:12px;">Carregando histórico...</div></div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-top:16px;">
-                <button id="btn-close-admin-meal-details-footer" class="btn-secondary w-full" style="font-size:12px; padding:10px; border-radius:8px;">Fechar</button>
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes de Refeição -->
+    <div class="modal-overlay" id="admin-meal-details-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100000;justify-content:center;align-items:center;">
+        <div class="modal-card" style="max-width:420px;background:#181d28;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:20px;width:90%;box-sizing:border-box;">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:12px;margin-bottom:16px;">
+                <h3 id="admin-meal-detail-title" style="margin:0;font-size:16px;font-weight:700;color:#fff;">Detalhes da Refeição</h3>
+                <button class="icon-btn" id="btn-close-admin-meal-details" style="background:transparent;border:none;color:#8e8e93;cursor:pointer;"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px;max-height:60vh;overflow-y:auto;padding-right:4px;">
+                <div id="admin-meal-detail-image-wrapper" style="display:none;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);position:relative;">
+                    <img id="admin-meal-detail-photo" src="" alt="Foto do Prato" style="width:100%;height:auto;object-fit:cover;display:block;max-height:200px;">
+                    <div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.6);color:#fee440;padding:4px 8px;border-radius:12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;"><i data-lucide="scan" style="width:10px;height:10px;vertical-align:middle;margin-right:2px;"></i> Escaneado</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:12px;">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;">
+                        <div><span style="display:block;font-size:9px;opacity:0.5;margin-bottom:2px;">CALORIAS</span><strong id="admin-meal-detail-calories" style="font-size:12px;font-weight:700;color:#fff;">-</strong></div>
+                        <div><span style="display:block;font-size:9px;opacity:0.5;margin-bottom:2px;color:#22c55e;">PROT</span><strong id="admin-meal-detail-protein" style="font-size:12px;font-weight:700;color:#22c55e;">-</strong></div>
+                        <div><span style="display:block;font-size:9px;opacity:0.5;margin-bottom:2px;color:#3b82f6;">CARBO</span><strong id="admin-meal-detail-carbs" style="font-size:12px;font-weight:700;color:#3b82f6;">-</strong></div>
+                        <div><span style="display:block;font-size:9px;opacity:0.5;margin-bottom:2px;color:#f97316;">GORD</span><strong id="admin-meal-detail-fat" style="font-size:12px;font-weight:700;color:#f97316;">-</strong></div>
+                    </div>
+                </div>
+                <div>
+                    <h4 style="margin:0 0 8px;font-size:12.5px;font-weight:600;opacity:0.8;color:#fff;">Alimentos Identificados</h4>
+                    <div id="admin-meal-detail-items" style="display:flex;flex-direction:column;gap:8px;"></div>
+                </div>
+            </div>
+            <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;margin-top:16px;">
+                <button id="btn-close-admin-meal-details-footer" class="btn-secondary w-full" style="font-size:12px;padding:10px;border-radius:8px;">Fechar</button>
             </div>
         </div>
     </div>
-    <!-- Modal: Gerador de Receitas via IA (Admin/Pro) -->
-    <div class="modal-overlay" id="admin-recipe-generator-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:100000; justify-content:center; align-items:center; backdrop-filter:blur(4px);">
-        <div class="modal-card" style="max-width: 500px; background:#181d28; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; width:90%; box-sizing:border-box; display:flex; flex-direction:column; max-height:85vh;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px; margin-bottom:16px;">
-                <h3 style="margin:0; font-size:16px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
-                    <i data-lucide="sparkles" style="width:18px; height:18px; color:var(--color-primary);"></i>
-                    Receita Sugerida pela IA
+
+    <!-- Modal: Gerador de Receitas via IA -->
+    <div class="modal-overlay" id="admin-recipe-generator-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:100000;justify-content:center;align-items:center;">
+        <div class="modal-card" style="max-width:500px;background:#181d28;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:20px;width:90%;box-sizing:border-box;display:flex;flex-direction:column;max-height:85vh;">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:12px;margin-bottom:16px;">
+                <h3 style="margin:0;font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;">
+                    <i data-lucide="sparkles" style="width:18px;height:18px;color:var(--color-primary);"></i> Receita Sugerida pela IA
                 </h3>
-                <button class="icon-btn" id="btn-close-recipe-generator" style="background:transparent; border:none; color:#8e8e93; cursor:pointer;"><i data-lucide="x" style="width:18px; height:18px;"></i></button>
+                <button class="icon-btn" id="btn-close-recipe-generator" style="background:transparent;border:none;color:#8e8e93;cursor:pointer;"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
             </div>
-            
-            <div id="recipe-generator-loading" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 20px; gap:16px;">
-                <div class="spinner" style="border:3px solid rgba(255,255,255,0.1); border-top:3px solid var(--color-primary); border-radius:50%; width:36px; height:36px; animation:spin 1s linear infinite;"></div>
-                <p style="margin:0; font-size:13px; color:var(--color-text-muted); text-align:center;">Nossa Inteligência Artificial está preparando a sua receita personalizada. Por favor, aguarde...</p>
+            <div id="recipe-generator-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:16px;">
+                <div class="spinner" style="border:3px solid rgba(255,255,255,0.1);border-top:3px solid var(--color-primary);border-radius:50%;width:36px;height:36px;animation:spin 1s linear infinite;"></div>
+                <p style="margin:0;font-size:13px;color:var(--color-text-muted);text-align:center;">Nossa Inteligência Artificial está preparando a sua receita personalizada. Por favor, aguarde...</p>
             </div>
-
-            <div id="recipe-generator-content" style="display:none; flex-direction:column; gap:16px; overflow-y:auto; padding-right:4px;">
+            <div id="recipe-generator-content" style="display:none;flex-direction:column;gap:16px;overflow-y:auto;padding-right:4px;">
                 <div>
-                    <h4 id="recipe-gen-title" style="margin:0 0 4px 0; font-size:15px; font-weight:700; color:var(--color-primary);">Nome da Receita</h4>
-                    <span id="recipe-gen-meta" style="font-size:11px; color:var(--color-text-muted);">Tempo de Preparo: 20 min</span>
+                    <h4 id="recipe-gen-title" style="margin:0 0 4px;font-size:15px;font-weight:700;color:var(--color-primary);">Nome da Receita</h4>
+                    <span id="recipe-gen-meta" style="font-size:11px;color:var(--color-text-muted);">Tempo de Preparo: 20 min</span>
                 </div>
-
-                <!-- Info de Macros -->
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:8px; padding:10px;">
-                    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; text-align:center; font-size:11px;">
-                        <div>
-                            <span style="display:block; opacity:0.5; margin-bottom:2px; font-size:9px;">CALORIAS</span>
-                            <strong id="recipe-gen-calories" style="font-weight:700; color:#fff;">-</strong>
-                        </div>
-                        <div>
-                            <span style="display:block; opacity:0.5; margin-bottom:2px; color:#22c55e; font-size:9px;">PROT</span>
-                            <strong id="recipe-gen-protein" style="font-weight:700; color:#22c55e;">-</strong>
-                        </div>
-                        <div>
-                            <span style="display:block; opacity:0.5; margin-bottom:2px; color:#3b82f6; font-size:9px;">CARBO</span>
-                            <strong id="recipe-gen-carbs" style="font-weight:700; color:#3b82f6;">-</strong>
-                        </div>
-                        <div>
-                            <span style="display:block; opacity:0.5; margin-bottom:2px; color:#f97316; font-size:9px;">GORD</span>
-                            <strong id="recipe-gen-fat" style="font-weight:700; color:#f97316;">-</strong>
-                        </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:10px;">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:11px;">
+                        <div><span style="display:block;opacity:0.5;margin-bottom:2px;font-size:9px;">CALORIAS</span><strong id="recipe-gen-calories" style="font-weight:700;color:#fff;">-</strong></div>
+                        <div><span style="display:block;opacity:0.5;margin-bottom:2px;color:#22c55e;font-size:9px;">PROT</span><strong id="recipe-gen-protein" style="font-weight:700;color:#22c55e;">-</strong></div>
+                        <div><span style="display:block;opacity:0.5;margin-bottom:2px;color:#3b82f6;font-size:9px;">CARBO</span><strong id="recipe-gen-carbs" style="font-weight:700;color:#3b82f6;">-</strong></div>
+                        <div><span style="display:block;opacity:0.5;margin-bottom:2px;color:#f97316;font-size:9px;">GORD</span><strong id="recipe-gen-fat" style="font-weight:700;color:#f97316;">-</strong></div>
                     </div>
                 </div>
-
-                <!-- Lista de Ingredientes -->
                 <div>
-                    <h5 style="margin:0 0 6px 0; font-size:12.5px; font-weight:600; color:#fff;">Ingredientes</h5>
-                    <ul id="recipe-gen-ingredients-list" style="margin:0; padding-left:20px; font-size:12px; color:var(--color-text-muted); line-height:1.6;">
-                        <!-- Injetado por JS -->
-                    </ul>
+                    <h5 style="margin:0 0 6px;font-size:12.5px;font-weight:600;color:#fff;">Ingredientes</h5>
+                    <ul id="recipe-gen-ingredients-list" style="margin:0;padding-left:20px;font-size:12px;color:var(--color-text-muted);line-height:1.6;"></ul>
                 </div>
-
-                <!-- Modo de Preparo -->
                 <div>
-                    <h5 style="margin:0 0 6px 0; font-size:12.5px; font-weight:600; color:#fff;">Modo de Preparo</h5>
-                    <div id="recipe-gen-directions" style="font-size:12px; color:var(--color-text-muted); line-height:1.6; white-space:pre-wrap;">
-                        <!-- Injetado por JS -->
-                    </div>
+                    <h5 style="margin:0 0 6px;font-size:12.5px;font-weight:600;color:#fff;">Modo de Preparo</h5>
+                    <div id="recipe-gen-directions" style="font-size:12px;color:var(--color-text-muted);line-height:1.6;white-space:pre-wrap;"></div>
                 </div>
             </div>
-
-            <div id="recipe-generator-footer" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-top:16px; display:none; gap:12px;">
-                <button id="btn-apply-recipe" class="btn-primary" style="flex:1; font-size:12px; padding:10px; border-radius:8px; font-weight:600;">Usar Receita no Plano</button>
-                <button id="btn-close-recipe-generator-footer" class="btn-secondary" style="font-size:12px; padding:10px; border-radius:8px; width:100px;">Fechar</button>
+            <div id="recipe-generator-footer" style="border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;margin-top:16px;display:none;gap:12px;">
+                <button id="btn-apply-recipe" class="btn-primary" style="flex:1;font-size:12px;padding:10px;border-radius:8px;font-weight:600;">Usar Receita no Plano</button>
+                <button id="btn-close-recipe-generator-footer" class="btn-secondary" style="font-size:12px;padding:10px;border-radius:8px;width:100px;">Fechar</button>
             </div>
         </div>
     </div>
 
-    <!-- Script Principal -->
     <script type="module" src="admin.js"></script>
 </body>
 </html>

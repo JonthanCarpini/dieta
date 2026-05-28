@@ -1301,10 +1301,9 @@ export function initProMeals() {
         document.getElementById('meal-plans-builder-view').classList.add('hidden');
         document.getElementById('meal-plans-list-view').classList.remove('hidden');
 
-        if (fromPatient) {
-            // Volta para a view do paciente preservando os detalhes abertos
-            adminState._preservePatientDetail = true;
-            if (window.switchTab) window.switchTab('patients');
+        if (fromPatient && window.openPatientWorkspace) {
+            // Volta direto para o workspace do paciente na aba de cardápio
+            window.openPatientWorkspace('meal-plan');
             setTimeout(() => {
                 const mealPlanTabBtn = document.querySelector('.patient-tab-btn[data-patient-tab="meal-plan"]');
                 if (mealPlanTabBtn) mealPlanTabBtn.click();
