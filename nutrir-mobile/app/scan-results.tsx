@@ -75,7 +75,28 @@ export default function ScanResultsScreen() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  const foods: FoodItem[] = results ? JSON.parse(results) : [];
+  let parsedFoods: FoodItem[] = [];
+  try {
+    if (results) {
+      const parsed = JSON.parse(results);
+      // Suporta tanto o array de alimentos direto quanto o objeto completo da IA
+      const rawList = Array.isArray(parsed) ? parsed : (parsed?.items || []);
+      
+      parsedFoods = rawList.map((item: any) => ({
+        name: item.name || 'Alimento',
+        quantity: Number(item.weight_g || item.quantity || 100),
+        unit: item.unit || 'g',
+        calories: Math.round(Number(item.calories || 0)),
+        protein: Math.round(Number(item.protein || 0)),
+        carbs: Math.round(Number(item.carbs || 0)),
+        fats: item.fat !== undefined ? Math.round(Number(item.fat)) : Math.round(Number(item.fats || 0)),
+      }));
+    }
+  } catch (err) {
+    console.error('Erro ao processar alimentos da IA:', err);
+  }
+
+  const foods = parsedFoods;
   const [selected, setSelected] = useState<Set<number>>(new Set(foods.map((_, i) => i)));
   const [mealType, setMealType] = useState('almoco');
 
@@ -90,18 +111,57 @@ export default function ScanResultsScreen() {
   const totalCal = selectedFoods.reduce((s, f) => s + f.calories, 0);
 
   const mutation = useMutation({
-    mutationFn: () =>
-      api.post('/diario/add-foods', {
-        meal_type: mealType,
-        foods: selectedFoods,
-      }),
+    mutationFn: () => {
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = now.toTimeString().substring(0, 5);
+
+      const mealNames: Record<string, string> = {
+        cafe: 'Café da Manhã',
+        lanche_manha: 'Lanche da Manhã',
+        almoco: 'Almoço',
+        lanche_tarde: 'Lanche da Tarde',
+        jantar: 'Jantar',
+        ceia: 'Ceia',
+      };
+
+      const name = mealNames[mealType] || 'Refeição';
+      const mealId = `meal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      // Mapeia para o formato que o backend espera (qty, fat, etc)
+      const dbItems = selectedFoods.map((f) => ({
+        name: f.name,
+        qty: f.quantity,
+        calories: f.calories,
+        protein: f.protein,
+        carbs: f.carbs,
+        fat: f.fats,
+      }));
+
+      const total = {
+        calories: Math.round(dbItems.reduce((sum, item) => sum + item.calories, 0)),
+        protein: Math.round(dbItems.reduce((sum, item) => sum + item.protein, 0)),
+        carbs: Math.round(dbItems.reduce((sum, item) => sum + item.carbs, 0)),
+        fat: Math.round(dbItems.reduce((sum, item) => sum + item.fat, 0)),
+      };
+
+      return api.post('/user/meals', {
+        id: mealId,
+        date: dateStr,
+        time: timeStr,
+        name,
+        items: dbItems,
+        total,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['daily-summary'] });
       Alert.alert('Adicionado!', `${selectedFoods.length} alimento(s) registrado(s) no diário.`, [
         { text: 'OK', onPress: () => router.replace('/(tabs)') },
       ]);
     },
-    onError: () => {
+    onError: (err: any) => {
+      console.error('Erro ao salvar alimentos:', err);
       Alert.alert('Erro', 'Não foi possível salvar os alimentos.');
     },
   });
