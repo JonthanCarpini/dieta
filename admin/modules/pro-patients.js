@@ -136,24 +136,6 @@ export async function viewPatientDetails(patient) {
     if (hiddenId) hiddenId.value = patient.id;
     if (contentText) contentText.value = '';
 
-    const weightLabel = document.getElementById('detail-patient-weight');
-    const heightLabel = document.getElementById('detail-patient-height');
-    const goalLabel = document.getElementById('detail-patient-goal');
-    const caloriesLabel = document.getElementById('detail-patient-calories');
-    const waterStatus = document.getElementById('detail-water-status');
-    const fastingStatus = document.getElementById('detail-fasting-status');
-    const mealsBody = document.getElementById('detail-meals-table-body');
-    const weightHistoryBody = document.getElementById('detail-weight-history-body');
-    
-    if (weightLabel) weightLabel.innerText = patient.weight ? `${patient.weight} kg` : '-';
-    if (heightLabel) heightLabel.innerText = patient.height ? `${patient.height} cm` : '-';
-    if (goalLabel) goalLabel.innerText = patient.goal || '-';
-    if (caloriesLabel) caloriesLabel.innerText = patient.target_calories ? `${patient.target_calories} kcal` : '-';
-    if (waterStatus) waterStatus.innerText = 'Carregando...';
-    if (fastingStatus) fastingStatus.innerText = 'Carregando...';
-    if (mealsBody) mealsBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Carregando diário...</td></tr>`;
-    if (weightHistoryBody) weightHistoryBody.innerHTML = `<tr><td colspan="2" style="text-align: center; opacity: 0.5;">Carregando pesos...</td></tr>`;
-
     // Abre o workspace do paciente na aba "overview"
     if (window.openPatientWorkspace) window.openPatientWorkspace('overview');
 
