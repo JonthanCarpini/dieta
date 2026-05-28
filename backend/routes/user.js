@@ -992,4 +992,140 @@ router.get('/diario/historico', async (req, res) => {
   }
 });
 
+// ==========================================
+// RASTREADOR DE PASSOS E ATIVIDADES FÍSICAS
+// ==========================================
+router.get('/activity', async (req, res) => {
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+  try {
+    const activityRes = await db.query('SELECT * FROM activity_log WHERE user_id = $1 AND date = $2', [req.user.id, date]);
+    res.json(activityRes.rows[0] || { steps: 0, steps_target: 10000, steps_calories: 0.0, exercises: [], date });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar atividades.' });
+  }
+});
+
+router.post('/activity/steps', async (req, res) => {
+  const { date, steps, steps_target } = req.body;
+  if (!date || steps === undefined || steps_target === undefined) {
+    return res.status(400).json({ error: 'Parâmetros de passos inválidos.' });
+  }
+
+  try {
+    // Obter peso para cálculo preciso de calorias
+    const profileRes = await db.query('SELECT weight FROM profiles WHERE user_id = $1', [req.user.id]);
+    const weight = profileRes.rows[0]?.weight ? Number(profileRes.rows[0].weight) : 70;
+    
+    // Calorias por passo: 0.000628 * peso (kg)
+    const steps_calories = Math.round(steps * 0.000628 * weight * 10) / 10;
+
+    const activityRes = await db.query(`
+      INSERT INTO activity_log (user_id, date, steps, steps_target, steps_calories)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (user_id, date) DO UPDATE SET
+        steps = EXCLUDED.steps,
+        steps_target = EXCLUDED.steps_target,
+        steps_calories = EXCLUDED.steps_calories
+      RETURNING *
+    `, [req.user.id, date, steps, steps_target, steps_calories]);
+
+    res.json(activityRes.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar passos.' });
+  }
+});
+
+router.post('/activity/exercise', async (req, res) => {
+  const { date, name, duration_min, custom_calories, met } = req.body;
+  if (!date || !name || !duration_min) {
+    return res.status(400).json({ error: 'Parâmetros de exercício inválidos.' });
+  }
+
+  try {
+    // Obter peso para cálculo de MET
+    const profileRes = await db.query('SELECT weight FROM profiles WHERE user_id = $1', [req.user.id]);
+    const weight = profileRes.rows[0]?.weight ? Number(profileRes.rows[0].weight) : 70;
+
+    let calories = 0;
+    if (custom_calories !== undefined && custom_calories !== null && custom_calories !== '') {
+      calories = Number(custom_calories);
+    } else {
+      // Fórmula: MET * peso (kg) * (tempo / 60)
+      const currentMet = Number(met) || 4.0;
+      calories = Math.round(currentMet * weight * (Number(duration_min) / 60));
+    }
+
+    const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    const newExercise = {
+      name,
+      duration_min: Number(duration_min),
+      calories,
+      time
+    };
+
+    // Obter ou criar registro do dia
+    const activityRes = await db.query('SELECT * FROM activity_log WHERE user_id = $1 AND date = $2', [req.user.id, date]);
+    let exercises = [];
+    if (activityRes.rows[0]) {
+      exercises = typeof activityRes.rows[0].exercises === 'string' 
+        ? JSON.parse(activityRes.rows[0].exercises) 
+        : (activityRes.rows[0].exercises || []);
+    }
+    exercises.push(newExercise);
+
+    const updateRes = await db.query(`
+      INSERT INTO activity_log (user_id, date, exercises)
+      VALUES ($1, $2, $3::jsonb)
+      ON CONFLICT (user_id, date) DO UPDATE SET
+        exercises = EXCLUDED.exercises
+      RETURNING *
+    `, [req.user.id, date, JSON.stringify(exercises)]);
+
+    res.json(updateRes.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao adicionar exercício.' });
+  }
+});
+
+router.delete('/activity/exercise/:index', async (req, res) => {
+  const index = Number(req.params.index);
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+
+  if (isNaN(index)) {
+    return res.status(400).json({ error: 'Índice de exercício inválido.' });
+  }
+
+  try {
+    const activityRes = await db.query('SELECT * FROM activity_log WHERE user_id = $1 AND date = $2', [req.user.id, date]);
+    if (!activityRes.rows[0]) {
+      return res.status(404).json({ error: 'Nenhuma atividade registrada nesta data.' });
+    }
+
+    let exercises = typeof activityRes.rows[0].exercises === 'string'
+      ? JSON.parse(activityRes.rows[0].exercises)
+      : (activityRes.rows[0].exercises || []);
+
+    if (index < 0 || index >= exercises.length) {
+      return res.status(400).json({ error: 'Exercício não encontrado.' });
+    }
+
+    exercises.splice(index, 1);
+
+    const updateRes = await db.query(`
+      UPDATE activity_log 
+      SET exercises = $1::jsonb
+      WHERE user_id = $2 AND date = $3
+      RETURNING *
+    `, [JSON.stringify(exercises), req.user.id, date]);
+
+    res.json(updateRes.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remover exercício.' });
+  }
+});
+
 module.exports = router;

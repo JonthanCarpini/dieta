@@ -29,6 +29,23 @@ db.query(`
     ADD COLUMN IF NOT EXISTS health_goals TEXT DEFAULT ''
 `).catch((e) => console.error('Migration skip:', e.message));
 
+// One-time idempotent migration for activity tracking table
+db.query(`
+  CREATE TABLE IF NOT EXISTS activity_log (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    steps INTEGER DEFAULT 0,
+    steps_target INTEGER DEFAULT 10000,
+    steps_calories DECIMAL(6,1) DEFAULT 0.0,
+    exercises JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_user_date_activity UNIQUE (user_id, date)
+  );
+`).then(() => {
+  db.query(`CREATE INDEX IF NOT EXISTS idx_activity_log_user_date ON activity_log(user_id, date);`);
+}).catch((e) => console.error('Activity migration skip:', e.message));
+
 // Migration: Tabela de Alimentos (Banco TACO/TBCA)
 (async () => {
   try {
