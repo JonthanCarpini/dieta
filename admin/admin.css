@@ -1451,6 +1451,28 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     text-align: center;
 }
 .calorie-qty-input:focus { outline: none; border-color: var(--color-primary); }
+.taco-measures {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 4px 0 2px;
+}
+.taco-measure-btn {
+    background: rgba(var(--color-primary-rgb, 74,222,128), 0.08);
+    border: 1px solid rgba(var(--color-primary-rgb, 74,222,128), 0.2);
+    color: var(--color-primary);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.12s;
+    white-space: nowrap;
+}
+.taco-measure-btn:hover {
+    background: rgba(var(--color-primary-rgb, 74,222,128), 0.18);
+    border-color: var(--color-primary);
+}
 .plan-day-tabs {
     display: flex;
     gap: 4px;

@@ -528,25 +528,44 @@ export async function runTacoSearch() {
             results.innerHTML = '<p style="padding:8px;color:var(--color-text-muted);">Nenhum alimento encontrado. Tente o painel "Alimento Manual".</p>';
             return;
         }
-        results.innerHTML = data.items.map((food, idx) => `
+        results.innerHTML = data.items.map((food, idx) => {
+            const measuresHtml = (food.measures && food.measures.length > 0)
+                ? `<div class="taco-measures">
+                    ${food.measures.slice(0, 5).map(m =>
+                        `<button class="taco-measure-btn" data-taco-idx="${idx}" data-grams="${m.grams}" title="${m.grams}g">${m.label}</button>`
+                    ).join('')}
+                   </div>`
+                : '';
+            return `
             <div class="calorie-result-item" data-taco-idx="${idx}">
                 <div class="calorie-result-name">${food.name}</div>
-                <div class="calorie-result-meta">${food.category} · fonte: ${food.source}</div>
+                <div class="calorie-result-meta">${food.category} · ${food.source}</div>
                 <div class="calorie-result-macros">
                     <span class="usda-per100">por 100g:</span>
                     ${Math.round(food.energy_kcal)} kcal ·
                     P:${parseFloat(food.protein_g).toFixed(1)}g ·
                     C:${parseFloat(food.carbs_g).toFixed(1)}g ·
                     G:${parseFloat(food.fat_g).toFixed(1)}g
-                    ${food.fiber_g !== null ? `· Fibra:${parseFloat(food.fiber_g).toFixed(1)}g` : ''}
+                    ${food.fiber_g != null ? `· Fibra:${parseFloat(food.fiber_g).toFixed(1)}g` : ''}
                 </div>
-                <div class="calorie-result-actions" style="display:flex;align-items:center;gap:8px;">
+                ${measuresHtml}
+                <div class="calorie-result-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                     <input type="number" class="calorie-qty-input" value="100" min="1" max="2000" step="5" data-taco-idx="${idx}">
                     <span style="font-size:11px;color:var(--color-text-muted);">g</span>
                     <button class="btn-sm btn-primary taco-add-btn" data-taco-idx="${idx}">+ Adicionar</button>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
+
+        // Bind: medidas caseiras — preenche o campo de gramas ao clicar
+        results.querySelectorAll('.taco-measure-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.tacoIdx);
+                const grams = parseFloat(btn.dataset.grams) || 100;
+                const qtyInput = results.querySelector(`.calorie-qty-input[data-taco-idx="${idx}"]`);
+                if (qtyInput) qtyInput.value = grams;
+            });
+        });
 
         // Bind: add button
         results.querySelectorAll('.taco-add-btn').forEach(btn => {

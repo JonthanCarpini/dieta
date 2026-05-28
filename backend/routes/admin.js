@@ -382,25 +382,58 @@ Regras de saída:
 // BANCO DE ALIMENTOS TACO/TBCA (PROFISSIONAIS)
 // ==========================================
 
-// GET /admin/food-db?q=termo — busca de alimentos brasileiros
+// GET /admin/food-db?q=termo — busca de alimentos brasileiros (WebDiet 22k + personalizados)
 router.get('/food-db', requireRole(['admin', 'nutritionist', 'trainer']), async (req, res) => {
   const q = (req.query.q || '').trim();
   const limit = Math.min(parseInt(req.query.limit) || 15, 30);
   if (!q) return res.status(400).json({ error: 'Query obrigatória.' });
   try {
-    const result = await db.query(
-      `SELECT id, name, category, energy_kcal, protein_g, carbs_g, fat_g, fiber_g, source
-       FROM foods
-       WHERE name ILIKE $1
+    // Busca primária: tabela alimentos (WebDiet 22k foods)
+    const webResult = await db.query(
+      `SELECT id, nome AS name, COALESCE(grupo, 'Geral') AS category,
+              kcal AS energy_kcal, ptn AS protein_g, cho AS carbs_g, lip AS fat_g, fibras AS fiber_g,
+              COALESCE(origem, 'WebDiet') AS source
+       FROM alimentos
+       WHERE nome ILIKE $1 AND (tipo IS NULL OR tipo = 'alimento')
        ORDER BY
-         CASE WHEN LOWER(name) = LOWER($2) THEN 0
-              WHEN LOWER(name) LIKE LOWER($3) THEN 1
+         CASE WHEN LOWER(nome) = LOWER($2) THEN 0
+              WHEN LOWER(nome) LIKE LOWER($3) THEN 1
               ELSE 2 END,
-         name ASC
+         nome ASC
        LIMIT $4`,
       [`%${q}%`, q, `${q}%`, limit]
     );
-    res.json({ items: result.rows });
+
+    const items = webResult.rows;
+
+    // Complementa com alimentos personalizados se resultado for pequeno
+    if (items.length < limit) {
+      const customRes = await db.query(
+        `SELECT id, name, COALESCE(category,'Personalizado') AS category,
+                energy_kcal, protein_g, carbs_g, fat_g, fiber_g, source
+         FROM foods WHERE name ILIKE $1 ORDER BY name ASC LIMIT $2`,
+        [`%${q}%`, limit - items.length]
+      );
+      items.push(...customRes.rows);
+    }
+
+    // Busca medidas caseiras dos alimentos WebDiet
+    const webIds = webResult.rows.map(f => f.id);
+    const medidasMap = {};
+    if (webIds.length > 0) {
+      const medRes = await db.query(
+        `SELECT alimento_id, nome_mc, peso_g FROM medidas_caseiras WHERE alimento_id = ANY($1) ORDER BY peso_g ASC`,
+        [webIds]
+      );
+      medRes.rows.forEach(m => {
+        if (!medidasMap[m.alimento_id]) medidasMap[m.alimento_id] = [];
+        medidasMap[m.alimento_id].push({ label: m.nome_mc, grams: parseFloat(m.peso_g) });
+      });
+    }
+
+    items.forEach(item => { item.measures = medidasMap[item.id] || []; });
+
+    res.json({ items });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar alimentos.' });
