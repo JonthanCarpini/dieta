@@ -77,6 +77,12 @@ export default function AtividadesScreen() {
   const [exDuration, setExDuration] = useState('');
   const [exCustomCal, setExCustomCal] = useState('');
 
+  // Busca do histórico de atividades de hoje do backend
+  const { data: activity, isLoading, refetch } = useQuery<ActivityData>({
+    queryKey: ['activity-today'],
+    queryFn: () => api.get(`/user/activity?date=${today}`).then((r) => r.data),
+  });
+
   // Hook do Pedometer Nativo
   const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps, resetBaseSteps } = useStepCounter(activity?.steps ?? 0);
 
@@ -86,12 +92,6 @@ export default function AtividadesScreen() {
     queryFn: () => api.get('/user/profile').then((r) => r.data),
   });
   const weight = profileData?.profile?.weight ? Number(profileData.profile.weight) : 70;
-
-  // Busca do histórico de atividades de hoje do backend
-  const { data: activity, isLoading, refetch } = useQuery<ActivityData>({
-    queryKey: ['activity-today'],
-    queryFn: () => api.get(`/user/activity?date=${today}`).then((r) => r.data),
-  });
 
   // Mutação para atualizar passos no backend
   const saveStepsMutation = useMutation({
@@ -336,6 +336,39 @@ export default function AtividadesScreen() {
                 </View>
               ))
             )}
+          </View>
+        
+          {/* Painel de Debug */}
+          <View style={styles.debugCard}>
+            <Text style={styles.debugTitle}>🔧 Informações de Debug</Text>
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>OS:</Text>
+              <Text style={styles.debugValue}>{Platform.OS} (v{Platform.Version})</Text>
+            </View>
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>Pedômetro Disponível:</Text>
+              <Text style={styles.debugValue}>{isPedometerAvailable ? 'Sim' : 'Não'}</Text>
+            </View>
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>Status da Permissão:</Text>
+              <Text style={styles.debugValue}>{permissionStatus}</Text>
+            </View>
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>Passos do Sensor (sensorSteps):</Text>
+              <Text style={styles.debugValue}>{sensorSteps}</Text>
+            </View>
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>Erro do Sensor:</Text>
+              <Text style={[styles.debugValue, sensorError ? { color: '#EF4444' } : {}]}>{sensorError || 'Nenhum'}</Text>
+            </View>
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>Passos no Banco (DB):</Text>
+              <Text style={styles.debugValue}>{activity?.steps ?? 0}</Text>
+            </View>
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>Calorias Passos (DB):</Text>
+              <Text style={styles.debugValue}>{activity?.steps_calories ?? 0} kcal</Text>
+            </View>
           </View>
 
         </ScrollView>
@@ -609,4 +642,35 @@ const styles = StyleSheet.create({
   },
   typeBadgeText: { ...typography.caption, color: colors.textSecondary },
   typeBadgeTextActive: { color: colors.accentGreen, fontWeight: '700' },
+
+  // Debug styles
+  debugCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    gap: 8,
+  },
+  debugTitle: {
+    ...typography.body,
+    fontWeight: '700',
+    color: colors.accentYellow,
+    marginBottom: 4,
+  },
+  debugRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  debugLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  debugValue: {
+    ...typography.caption,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
 });
