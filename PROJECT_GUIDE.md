@@ -1120,3 +1120,63 @@ Implementamos a segunda fase de melhorias de controle de dieta e correções no 
 - Container Docker mantém versão antiga rodando se o novo build falha. Bug com `const` duplicado fez SyntaxError silencioso — a rota nova retornava 404 enquanto outras funcionavam.
 - **Build do APK Nativo local:** Sempre rodar `.\gradlew.bat assembleRelease` no diretório `nutrir-mobile/android` após ajustes de UI. Copie o APK final gerado para a pasta de distribuição da IDE (`C:\Users\admin\.gemini\antigravity-ide\brain\<conv-id>\nutrir-app.apk`) para disponibilizá-lo para download imediato.
 
+---
+
+## 17. Contador de Passos Nativo e Registro de Atividades Físicas (28/05/2026)
+
+Implementamos a funcionalidade completa de contagem de passos nativa (usando o sensor do celular) e gerenciamento de atividades físicas (exercícios) com cálculo automático de calorias gastas, integrada entre a aplicação mobile React Native e o backend Node.js.
+
+### 17.1. Banco de Dados e API do Backend
+
+1. **Nova Tabela no Banco de Dados (`activity_log`):**
+   Armazena o total de passos e a lista em formato JSONB de exercícios extras praticados no dia por cada usuário. Uma migração idempotente foi adicionada à inicialização em `backend/server.js`:
+   ```sql
+   CREATE TABLE IF NOT EXISTS activity_log (
+       id SERIAL PRIMARY KEY,
+       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+       date DATE NOT NULL,
+       steps INTEGER DEFAULT 0,
+       steps_target INTEGER DEFAULT 10000,
+       steps_calories NUMERIC DEFAULT 0,
+       exercises JSONB NOT NULL DEFAULT '[]',
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+       CONSTRAINT unique_user_date UNIQUE (user_id, date)
+   );
+   CREATE INDEX IF NOT EXISTS idx_activity_log_user_date ON activity_log(user_id, date);
+   ```
+
+2. **Rotas da API (`backend/routes/user.js`):**
+   - `GET /api/user/activity?date=YYYY-MM-DD`: Retorna as informações de passos e a lista de exercícios do dia especificado.
+   - `POST /api/user/activity/steps`: Atualiza a contagem de passos do dia. O backend calcula as calorias gastas pelos passos (`steps_calories`) usando o peso do perfil do usuário (ou fallback de 70kg) baseado na taxa MET média de caminhada (0.04 kcal por passo).
+   - `POST /api/user/activity/exercise`: Adiciona um exercício ao diário do dia. O backend calcula as calorias gastas a partir da fórmula MET (`calorias = MET * peso_kg * (duração_min / 60)`) ou aceita um valor de calorias personalizado inserido pelo usuário.
+   - `DELETE /api/user/activity/exercise/:index?date=YYYY-MM-DD`: Remove o exercício no índice fornecido da lista de atividades do dia especificado.
+
+---
+
+### 17.2. Aplicação Mobile (React Native)
+
+1. **Instalação do Expo Sensors:**
+   Adicionada a dependência `"expo-sensors": "~56.0.4"` para obter acesso à API de pedômetro do Android/iOS.
+
+2. **Hook de Sensor Nativo (`nutrir-mobile/src/hooks/useStepCounter.ts`):**
+   - Solicita permissões nativas de atividade física (`ACTIVITY_RECOGNITION` no Android / `Motion` no iOS).
+   - Consulta o número de passos desde a meia-noite do dia atual usando `Pedometer.getStepCountAsync(start, end)`.
+   - Adiciona um listener em tempo real via `Pedometer.watchStepCount` para recalcular o total de passos e sincronizá-lo sempre que o sensor registrar novas atividades enquanto o app estiver em primeiro plano.
+   - Fornece um mecanismo de fallback robusto para simulação ou dispositivos sem o sensor físico habilitado.
+
+3. **Tela de Atividades Físicas (`nutrir-mobile/app/atividades.tsx`):**
+   - **Anel de Progresso de Passos**: Renderiza um gráfico circular (SVG) que ilustra a porcentagem concluída da meta diária de passos.
+   - **Controle Manual**: Permite ao usuário ajustar seus passos manualmente via modal se o pedômetro não estiver ativo ou se o aparelho não possuir o sensor de passos.
+   - **Controle de Exercícios**: Permite adicionar exercícios adicionais com uma lista de presets categorizados (Musculação, Corrida, Caminhada, Ciclismo, Natação, Ioga, Pilates, Dança, Outro).
+   - **Cálculo com Base no Perfil**: As calorias estimadas utilizam o peso cadastrado no perfil do paciente (`/user/profile`) de forma automática na visualização prévia da adição.
+   - **Listagem e Exclusão**: Exibe os exercícios em formato de card, com detalhes de tempo e calorias queimadas, permitindo a exclusão imediata pelo ícone de lixeira.
+
+4. **Integração no Dashboard Principal (`nutrir-mobile/app/(tabs)/index.tsx`):**
+   - **Cálculo de Calorias Líquidas**: Subtrai o total de calorias queimadas (passos + exercícios extras) do consumo calórico diário de alimentos, exibindo o saldo em formato de calorias líquidas:
+     $$\text{Calorias Líquidas} = \text{Calorias Consumidas} - \text{Calorias Queimadas}$$
+   - **Ring Calórico e Alertas**: O `CalorieRing` e o banner de notificações de meta agora reagem em tempo real às calorias líquidas atualizadas.
+   - **Card de Atividades**: Adicionado o componente `activityCardHome` logo abaixo do rastreador de água, resumindo os passos do dia, total de calorias queimadas e número de exercícios realizados, servindo como atalho para a tela `/atividades`.
+   - **Sincronização**: Invalida automaticamente a query `daily-summary` no TanStack Query após qualquer inclusão/exclusão de exercício ou alteração de passos para atualizar os cards imediatamente.
+
+
