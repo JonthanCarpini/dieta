@@ -555,10 +555,9 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     background: var(--bg);
 }
 
-/* Patient tab panels */
+/* Patient tab panels — only .active is shown */
 .patient-tab-content-panel { display: none; }
-.patient-tab-content-panel.active,
-.patient-tab-content-panel:not(.hidden) { display: block; }
+.patient-tab-content-panel.active { display: block; }
 
 /* ==========================================================
    PAGE HEADERS
@@ -1274,6 +1273,356 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
    ========================================================== */
 @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
 .spinner { animation: spin 1s linear infinite; }
+
+/* ==========================================================
+   PATIENT WORKSPACE — PAGE LAYOUTS
+   ========================================================== */
+
+/* Cabeçalho padrão de página do paciente */
+.pp-header {
+    margin-bottom: 28px;
+}
+.pp-header h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin: 0 0 4px;
+}
+.pp-header p {
+    font-size: 13px;
+    color: var(--text-2);
+    margin: 0;
+}
+.pp-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+.pp-header-row h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin: 0 0 4px;
+}
+.pp-header-row p {
+    font-size: 13px;
+    color: var(--text-2);
+    margin: 0;
+}
+
+/* Grid de cards de resumo */
+.pp-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.pp-summary-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.pp-summary-card.accent-border { border-color: rgba(245,193,77,0.25); }
+.pp-summary-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-3);
+}
+.pp-summary-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+.pp-summary-value small { font-size: 11px; font-weight: 400; color: var(--text-2); }
+.pp-summary-value.accent { color: var(--accent); }
+.pp-summary-value.green  { color: #4ade80; }
+.pp-summary-value.red    { color: #f87171; }
+.pp-summary-sub {
+    font-size: 11px;
+    color: var(--text-2);
+}
+
+/* Bloco de seção com card */
+.pp-section {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 20px;
+}
+.pp-section + .pp-section { }
+.pp-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-2);
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pp-section-title i, .pp-section-title svg { width: 14px; height: 14px; color: var(--accent); }
+
+/* Diário - day accordion */
+.diary-day-block {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+.diary-day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-surface-alt);
+    cursor: pointer;
+    user-select: none;
+    gap: 12px;
+}
+.diary-day-header:hover { background: var(--bg-hover); }
+.diary-day-date {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.diary-day-date i, .diary-day-date svg { width: 13px; height: 13px; color: var(--accent); }
+.diary-day-macro-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.diary-macro-pill {
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--mono);
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--bg-hover);
+    color: var(--text-2);
+}
+.diary-macro-pill.kcal { background: var(--accent-dim); color: var(--accent); }
+.diary-day-meals {
+    display: none;
+    border-top: 1px solid var(--border);
+}
+.diary-day-block.expanded .diary-day-meals { display: block; }
+.diary-meal-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.diary-meal-row:last-child { border-bottom: none; }
+.diary-meal-row:hover { background: var(--bg-surface-alt); }
+.diary-meal-time {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text-2);
+    width: 38px;
+    flex-shrink: 0;
+}
+.diary-meal-type-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--bg-hover);
+    color: var(--text-2);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.diary-meal-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.diary-meal-kcal {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--accent);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Ficha Clínica - info display */
+.clinical-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+@media (max-width: 900px) { .clinical-info-grid { grid-template-columns: 1fr; } }
+.clinical-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.clinical-field label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-2);
+}
+.clinical-field.span2 { grid-column: span 2; }
+
+/* Antropometria - progress indicators */
+.meas-stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.meas-stat-card {
+    background: var(--bg-surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+}
+.meas-stat-card .label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); margin-bottom: 6px; }
+.meas-stat-card .value { font-size: 20px; font-weight: 800; color: var(--text); }
+.meas-stat-card .unit  { font-size: 11px; color: var(--text-2); }
+
+/* Prescrições - feedback items */
+.feedback-item {
+    background: var(--bg-surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+}
+.feedback-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.feedback-item-date {
+    font-size: 11px;
+    color: var(--text-2);
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.feedback-item-body {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.65;
+    white-space: pre-wrap;
+}
+
+/* Exames - file card */
+.exam-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+}
+.exam-card-icon {
+    width: 38px; height: 38px;
+    background: var(--accent-dim);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--accent);
+}
+.exam-card-icon i, .exam-card-icon svg { width: 18px; height: 18px; }
+.exam-card-info { flex: 1; min-width: 0; }
+.exam-card-name { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exam-card-date { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+.exam-card-note { width: 200px; flex-shrink: 0; }
+.exam-card-actions { flex-shrink: 0; }
+
+/* Adherence bar */
+.adherence-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.adherence-track { flex: 1; height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
+.adherence-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s; }
+.adherence-fill.good { background: #4ade80; }
+.adherence-fill.over { background: #f87171; }
+.adherence-pct { font-size: 12px; font-weight: 700; font-family: var(--mono); color: var(--text-2); width: 36px; text-align: right; }
+
+/* Feedback history items (rendered by loadFeedbackHistory JS) */
+.fhi-item {
+    background: var(--bg-surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+.fhi-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.fhi-date {
+    font-size: 11px;
+    color: var(--text-2);
+    font-family: var(--mono);
+}
+.fhi-body {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.65;
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+/* Clinical form inputs */
+.clinical-field input,
+.clinical-field textarea {
+    background: var(--bg-surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 9px 12px;
+    font-size: 13px;
+    font-family: var(--font);
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.18s;
+}
+.clinical-field input:focus,
+.clinical-field textarea:focus { outline: none; border-color: var(--accent); }
+
+/* patient-main scrollbar */
+.patient-main::-webkit-scrollbar { width: 6px; }
+.patient-main::-webkit-scrollbar-track { background: transparent; }
+.patient-main::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+.patient-main::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
 /* ==========================================================
    RESPONSIVE

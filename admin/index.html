@@ -811,63 +811,76 @@
                 <!-- Área principal do paciente -->
                 <main class="patient-main">
 
-                    <!-- PAINEL: VISÃO GERAL -->
+                    <!-- ══════════════════════════════════════════
+                         PAINEL 1: VISÃO GERAL
+                    ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel active" id="patient-tab-content-overview">
-                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Visão Geral</h2>
-                        <p class="description" style="margin-bottom:24px;">Evolução de peso e status atual do paciente</p>
-
-                        <div class="weight-chart-wrap" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;">
-                            <h3 style="margin:0 0 16px;font-size:14px;font-weight:600;color:var(--text-muted);">EVOLUÇÃO DE PESO</h3>
-                            <canvas id="detail-weight-chart"></canvas>
-                            <p id="detail-weight-empty" class="description" style="display:none;text-align:center;padding:16px;">Nenhum peso registrado ainda.</p>
+                        <div class="pp-header">
+                            <h1>Visão Geral</h1>
+                            <p>Evolução de peso e status de hoje do paciente</p>
                         </div>
 
-                        <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);">
-                            <div class="stat-card" style="padding:14px;">
-                                <div class="stat-icon bg-blue" style="width:36px;height:36px;font-size:16px;"><i data-lucide="droplet"></i></div>
-                                <div class="stat-details">
-                                    <span class="stat-label">Água (Hoje)</span>
-                                    <h4 id="detail-water-status" style="font-size:16px;font-weight:600;margin:0;">0 / 2500 ml</h4>
-                                </div>
+                        <!-- Cards de resumo rápido -->
+                        <div class="pp-summary-grid" style="grid-template-columns:repeat(2,1fr);">
+                            <div class="pp-summary-card">
+                                <span class="pp-summary-label">Água consumida (hoje)</span>
+                                <span class="pp-summary-value" id="detail-water-status" style="font-size:18px;">—</span>
                             </div>
-                            <div class="stat-card" style="padding:14px;">
-                                <div class="stat-icon bg-purple" style="width:36px;height:36px;font-size:16px;"><i data-lucide="timer"></i></div>
-                                <div class="stat-details">
-                                    <span class="stat-label">Jejum Ativo</span>
-                                    <h4 id="detail-fasting-status" style="font-size:16px;font-weight:600;margin:0;">Não ativo</h4>
-                                </div>
+                            <div class="pp-summary-card">
+                                <span class="pp-summary-label">Jejum intermitente</span>
+                                <span class="pp-summary-value" id="detail-fasting-status" style="font-size:18px;">Não ativo</span>
+                            </div>
+                        </div>
+
+                        <!-- Gráfico de evolução de peso -->
+                        <div class="pp-section">
+                            <div class="pp-section-title">
+                                <i data-lucide="trending-up"></i> Evolução de Peso
+                            </div>
+                            <div style="position:relative; min-height:200px;">
+                                <canvas id="detail-weight-chart" style="width:100%;"></canvas>
+                                <p id="detail-weight-empty" style="display:none;text-align:center;padding:40px 16px;color:var(--text-2);font-size:13px;">
+                                    Nenhum registro de peso encontrado ainda.
+                                </p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- PAINEL: DIÁRIO ALIMENTAR -->
+                    <!-- ══════════════════════════════════════════
+                         PAINEL 2: DIÁRIO ALIMENTAR
+                    ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel" id="patient-tab-content-diary">
-                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Diário Alimentar</h2>
-                        <p class="description" style="margin-bottom:24px;">Histórico de refeições, consumo de água e jejum intermitente</p>
-
-                        <div class="diary-filter-bar margin-top-md">
-                            <span class="diary-filter-label">Período:</span>
-                            <div class="diary-filter-btns">
+                        <!-- Cabeçalho + filtros -->
+                        <div class="pp-header-row">
+                            <div>
+                                <h1>Diário Alimentar</h1>
+                                <p>Refeições registradas pelo paciente no app</p>
+                            </div>
+                            <div class="diary-filter-btns" style="flex-shrink:0;">
                                 <button class="diary-filter-btn active" data-days="7">7 dias</button>
                                 <button class="diary-filter-btn" data-days="30">30 dias</button>
                                 <button class="diary-filter-btn" data-days="0">Tudo</button>
                             </div>
-                            <div class="diary-adherence-info" id="diary-adherence-info" style="display:none;">
-                                <span>Aderência calórica:</span>
-                                <strong id="detail-caloric-adherence">-</strong>
+                        </div>
+
+                        <!-- Barra de aderência calórica -->
+                        <div id="diary-adherence-info" class="pp-section" style="display:none; padding:14px 20px; margin-bottom:16px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;">
+                                <span style="font-size:12px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:0.06em;">Aderência Calórica Média</span>
+                                <strong id="detail-caloric-adherence" style="font-size:22px; font-weight:800; color:var(--accent); font-family:var(--mono);">—</strong>
                             </div>
                         </div>
 
-                        <h3 class="margin-top-md">Refeições Registradas</h3>
-                        <div class="table-responsive margin-top-md" style="max-height:400px;overflow-y:auto;">
-                            <table class="data-table">
+                        <!-- Refeições — preenchido pelo JS -->
+                        <div class="pp-section" style="padding:0; overflow:hidden;">
+                            <table class="data-table" style="margin:0;">
                                 <thead>
                                     <tr>
-                                        <th>Data / Hora</th>
-                                        <th>Refeição</th>
-                                        <th>Tipo</th>
-                                        <th>Calorias</th>
-                                        <th>Macros (C/P/G)</th>
+                                        <th style="padding:12px 16px;">Data / Hora</th>
+                                        <th style="padding:12px 16px;">Refeição</th>
+                                        <th style="padding:12px 16px;">Tipo</th>
+                                        <th style="padding:12px 16px;">Calorias</th>
+                                        <th style="padding:12px 16px;">Macros (C / P / G)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="detail-meals-table-body"></tbody>
@@ -875,169 +888,207 @@
                         </div>
                     </div>
 
-                    <!-- PAINEL: FICHA CLÍNICA -->
+                    <!-- ══════════════════════════════════════════
+                         PAINEL 3: FICHA CLÍNICA
+                    ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel" id="patient-tab-content-clinical">
-                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Ficha Clínica</h2>
-                        <p class="description" style="margin-bottom:24px;">Comorbidades, intolerâncias alimentares e anotações médicas relevantes</p>
+                        <div class="pp-header">
+                            <h1>Ficha Clínica</h1>
+                            <p>Condições de saúde, intolerâncias e anotações médicas</p>
+                        </div>
 
-                        <form id="pro-patient-clinical-form" style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
-                            <div class="form-group">
-                                <label for="pro-clinical-comorbidities">Comorbidades / Condições de Saúde</label>
-                                <input type="text" id="pro-clinical-comorbidities" placeholder="Ex: Diabetes Tipo 2, Hipertensão, Gastrite...">
+                        <form id="pro-patient-clinical-form">
+                            <!-- Seção: Condições -->
+                            <div class="pp-section" style="margin-bottom:16px;">
+                                <div class="pp-section-title"><i data-lucide="activity"></i> Condições de Saúde</div>
+                                <div class="clinical-info-grid">
+                                    <div class="clinical-field">
+                                        <label for="pro-clinical-comorbidities">Comorbidades</label>
+                                        <input type="text" id="pro-clinical-comorbidities" placeholder="Ex: Diabetes Tipo 2, Hipertensão, Gastrite...">
+                                    </div>
+                                    <div class="clinical-field">
+                                        <label for="pro-clinical-intolerances">Intolerâncias e Alergias</label>
+                                        <input type="text" id="pro-clinical-intolerances" placeholder="Ex: Lactose, Glúten, Amendoim...">
+                                    </div>
+                                    <div class="clinical-field span2">
+                                        <label for="pro-clinical-restrictions">Restrições / Preferências Alimentares</label>
+                                        <input type="text" id="pro-clinical-restrictions" placeholder="Ex: Vegano, Vegetariano, Sem carne vermelha...">
+                                    </div>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="pro-clinical-intolerances">Intolerâncias e Alergias Alimentares</label>
-                                <input type="text" id="pro-clinical-intolerances" placeholder="Ex: Lactose, Glúten, Amendoim, Frutos do mar...">
+
+                            <!-- Seção: Anotações -->
+                            <div class="pp-section" style="margin-bottom:20px;">
+                                <div class="pp-section-title"><i data-lucide="file-text"></i> Anotações Clínicas</div>
+                                <textarea id="pro-clinical-notes" placeholder="Escreva aqui observações gerais, histórico, evolução do tratamento..." style="width:100%; height:140px; background:var(--bg-surface-alt); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:12px 14px; font-size:13px; font-family:var(--font); resize:vertical; box-sizing:border-box; line-height:1.6;"></textarea>
                             </div>
-                            <div class="form-group">
-                                <label for="pro-clinical-restrictions">Restrições Alimentares / Preferências</label>
-                                <input type="text" id="pro-clinical-restrictions" placeholder="Ex: Vegano, Vegetariano, Sem carne vermelha...">
-                            </div>
-                            <div class="form-group">
-                                <label for="pro-clinical-notes">Observações Clínicas e Anotações Gerais</label>
-                                <textarea id="pro-clinical-notes" placeholder="Digite anotações adicionais..." style="height:120px;resize:vertical;"></textarea>
-                            </div>
-                            <div>
+
+                            <div style="display:flex; align-items:center; gap:12px;">
                                 <button type="submit" class="btn-primary">
-                                    <i data-lucide="save" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"></i>
+                                    <i data-lucide="save" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"></i>
                                     Salvar Ficha Clínica
                                 </button>
+                                <div id="clinical-success-msg" class="success-banner hidden">Ficha clínica salva!</div>
                             </div>
                         </form>
-                        <div id="clinical-success-msg" class="success-banner hidden" style="margin-top:10px;">Ficha clínica salva com sucesso!</div>
                     </div>
 
-                    <!-- PAINEL: EXAMES -->
+                    <!-- ══════════════════════════════════════════
+                         PAINEL 4: EXAMES
+                    ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel" id="patient-tab-content-exams">
-                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Exames Laboratoriais</h2>
-                        <p class="description" style="margin-bottom:24px;">Visualize exames enviados pelo paciente e adicione notas clínicas específicas</p>
+                        <div class="pp-header">
+                            <h1>Exames Laboratoriais</h1>
+                            <p>Arquivos enviados pelo paciente — adicione notas clínicas específicas</p>
+                        </div>
 
-                        <div class="table-responsive" style="max-height:400px;overflow-y:auto;">
-                            <table class="data-table">
+                        <!-- Exames em cards — preenchido pelo JS (mantém tbody para compatibilidade) -->
+                        <div class="pp-section" style="padding:0; overflow:hidden;">
+                            <table class="data-table" style="margin:0;">
                                 <thead>
                                     <tr>
-                                        <th>Arquivo</th>
-                                        <th>Data de Envio</th>
-                                        <th>Anotações do Nutricionista</th>
-                                        <th>Ações</th>
+                                        <th style="padding:12px 16px;">Arquivo</th>
+                                        <th style="padding:12px 16px;">Data de Envio</th>
+                                        <th style="padding:12px 16px;">Anotações do Nutricionista</th>
+                                        <th style="padding:12px 16px;">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody id="pro-patient-exams-table-body">
-                                    <tr><td colspan="4" style="text-align:center;color:var(--color-text-muted);padding:20px;">Nenhum exame enviado por este paciente.</td></tr>
+                                    <tr><td colspan="4" style="text-align:center;color:var(--text-2);padding:32px;">Nenhum exame enviado por este paciente.</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                    <!-- PAINEL: ANTROPOMETRIA -->
+                    <!-- ══════════════════════════════════════════
+                         PAINEL 5: ANTROPOMETRIA
+                    ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel" id="patient-tab-content-measurements">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                        <div class="pp-header-row">
                             <div>
-                                <h2 style="margin:0;font-size:20px;font-weight:700;">Antropometria</h2>
-                                <p class="description" style="margin:4px 0 0;">Evolução das medidas corporais ao longo do tempo</p>
+                                <h1>Antropometria</h1>
+                                <p>Evolução das medidas corporais ao longo do tratamento</p>
                             </div>
-                            <button class="btn-primary btn-sm" id="btn-toggle-meas-form" style="white-space:nowrap;">
-                                <i data-lucide="plus" style="width:14px;height:14px;"></i> Nova Medição
+                            <button class="btn-primary" id="btn-toggle-meas-form">
+                                <i data-lucide="plus" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"></i> Nova Medição
                             </button>
                         </div>
 
-                        <div id="meas-form-wrap" class="hidden" style="background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">
-                            <h4 style="margin:0 0 16px;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;">Nova Avaliação</h4>
+                        <!-- Formulário de nova medição -->
+                        <div id="meas-form-wrap" class="hidden pp-section" style="margin-bottom:20px;">
+                            <div class="pp-section-title"><i data-lucide="ruler"></i> Nova Avaliação</div>
                             <form id="patient-meas-form">
-                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
-                                    <div class="form-group" style="margin:0;">
-                                        <label>Data da Avaliação</label>
-                                        <input type="date" id="meas-date" required>
-                                    </div>
-                                    <div class="form-group" style="margin:0;">
-                                        <label>Peso (kg)</label>
-                                        <input type="number" id="meas-weight" step="0.1" min="0" placeholder="Ex: 72.5">
-                                    </div>
-                                    <div class="form-group" style="margin:0;">
-                                        <label>Altura (cm)</label>
-                                        <input type="number" id="meas-height" step="0.1" min="0" placeholder="Ex: 168">
-                                    </div>
+                                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
+                                    <div class="form-group" style="margin:0;"><label>Data da Avaliação</label><input type="date" id="meas-date" required></div>
+                                    <div class="form-group" style="margin:0;"><label>Peso (kg)</label><input type="number" id="meas-weight" step="0.1" min="0" placeholder="Ex: 72.5"></div>
+                                    <div class="form-group" style="margin:0;"><label>Altura (cm)</label><input type="number" id="meas-height" step="0.1" min="0" placeholder="Ex: 168"></div>
                                 </div>
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-                                    <div class="form-group" style="margin:0;">
-                                        <label>% Gordura Corporal</label>
-                                        <input type="number" id="meas-fat" step="0.1" min="0" max="80" placeholder="Ex: 22.5">
-                                    </div>
-                                    <div class="form-group" style="margin:0;">
-                                        <label>Massa Muscular (kg)</label>
-                                        <input type="number" id="meas-muscle" step="0.1" min="0" placeholder="Ex: 35.2">
-                                    </div>
+                                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px;">
+                                    <div class="form-group" style="margin:0;"><label>% Gordura Corporal</label><input type="number" id="meas-fat" step="0.1" min="0" max="80" placeholder="Ex: 22.5"></div>
+                                    <div class="form-group" style="margin:0;"><label>Massa Muscular (kg)</label><input type="number" id="meas-muscle" step="0.1" min="0" placeholder="Ex: 35.2"></div>
                                 </div>
-                                <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px;">
-                                    <div class="form-group" style="margin:0;"><label>Cintura (cm)</label><input type="number" id="meas-waist" step="0.1" min="0" placeholder="80"></div>
-                                    <div class="form-group" style="margin:0;"><label>Quadril (cm)</label><input type="number" id="meas-hip" step="0.1" min="0" placeholder="95"></div>
-                                    <div class="form-group" style="margin:0;"><label>Tórax (cm)</label><input type="number" id="meas-chest" step="0.1" min="0" placeholder="90"></div>
-                                    <div class="form-group" style="margin:0;"><label>Braço (cm)</label><input type="number" id="meas-arm" step="0.1" min="0" placeholder="30"></div>
-                                    <div class="form-group" style="margin:0;"><label>Coxa (cm)</label><input type="number" id="meas-thigh" step="0.1" min="0" placeholder="52"></div>
+                                <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px;">
+                                    <div class="form-group" style="margin:0;"><label>Cintura</label><input type="number" id="meas-waist" step="0.1" min="0" placeholder="80"></div>
+                                    <div class="form-group" style="margin:0;"><label>Quadril</label><input type="number" id="meas-hip" step="0.1" min="0" placeholder="95"></div>
+                                    <div class="form-group" style="margin:0;"><label>Tórax</label><input type="number" id="meas-chest" step="0.1" min="0" placeholder="90"></div>
+                                    <div class="form-group" style="margin:0;"><label>Braço</label><input type="number" id="meas-arm" step="0.1" min="0" placeholder="30"></div>
+                                    <div class="form-group" style="margin:0;"><label>Coxa</label><input type="number" id="meas-thigh" step="0.1" min="0" placeholder="52"></div>
                                 </div>
-                                <div class="form-group" style="margin-bottom:12px;">
+                                <div class="form-group" style="margin-bottom:14px;">
                                     <label>Observações</label>
-                                    <textarea id="meas-notes" placeholder="Anotações sobre a avaliação..." style="height:64px;resize:vertical;"></textarea>
+                                    <textarea id="meas-notes" placeholder="Anotações sobre esta avaliação..." style="height:64px;resize:vertical;"></textarea>
                                 </div>
                                 <div style="display:flex;gap:8px;justify-content:flex-end;">
-                                    <button type="button" class="btn-secondary btn-sm" id="btn-cancel-meas-form">Cancelar</button>
-                                    <button type="submit" class="btn-primary btn-sm">
-                                        <i data-lucide="save" style="width:13px;height:13px;"></i> Salvar Medição
+                                    <button type="button" class="btn-secondary" id="btn-cancel-meas-form">Cancelar</button>
+                                    <button type="submit" class="btn-primary">
+                                        <i data-lucide="save" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px;"></i> Salvar Medição
                                     </button>
                                 </div>
                             </form>
                         </div>
 
-                        <div class="table-responsive" style="max-height:420px;overflow-y:auto;">
-                            <table class="data-table" id="meas-history-table">
+                        <!-- Histórico de medições -->
+                        <div class="pp-section" style="padding:0; overflow:hidden;">
+                            <table class="data-table" id="meas-history-table" style="margin:0;">
                                 <thead>
                                     <tr>
-                                        <th>Data</th><th>Peso</th><th>IMC</th><th>% Gord.</th>
-                                        <th>M. Musc.</th><th>Cintura</th><th>Quadril</th>
-                                        <th>RCQ</th><th>Tórax</th><th>Braço</th><th>Coxa</th><th></th>
+                                        <th style="padding:12px 16px;">Data</th>
+                                        <th style="padding:12px 16px;">Peso</th>
+                                        <th style="padding:12px 16px;">IMC</th>
+                                        <th style="padding:12px 16px;">% Gord.</th>
+                                        <th style="padding:12px 16px;">M. Muscular</th>
+                                        <th style="padding:12px 16px;">Cintura</th>
+                                        <th style="padding:12px 16px;">Quadril</th>
+                                        <th style="padding:12px 16px;">RCQ</th>
+                                        <th style="padding:12px 16px;">Tórax</th>
+                                        <th style="padding:12px 16px;">Braço</th>
+                                        <th style="padding:12px 16px;">Coxa</th>
+                                        <th style="padding:12px 16px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="meas-history-body">
-                                    <tr><td colspan="12" style="text-align:center;color:var(--color-text-muted);padding:20px;">Nenhuma medição registrada.</td></tr>
+                                    <tr><td colspan="12" style="text-align:center;color:var(--text-2);padding:32px;">Nenhuma medição registrada.</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                    <!-- PAINEL: CARDÁPIO DO PACIENTE -->
+                    <!-- ══════════════════════════════════════════
+                         PAINEL 6: CARDÁPIO DO PACIENTE
+                    ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel" id="patient-tab-content-meal-plan">
-                        <div style="text-align:center;padding:40px;color:var(--color-text-muted);">
-                            <p style="font-size:13px;">Carregando planos alimentares do paciente...</p>
+                        <!-- Preenchido dinamicamente pelo JS (_loadPatientMealPlansInTab) -->
+                        <div style="display:flex;align-items:center;justify-content:center;padding:60px 20px;color:var(--text-2);">
+                            <span style="font-size:13px;">Selecione "Cardápio" na barra lateral para carregar os planos.</span>
                         </div>
                     </div>
 
-                    <!-- PAINEL: CÁLCULO ENERGÉTICO -->
+                    <!-- ══════════════════════════════════════════
+                         PAINEL 7: CÁLCULO ENERGÉTICO
+                    ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel" id="patient-tab-content-energy">
-                        <div style="text-align:center;padding:40px;color:var(--color-text-muted);">
-                            <p style="font-size:13px;">Carregando calculador de TMB e GET...</p>
+                        <!-- Preenchido dinamicamente pelo JS (renderEnergyCalcTab) -->
+                        <div style="display:flex;align-items:center;justify-content:center;padding:60px 20px;color:var(--text-2);">
+                            <span style="font-size:13px;">Selecione "Cálculo Energético" na barra lateral para abrir a calculadora.</span>
                         </div>
                     </div>
 
-                    <!-- PAINEL: PRESCRIÇÕES / FEEDBACK -->
+                    <!-- ══════════════════════════════════════════
+                         PAINEL 8: PRESCRIÇÕES / FEEDBACK
+                    ═══════════════════════════════════════════ -->
                     <div class="patient-tab-content-panel" id="patient-tab-content-feedback">
-                        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;">Prescrições e Orientações</h2>
-                        <p class="description" style="margin-bottom:24px;">Envie orientações diretamente para o app do paciente</p>
+                        <div class="pp-header">
+                            <h1>Prescrições e Orientações</h1>
+                            <p>Envie orientações diretamente para o app do paciente</p>
+                        </div>
 
-                        <form id="patient-feedback-form" style="max-width:720px;margin-bottom:32px;">
-                            <input type="hidden" id="feedback-patient-id">
-                            <div class="form-group">
-                                <label for="feedback-content">Nova Prescrição / Mensagem</label>
-                                <textarea id="feedback-content" placeholder="Escreva aqui as orientações, plano alimentar ou sugestões de treino..." style="height:150px;" required></textarea>
-                            </div>
-                            <button type="submit" class="btn-primary">Enviar para o Painel do Paciente</button>
-                        </form>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start;">
 
-                        <div id="feedback-history-section">
-                            <div class="feedback-history-header">
-                                <h3>Orientações Enviadas</h3>
-                                <span id="feedback-history-count" class="feedback-history-badge"></span>
+                            <!-- Coluna esquerda: Composição -->
+                            <div class="pp-section">
+                                <div class="pp-section-title"><i data-lucide="send"></i> Nova Prescrição</div>
+                                <form id="patient-feedback-form">
+                                    <input type="hidden" id="feedback-patient-id">
+                                    <textarea id="feedback-content"
+                                        placeholder="Escreva as orientações, plano alimentar, sugestões de treino ou observações para o paciente..."
+                                        style="width:100%; height:200px; background:var(--bg-surface-alt); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:14px; font-size:13px; font-family:var(--font); resize:vertical; box-sizing:border-box; line-height:1.65;"
+                                        required></textarea>
+                                    <button type="submit" class="btn-primary w-full" style="margin-top:12px;">
+                                        <i data-lucide="send" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"></i>
+                                        Enviar para o Paciente
+                                    </button>
+                                </form>
                             </div>
-                            <div id="feedback-history-list" class="feedback-history-list margin-top-md"></div>
+
+                            <!-- Coluna direita: Histórico -->
+                            <div class="pp-section">
+                                <div class="pp-section-title" style="justify-content:space-between;">
+                                    <span style="display:flex;align-items:center;gap:8px;"><i data-lucide="history"></i> Orientações Enviadas</span>
+                                    <span id="feedback-history-count" class="feedback-history-badge"></span>
+                                </div>
+                                <div id="feedback-history-list" style="max-height:440px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
+                            </div>
+
                         </div>
                     </div>
 
