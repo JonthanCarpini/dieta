@@ -1051,7 +1051,72 @@ Set-Location "C:\Users\admin\Desktop\Dieta\nutrir-mobile\android"
 6. **Galeria adicionada ao scanner** — botão `ImagePicker.launchImageLibraryAsync` ao lado do botão de captura
 7. **Suporte à Safe Area Bottom nas telas avulsas e rodapés:** Adicionado suporte a `edges={['top', 'bottom']}` nas `SafeAreaView` de todas as telas avulsas e cálculo dinâmico com `useSafeAreaInsets()` nos rodapés/modais (`scan-results.tsx` e `add-food.tsx`) para evitar que botões ou campos fossem cobertos pela barra de navegação/ações nativa do Android.
 
-### 14.8. Memória/contexto importante
+---
+
+## 15. Novas Melhorias e Ajustes Mobile (28/05/2026)
+
+Após a resolução do crash do scanner, implementamos um conjunto de quatro melhorias críticas de usabilidade e integração na aplicação mobile:
+
+### 15.1. Altura do Menu do Rodapé (Tab Bar) no Android
+- **Arquivos**: `nutrir-mobile/app/(tabs)/_layout.tsx`
+- **Problema**: O fallback de `20` dp quando `insets.bottom` retornava `0` (comum no Android com navegação virtual de botões) fazia com que o sistema cobrisse metade dos textos "Diário", "Receitas", "Pro", "Clínico".
+- **Correção**: Aumentamos o fallback de compensação da barra virtual do sistema para `36` no Android. Os botões e rótulos agora sobem o suficiente e ficam totalmente legíveis.
+
+### 15.2. Modal de Detalhes da Refeição & Sincronização Local
+- **Arquivos**: `nutrir-mobile/app/(tabs)/index.tsx`, `nutrir-mobile/src/components/WaterTracker.tsx`
+- **Problema**: 
+  - Ao clicar nas refeições cadastradas no diário, nada acontecia. Além disso, a hidratação diária exibia `0.0L` constantemente devido ao fuso horário UTC (`new Date().toISOString()`) que salvava os registros na data do dia seguinte de madrugada.
+- **Correção**:
+  - Implementamos uma função utilitária para capturar a data local do dispositivo no formato `YYYY-MM-DD` (`getLocalDateString`).
+  - Adaptamos as requisições de diário e hidratação para usarem o fuso local do aparelho do usuário.
+  - Modificamos a query de refeições (`daily-summary`) para reter toda a estrutura de macros e pesos individuais de cada alimento ingerido.
+  - Tornamos o `MealCard` clicável, abrindo um modal interativo completo que resume o total de macros consumidos na refeição e lista os alimentos com pesos (g) e calorias e macros individualizados.
+  - Adicionamos logs de erro detalhados (`console.error`) no GET e POST do `WaterTracker` para melhor depuração local.
+
+### 15.3. Edição Local de Alimentos no Scanner & Destaque de Calorias
+- **Arquivos**: `nutrir-mobile/app/scan-results.tsx`
+- **Problema**: Os alimentos identificados pela IA não eram editáveis antes de salvar no diário, e o total de calorias ficava discreto no canto da tela.
+- **Correção**:
+  - Convertemos a lista de alimentos para um estado editável (`useState`).
+  - Adicionamos um ícone de lápis de edição em cada alimento. Ao clicar, abre-se um modal de edição (`EditFoodModal`) contendo campos de texto para nome, calorias, macros e peso (com botões de ajuste fino `-50g`, `-10g`, `+10g`, `+50g` que recalculam todos os macros proporcionalmente de forma automática).
+  - Incluímos um console consolidador de macros no topo da lista (resumo da refeição) que atualiza em tempo real.
+  - Destacamos o total de calorias da refeição no rodapé com tamanho de fonte aumentado (`fontSize: 18`), peso em negrito e cor verde-esmeralda vibrante.
+
+### 15.4. Integração Real de Consultas e Profissionais na aba Pro
+- **Arquivos**: `nutrir-mobile/app/(tabs)/profissional.tsx`
+- **Problema**: O app tentava acessar endpoints que não existiam no backend (`/user/nutritionist` e `/user/nutritionist-notes`), resultando em erros e exibição de dados zerados. A listagem de consultas também sofria com rota incorreta.
+- **Correção**:
+  - Migramos a aba profissional para os endpoints reais e funcionais do backend:
+    - `/user/appointments`: listagem correta de consultas agendadas do paciente.
+    - `/user/linked-professionals`: obtém o array de profissionais vinculados (suporta exibir simultaneamente Nutricionista e Personal Trainer).
+    - `/user/professional-feedbacks`: histórico de feedbacks e prescrições do prontuário.
+  - Refatoramos a UI da tela para renderizar cartões específicos de cada profissional ativo, mostrando nome, e-mail de contato e cargo.
+  - Exibimos as orientações clínicas na seção "Meu Acompanhamento", exibindo a data local em português (pt-BR) e indicando o profissional autor de cada instrução.
+
+---
+
+## 16. Ajustes de Usabilidade, Edição de Diário, Histórico e Alertas (28/05/2026)
+
+Implementamos a segunda fase de melhorias de controle de dieta e correções no backend e mobile:
+
+### 16.1. Detalhes das Implementações
+- **Menu do Rodapé Elevado (Android)**: Alterado `bottomInset` de `36` para `54` dp em `nutrir-mobile/app/(tabs)/_layout.tsx` para assegurar que em nenhuma resolução de tela o menu inferior sobreponha os botões virtuais nativos do Android.
+- **Notificação e Alertas Gráficos de Calorias**:
+  - Em `CalorieRing.tsx`, a cor do anel e o texto central agora ficam amarelos/laranjas ao atingir 80% da meta diária de calorias e vermelhos (com rótulo "meta excedida") ao atingir ou passar de 100%.
+  - No topo da tela do Diário (`index.tsx`), exibimos um banner Obsidian colorido (amarelo ou vermelho) notificando visualmente o estado da meta diária de calorias.
+- **Edição e Exclusão no Diário**:
+  - Inserido botão de exclusão de refeição inteira no cabeçalho do Modal Detalhado de refeições em `index.tsx`, disparando `DELETE /user/meals/:id` e recomeçando os cálculos.
+  - Inserido suporte a exclusão individual de alimentos de uma refeição, recalculando totais proporcionalmente e atualizando o backend via `POST /user/meals`. Se a refeição for esvaziada, ela é excluída do banco.
+  - Sub-modal de edição de alimento (`EditMealFoodModal`) adicionado com botões de incremento/decremento de peso (g) e recálculo proporcional automático.
+- **Consolidação do Histórico**:
+  - Adicionado o endpoint `GET /api/user/diario/historico` no backend em `routes/user.js`, agrupando dados de refeições (`meals`), consumo de água (`water_log`) e logs de peso (`weight_log`) do período selecionado, com fallbacks zerados para dias vazios.
+  - Atualizada a query da tela de histórico no mobile (`app/historico.tsx`) de `/diario/historico` para `/user/diario/historico`.
+
+---
+
+### 16.2. Memória/contexto importante
 
 - **Deploy workflow obrigatório:** `git add` → `git commit` → **`git push`** → `node deploy.js`. O `deploy.js` faz `git pull origin master` na VPS, então sem push o servidor pega código antigo.
 - Container Docker mantém versão antiga rodando se o novo build falha. Bug com `const` duplicado fez SyntaxError silencioso — a rota nova retornava 404 enquanto outras funcionavam.
+- **Build do APK Nativo local:** Sempre rodar `.\gradlew.bat assembleRelease` no diretório `nutrir-mobile/android` após ajustes de UI. Copie o APK final gerado para a pasta de distribuição da IDE (`C:\Users\admin\.gemini\antigravity-ide\brain\<conv-id>\nutrir-app.apk`) para disponibilizá-lo para download imediato.
+

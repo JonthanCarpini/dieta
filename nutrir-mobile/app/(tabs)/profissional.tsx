@@ -18,16 +18,20 @@ interface Appointment {
   agora_token?: string;
 }
 
-interface Nutritionist {
+interface Professional {
   id: number;
   name: string;
-  specialty: string;
-  crn: string;
+  email: string;
+  role: 'nutritionist' | 'trainer';
+  type: 'nutritionist' | 'trainer';
 }
 
-interface NutritionistNote {
+interface ProfessionalFeedback {
   id: number;
   content: string;
+  type: string;
+  professional_id: number;
+  professional_name: string;
   created_at: string;
 }
 
@@ -84,19 +88,22 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
 export default function ProfissionalScreen() {
   const router = useRouter();
 
+  // Consulta real de consultas do usuário
   const { data: appointments, isLoading: loadingAppts } = useQuery<Appointment[]>({
     queryKey: ['appointments'],
-    queryFn: () => api.get('/appointments').then((r) => r.data),
+    queryFn: () => api.get('/user/appointments').then((r) => r.data),
   });
 
-  const { data: nutritionist } = useQuery<Nutritionist>({
-    queryKey: ['my-nutritionist'],
-    queryFn: () => api.get('/user/nutritionist').then((r) => r.data),
+  // Consulta real de profissionais vinculados
+  const { data: professionals, isLoading: loadingPros } = useQuery<Professional[]>({
+    queryKey: ['linked-professionals'],
+    queryFn: () => api.get('/user/linked-professionals').then((r) => r.data),
   });
 
-  const { data: notes } = useQuery<NutritionistNote[]>({
-    queryKey: ['nutritionist-notes'],
-    queryFn: () => api.get('/user/nutritionist-notes').then((r) => r.data),
+  // Consulta real de orientações e feedbacks
+  const { data: feedbacks, isLoading: loadingFeedbacks } = useQuery<ProfessionalFeedback[]>({
+    queryKey: ['professional-feedbacks'],
+    queryFn: () => api.get('/user/professional-feedbacks').then((r) => r.data),
   });
 
   return (
@@ -104,22 +111,38 @@ export default function ProfissionalScreen() {
       <ScreenHeader title="Profissional" />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Nutritionist Card */}
-        {nutritionist && (
-          <View style={styles.nutriCard}>
-            <View style={styles.nutriAvatar}>
-              <User size={28} color={colors.accentPurple} />
+        {/* Seção de Profissionais Vinculados */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Meus Profissionais</Text>
+          {loadingPros ? (
+            <ActivityIndicator color={colors.accentGreen} />
+          ) : !professionals || professionals.length === 0 ? (
+            <View style={styles.empty}>
+              <User size={32} color={colors.textMuted} />
+              <Text style={styles.emptyText}>Nenhum profissional vinculado</Text>
             </View>
-            <View style={styles.nutriInfo}>
-              <Text style={styles.nutriName}>{nutritionist.name}</Text>
-              <Text style={styles.nutriSpecialty}>{nutritionist.specialty}</Text>
-              <Text style={styles.nutriCrn}>CRN: {nutritionist.crn}</Text>
+          ) : (
+            <View style={styles.proList}>
+              {professionals.map((prof) => (
+                <View key={prof.id} style={styles.nutriCard}>
+                  <View style={styles.nutriAvatar}>
+                    <User size={28} color={prof.role === 'nutritionist' ? colors.accentPurple : colors.accentGreen} />
+                  </View>
+                  <View style={styles.nutriInfo}>
+                    <Text style={styles.nutriName}>{prof.name}</Text>
+                    <Text style={styles.nutriSpecialty}>
+                      {prof.role === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer'}
+                    </Text>
+                    <Text style={styles.nutriCrn}>{prof.email}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.messageBtn} activeOpacity={0.8}>
+                    <MessageCircle size={20} color={colors.accentGreen} />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
-            <TouchableOpacity style={styles.messageBtn} activeOpacity={0.8}>
-              <MessageCircle size={20} color={colors.accentGreen} />
-            </TouchableOpacity>
-          </View>
-        )}
+          )}
+        </View>
 
         {/* Schedule button */}
         <TouchableOpacity
@@ -149,20 +172,26 @@ export default function ProfissionalScreen() {
           )}
         </View>
 
-        {/* Nutritionist notes / orientation */}
-        {notes && notes.length > 0 && (
+        {/* Orientações clínicas do acompanhamento */}
+        {feedbacks && feedbacks.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <ClipboardList size={15} color={colors.accentPurple} />
               <Text style={styles.sectionTitle}>Meu Acompanhamento</Text>
             </View>
             <View style={styles.notesList}>
-              {notes.map((note) => (
-                <View key={note.id} style={styles.noteCard}>
-                  <Text style={styles.noteDate}>{note.created_at}</Text>
-                  <Text style={styles.noteContent}>{note.content}</Text>
-                </View>
-              ))}
+              {feedbacks.map((note) => {
+                const dateFormatted = new Date(note.created_at).toLocaleDateString('pt-BR');
+                return (
+                  <View key={note.id} style={styles.noteCard}>
+                    <View style={styles.noteHeader}>
+                      <Text style={styles.noteAuthor}>{note.professional_name}</Text>
+                      <Text style={styles.noteDate}>{dateFormatted}</Text>
+                    </View>
+                    <Text style={styles.noteContent}>{note.content}</Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}
@@ -177,6 +206,11 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl, gap: spacing.lg },
 
+  section: { gap: spacing.sm },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { ...typography.h3, color: colors.textPrimary },
+
+  proList: { gap: spacing.sm },
   nutriCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -211,10 +245,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   scheduleBtnText: { color: '#000', fontWeight: '700', fontSize: 15 },
-
-  section: { gap: spacing.sm },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionTitle: { ...typography.h3, color: colors.textPrimary },
 
   empty: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm },
   emptyText: { ...typography.body, color: colors.textSecondary },
@@ -260,6 +290,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(139,92,246,0.2)',
     gap: 4,
+  },
+  noteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  noteAuthor: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accentPurple,
   },
   noteDate: { ...typography.caption, color: colors.textMuted },
   noteContent: { ...typography.body, color: colors.textPrimary, lineHeight: 20 },

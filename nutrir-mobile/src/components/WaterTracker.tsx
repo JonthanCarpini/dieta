@@ -5,8 +5,8 @@ import api from '../api/client';
 import { colors, spacing, radius, typography } from '../constants/theme';
 
 interface WaterData {
-  consumed_ml: number;
-  goal_ml: number;
+  consumed: number;
+  target: number;
 }
 
 const QUICK_ADD = [200, 300, 500];
@@ -14,18 +14,48 @@ const QUICK_ADD = [200, 300, 500];
 export default function WaterTracker() {
   const qc = useQueryClient();
 
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayStr = getLocalDateString();
+
   const { data, isLoading } = useQuery<WaterData>({
     queryKey: ['water-today'],
-    queryFn: () => api.get('/water/today').then((r) => r.data),
+    queryFn: () =>
+      api.get('/user/water', { params: { date: todayStr } })
+        .then((r) => r.data)
+        .catch((err) => {
+          console.error('Erro no GET de agua:', err?.response?.data || err.message);
+          throw err;
+        }),
   });
 
   const mutation = useMutation({
-    mutationFn: (ml: number) => api.post('/water/add', { ml }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['water-today'] }),
+    mutationFn: (ml: number) => {
+      const current = data?.consumed ?? 0;
+      const target = data?.target ?? 2500;
+      return api.post('/user/water', {
+        date: todayStr,
+        consumed: current + ml,
+        target,
+      }).catch((err) => {
+        console.error('Erro no POST de agua:', err?.response?.data || err.message);
+        throw err;
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['water-today'] });
+      qc.invalidateQueries({ queryKey: ['daily-summary'] });
+    },
   });
 
-  const consumed = data?.consumed_ml ?? 0;
-  const goal = data?.goal_ml ?? 2500;
+  const consumed = data?.consumed ?? 0;
+  const goal = data?.target ?? 2500;
   const pct = Math.min(consumed / goal, 1);
   const liters = (consumed / 1000).toFixed(1);
   const goalL = (goal / 1000).toFixed(1);

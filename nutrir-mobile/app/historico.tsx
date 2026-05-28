@@ -61,7 +61,7 @@ export default function HistoricoScreen() {
 
   const { data, isLoading } = useQuery<HistoryEntry[]>({
     queryKey: ['history', period],
-    queryFn: () => api.get('/diario/historico', { params: { days: period } }).then((r) => r.data),
+    queryFn: () => api.get('/user/diario/historico', { params: { days: period } }).then((r) => r.data),
   });
 
   const avgCalories = data?.length

@@ -7,11 +7,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronLeft, Plus, Minus } from 'lucide-react-native';
+import { Check, ChevronLeft, Plus, Minus, Edit3 } from 'lucide-react-native';
 import api from '../src/api/client';
 import { colors, spacing, radius, typography } from '../src/constants/theme';
 
@@ -38,18 +40,20 @@ function FoodCard({
   item,
   selected,
   onToggle,
+  onEdit,
 }: {
   item: FoodItem;
   selected: boolean;
   onToggle: () => void;
+  onEdit: () => void;
 }) {
   return (
-    <TouchableOpacity
-      style={[styles.foodCard, selected && styles.foodCardSelected]}
-      onPress={onToggle}
-      activeOpacity={0.8}
-    >
-      <View style={styles.foodCardLeft}>
+    <View style={[styles.foodCard, selected && styles.foodCardSelected]}>
+      <TouchableOpacity
+        style={styles.foodCardLeft}
+        onPress={onToggle}
+        activeOpacity={0.8}
+      >
         <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
           {selected && <Check size={14} color="#000" />}
         </View>
@@ -64,9 +68,15 @@ function FoodCard({
             <Text style={[styles.macro, { color: colors.fats }]}>G {item.fats}g</Text>
           </View>
         </View>
+      </TouchableOpacity>
+      
+      <View style={styles.foodCardRight}>
+        <Text style={styles.foodCalories}>{item.calories} kcal</Text>
+        <TouchableOpacity style={styles.editBtn} onPress={onEdit} hitSlop={8} activeOpacity={0.7}>
+          <Edit3 size={15} color={colors.textSecondary} />
+        </TouchableOpacity>
       </View>
-      <Text style={styles.foodCalories}>{item.calories} kcal</Text>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -76,30 +86,40 @@ export default function ScanResultsScreen() {
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
 
-  let parsedFoods: FoodItem[] = [];
-  try {
-    if (results) {
-      const parsed = JSON.parse(results);
-      // Suporta tanto o array de alimentos direto quanto o objeto completo da IA
-      const rawList = Array.isArray(parsed) ? parsed : (parsed?.items || []);
-      
-      parsedFoods = rawList.map((item: any) => ({
-        name: item.name || 'Alimento',
-        quantity: Number(item.weight_g || item.quantity || 100),
-        unit: item.unit || 'g',
-        calories: Math.round(Number(item.calories || 0)),
-        protein: Math.round(Number(item.protein || 0)),
-        carbs: Math.round(Number(item.carbs || 0)),
-        fats: item.fat !== undefined ? Math.round(Number(item.fat)) : Math.round(Number(item.fats || 0)),
-      }));
+  const [foods, setFoods] = useState<FoodItem[]>(() => {
+    let parsedFoods: FoodItem[] = [];
+    try {
+      if (results) {
+        const parsed = JSON.parse(results);
+        const rawList = Array.isArray(parsed) ? parsed : (parsed?.items || []);
+        parsedFoods = rawList.map((item: any) => ({
+          name: item.name || 'Alimento',
+          quantity: Number(item.weight_g || item.quantity || 100),
+          unit: item.unit || 'g',
+          calories: Math.round(Number(item.calories || 0)),
+          protein: Math.round(Number(item.protein || 0)),
+          carbs: Math.round(Number(item.carbs || 0)),
+          fats: item.fat !== undefined ? Math.round(Number(item.fat)) : Math.round(Number(item.fats || 0)),
+        }));
+      }
+    } catch (err) {
+      console.error('Erro ao processar alimentos da IA:', err);
     }
-  } catch (err) {
-    console.error('Erro ao processar alimentos da IA:', err);
-  }
+    return parsedFoods;
+  });
 
-  const foods = parsedFoods;
-  const [selected, setSelected] = useState<Set<number>>(new Set(foods.map((_, i) => i)));
+  const [selected, setSelected] = useState<Set<number>>(() => new Set(foods.map((_, i) => i)));
   const [mealType, setMealType] = useState('almoco');
+
+  // Estados de Edição do Alimento
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editQty, setEditQty] = useState('');
+  const [editCalories, setEditCalories] = useState('');
+  const [editProtein, setEditProtein] = useState('');
+  const [editCarbs, setEditCarbs] = useState('');
+  const [editFats, setEditFats] = useState('');
 
   const toggle = (i: number) =>
     setSelected((prev) => {
@@ -108,13 +128,70 @@ export default function ScanResultsScreen() {
       return next;
     });
 
+  const handleEditPress = (index: number) => {
+    const f = foods[index];
+    setEditingIndex(index);
+    setEditName(f.name);
+    setEditQty(String(f.quantity));
+    setEditCalories(String(f.calories));
+    setEditProtein(String(f.protein));
+    setEditCarbs(String(f.carbs));
+    setEditFats(String(f.fats));
+    setEditModalVisible(true);
+  };
+
+  const adjustQuantity = (amount: number) => {
+    const currentQty = Number(editQty) || 100;
+    const nextQty = Math.max(10, currentQty + amount);
+    const ratio = nextQty / currentQty;
+
+    setEditQty(String(nextQty));
+    setEditCalories(String(Math.round((Number(editCalories) || 0) * ratio)));
+    setEditProtein(String(Math.round((Number(editProtein) || 0) * ratio)));
+    setEditCarbs(String(Math.round((Number(editCarbs) || 0) * ratio)));
+    setEditFats(String(Math.round((Number(editFats) || 0) * ratio)));
+  };
+
+  const saveFoodEdit = () => {
+    if (editingIndex === null) return;
+    
+    const qty = Number(editQty) || 100;
+    const calories = Number(editCalories) || 0;
+    const protein = Number(editProtein) || 0;
+    const carbs = Number(editCarbs) || 0;
+    const fats = Number(editFats) || 0;
+
+    setFoods((prev) => {
+      const next = [...prev];
+      next[editingIndex] = {
+        ...next[editingIndex],
+        name: editName,
+        quantity: qty,
+        calories,
+        protein,
+        carbs,
+        fats,
+      };
+      return next;
+    });
+    setEditModalVisible(false);
+    setEditingIndex(null);
+  };
+
   const selectedFoods = foods.filter((_, i) => selected.has(i));
   const totalCal = selectedFoods.reduce((s, f) => s + f.calories, 0);
+  const totalPro = selectedFoods.reduce((s, f) => s + f.protein, 0);
+  const totalCarbs = selectedFoods.reduce((s, f) => s + f.carbs, 0);
+  const totalFats = selectedFoods.reduce((s, f) => s + f.fats, 0);
 
   const mutation = useMutation({
     mutationFn: () => {
       const now = new Date();
-      const dateStr = now.toISOString().split('T')[0];
+      // Formatação local YYYY-MM-DD
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const timeStr = now.toTimeString().substring(0, 5);
 
       const mealNames: Record<string, string> = {
@@ -129,7 +206,6 @@ export default function ScanResultsScreen() {
       const name = mealNames[mealType] || 'Refeição';
       const mealId = `meal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      // Mapeia para o formato que o backend espera (qty, fat, etc)
       const dbItems = selectedFoods.map((f) => ({
         name: f.name,
         qty: f.quantity,
@@ -204,6 +280,28 @@ export default function ScanResultsScreen() {
               ))}
             </ScrollView>
 
+            {/* Resumo de Macros da Refeição */}
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryTitleRow}>
+                <Text style={styles.summaryTitle}>Resumo da Refeição</Text>
+                <Text style={styles.summaryCalories}>{totalCal} kcal</Text>
+              </View>
+              <View style={styles.summaryMacrosRow}>
+                <View style={[styles.summaryMacro, { borderBottomColor: colors.protein }]}>
+                  <Text style={styles.summaryMacroVal}>{totalPro}g</Text>
+                  <Text style={styles.summaryMacroLabel}>Proteína</Text>
+                </View>
+                <View style={[styles.summaryMacro, { borderBottomColor: colors.carbs }]}>
+                  <Text style={styles.summaryMacroVal}>{totalCarbs}g</Text>
+                  <Text style={styles.summaryMacroLabel}>Carbo</Text>
+                </View>
+                <View style={[styles.summaryMacro, { borderBottomColor: colors.fats }]}>
+                  <Text style={styles.summaryMacroVal}>{totalFats}g</Text>
+                  <Text style={styles.summaryMacroLabel}>Gordura</Text>
+                </View>
+              </View>
+            </View>
+
             {/* Food list */}
             <Text style={styles.sectionLabel}>Alimentos identificados</Text>
             <View style={styles.foodList}>
@@ -213,16 +311,17 @@ export default function ScanResultsScreen() {
                   item={food}
                   selected={selected.has(i)}
                   onToggle={() => toggle(i)}
+                  onEdit={() => handleEditPress(i)}
                 />
               ))}
             </View>
           </ScrollView>
 
-          {/* Footer */}
+          {/* Footer com calorias destacadas */}
           <View style={[styles.footer, { paddingBottom: Math.max(spacing.md, insets.bottom) }]}>
-            <View>
+            <View style={styles.footerTextContainer}>
               <Text style={styles.footerLabel}>{selected.size} alimento(s) selecionado(s)</Text>
-              <Text style={styles.footerCalories}>{totalCal} kcal total</Text>
+              <Text style={styles.footerCaloriesHighlight}>{totalCal} kcal total</Text>
             </View>
             <TouchableOpacity
               style={[styles.addBtn, (mutation.isPending || selected.size === 0) && styles.addBtnDisabled]}
@@ -236,6 +335,118 @@ export default function ScanResultsScreen() {
               }
             </TouchableOpacity>
           </View>
+
+          {/* Modal de Edição de Alimento */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={editModalVisible}
+            onRequestClose={() => setEditModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Editar Alimento</Text>
+
+                {/* Nome */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Nome</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholder="Nome do alimento"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                </View>
+
+                {/* Quantidade em gramas */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Quantidade (g)</Text>
+                  <View style={styles.quantityEditRow}>
+                    <TouchableOpacity style={styles.adjBtn} onPress={() => adjustQuantity(-50)}>
+                      <Text style={styles.adjBtnText}>-50g</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.adjBtn} onPress={() => adjustQuantity(-10)}>
+                      <Text style={styles.adjBtnText}>-10</Text>
+                    </TouchableOpacity>
+                    <TextInput
+                      style={[styles.textInput, { flex: 1, textAlign: 'center', marginHorizontal: 6 }]}
+                      value={editQty}
+                      onChangeText={setEditQty}
+                      keyboardType="numeric"
+                    />
+                    <TouchableOpacity style={styles.adjBtn} onPress={() => adjustQuantity(10)}>
+                      <Text style={styles.adjBtnText}>+10</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.adjBtn} onPress={() => adjustQuantity(50)}>
+                      <Text style={styles.adjBtnText}>+50g</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Macros e Calorias */}
+                <View style={styles.gridRow}>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>Calorias (kcal)</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editCalories}
+                      onChangeText={setEditCalories}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>Proteína (g)</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editProtein}
+                      onChangeText={setEditProtein}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.gridRow}>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>Carbo (g)</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editCarbs}
+                      onChangeText={setEditCarbs}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>Gordura (g)</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editFats}
+                      onChangeText={setEditFats}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {/* Ações */}
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.cancelBtn]}
+                    onPress={() => setEditModalVisible(false)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.saveBtn]}
+                    onPress={saveFoodEdit}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.saveBtnText}>Salvar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </>
       )}
     </SafeAreaView>
@@ -272,6 +483,55 @@ const styles = StyleSheet.create({
   mealChipText: { ...typography.bodySmall, color: colors.textSecondary, fontWeight: '600' },
   mealChipTextActive: { color: '#000' },
 
+  summaryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: spacing.xs,
+    gap: spacing.sm,
+  },
+  summaryTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  summaryCalories: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.accentGreen,
+  },
+  summaryMacrosRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  summaryMacro: {
+    flex: 1,
+    backgroundColor: colors.bgSecondary,
+    borderBottomWidth: 3,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    gap: 2,
+  },
+  summaryMacroVal: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  summaryMacroLabel: {
+    fontSize: 10,
+    color: colors.textMuted,
+    fontWeight: '600',
+  },
+
   foodList: { gap: spacing.sm },
   foodCard: {
     flexDirection: 'row',
@@ -301,7 +561,20 @@ const styles = StyleSheet.create({
   foodQuantity: { ...typography.caption, color: colors.textMuted },
   macroRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
   macro: { fontSize: 11, fontWeight: '600' },
+  
+  foodCardRight: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+    paddingLeft: spacing.sm,
+  },
   foodCalories: { fontSize: 15, fontWeight: '700', color: colors.accentGreen },
+  editBtn: {
+    backgroundColor: colors.bgSecondary,
+    padding: 6,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 
   footer: {
     flexDirection: 'row',
@@ -312,8 +585,17 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.bgSecondary,
   },
+  footerTextContainer: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
   footerLabel: { ...typography.bodySmall, color: colors.textSecondary },
-  footerCalories: { ...typography.label, color: colors.textPrimary, fontSize: 16 },
+  footerCaloriesHighlight: { 
+    fontSize: 18, 
+    fontWeight: '800', 
+    color: colors.accentGreen,
+    marginTop: 2,
+  },
   addBtn: {
     backgroundColor: colors.accentGreen,
     borderRadius: radius.md,
@@ -334,4 +616,96 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   retryText: { color: colors.accentGreen, fontWeight: '600' },
+
+  // Estilos do Modal de Edição
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.md,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.sm,
+  },
+  inputGroup: {
+    gap: 6,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  textInput: {
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    color: colors.textPrimary,
+    fontSize: 14,
+  },
+  quantityEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  adjBtn: {
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 10,
+  },
+  adjBtnText: {
+    color: colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  modalBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cancelBtnText: {
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    backgroundColor: colors.accentGreen,
+  },
+  saveBtnText: {
+    color: '#000',
+    fontWeight: '700',
+  },
 });

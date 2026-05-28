@@ -885,4 +885,111 @@ router.post('/measurements', async (req, res) => {
   }
 });
 
+// ==========================================
+// 11. HISTÓRICO DIÁRIO CONSOLIDADO
+// ==========================================
+router.get('/diario/historico', async (req, res) => {
+  const days = parseInt(req.query.days) || 7;
+  try {
+    // Obter data atual no fuso de Brasília (America/Sao_Paulo)
+    const nowSaoPaulo = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    
+    // Gerar lista de datas retroativas YYYY-MM-DD
+    const dates = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(nowSaoPaulo);
+      d.setDate(nowSaoPaulo.getDate() - i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(d.getDate()).padStart(2, '0');
+      dates.push(`${y}-${m}-${dayStr}`);
+    }
+
+    const startDate = dates[0];
+    const endDate = dates[dates.length - 1];
+
+    // Inicializar mapa de histórico estruturado para o período
+    const historyMap = {};
+    for (const dateStr of dates) {
+      const parts = dateStr.split('-');
+      const label = `${parts[2]}/${parts[1]}`;
+      historyMap[dateStr] = {
+        date: dateStr,
+        label: label,
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        water_ml: 0,
+        weight: null
+      };
+    }
+
+    // Consultas concorrentes no banco para as tabelas relacionadas
+    const [mealsRes, waterRes, weightRes] = await Promise.all([
+      db.query(
+        `SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str, total 
+         FROM meals 
+         WHERE user_id = $1 AND date >= $2 AND date <= $3`,
+        [req.user.id, startDate, endDate]
+      ),
+      db.query(
+        `SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str, consumed 
+         FROM water_log 
+         WHERE user_id = $1 AND date >= $2 AND date <= $3`,
+        [req.user.id, startDate, endDate]
+      ),
+      db.query(
+        `SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str, weight 
+         FROM weight_log 
+         WHERE user_id = $1 AND date >= $2 AND date <= $3`,
+        [req.user.id, startDate, endDate]
+      )
+    ]);
+
+    // Consolidar e agregar refeições
+    for (const row of mealsRes.rows) {
+      const dateStr = row.date_str;
+      if (historyMap[dateStr]) {
+        const total = row.total || {};
+        historyMap[dateStr].calories += Number(total.calories || 0);
+        historyMap[dateStr].protein += Number(total.protein || 0);
+        historyMap[dateStr].carbs += Number(total.carbs || 0);
+        historyMap[dateStr].fats += Number(total.fat || total.fats || 0);
+      }
+    }
+
+    // Consolidar consumo de água
+    for (const row of waterRes.rows) {
+      const dateStr = row.date_str;
+      if (historyMap[dateStr]) {
+        historyMap[dateStr].water_ml += Number(row.consumed || 0);
+      }
+    }
+
+    // Consolidar peso
+    for (const row of weightRes.rows) {
+      const dateStr = row.date_str;
+      if (historyMap[dateStr]) {
+        historyMap[dateStr].weight = Number(row.weight);
+      }
+    }
+
+    // Arredondar valores agregados para exibição limpa
+    const result = dates.map(dateStr => {
+      const entry = historyMap[dateStr];
+      entry.calories = Math.round(entry.calories);
+      entry.protein = Math.round(entry.protein);
+      entry.carbs = Math.round(entry.carbs);
+      entry.fats = Math.round(entry.fats);
+      return entry;
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico diário.' });
+  }
+});
+
 module.exports = router;

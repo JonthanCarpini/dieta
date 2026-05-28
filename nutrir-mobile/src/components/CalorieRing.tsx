@@ -13,9 +13,27 @@ interface Props {
 }
 
 export default function CalorieRing({ consumed, goal }: Props) {
-  const progress = goal > 0 ? Math.min(consumed / goal, 1) : 0;
+  const pct = goal > 0 ? consumed / goal : 0;
+  const progress = Math.min(pct, 1);
   const dashOffset = CIRCUMFERENCE * (1 - progress);
   const remaining = Math.max(goal - consumed, 0);
+
+  let ringColor = colors.accentGreen;
+  let statusText = 'restantes';
+  let statusColor = colors.textMuted;
+  let consumedColor = colors.textPrimary;
+
+  if (pct >= 1.0) {
+    ringColor = '#EF4444'; // Vermelho
+    statusText = 'meta excedida';
+    statusColor = '#EF4444';
+    consumedColor = '#EF4444';
+  } else if (pct >= 0.8) {
+    ringColor = '#F59E0B'; // Laranja/Amarelo
+    statusText = 'limite próximo';
+    statusColor = '#F59E0B';
+    consumedColor = '#F59E0B';
+  }
 
   return (
     <View style={styles.wrapper}>
@@ -35,7 +53,7 @@ export default function CalorieRing({ consumed, goal }: Props) {
             cx={SIZE / 2}
             cy={SIZE / 2}
             r={RADIUS}
-            stroke={colors.accentGreen}
+            stroke={ringColor}
             strokeWidth={STROKE}
             strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
             strokeDashoffset={dashOffset}
@@ -45,9 +63,15 @@ export default function CalorieRing({ consumed, goal }: Props) {
         </G>
       </Svg>
       <View style={styles.center}>
-        <Text style={styles.consumed}>{consumed}</Text>
+        <Text style={[styles.consumed, { color: consumedColor }]}>{consumed}</Text>
         <Text style={styles.unit}>kcal</Text>
-        <Text style={styles.remaining}>{remaining} restantes</Text>
+        {pct >= 1.0 ? (
+          <Text style={[styles.remaining, { color: statusColor, fontWeight: '700' }]}>{statusText}</Text>
+        ) : (
+          <Text style={[styles.remaining, { color: statusColor }]}>
+            {remaining} {statusText}
+          </Text>
+        )}
       </View>
     </View>
   );
