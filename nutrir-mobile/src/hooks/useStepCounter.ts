@@ -27,15 +27,8 @@ export function useStepCounter(dbSteps: number = 0, isTracking: boolean = false)
     setIsLoading(true);
     setError(null);
     try {
-      const isAvailable = await Pedometer.isAvailableAsync();
-      setIsPedometerAvailable(isAvailable);
-
-      if (!isAvailable) {
-        setError('Sensor de passos não disponível neste dispositivo.');
-        setIsLoading(false);
-        return;
-      }
-
+      // 1. Verifica/solicita permissão primeiro. No Android 10+, isAvailableAsync()
+      // pode retornar false se a permissão de ACTIVITY_RECOGNITION ainda não foi concedida.
       const permission = await Pedometer.getPermissionsAsync();
       let status = permission.status;
       setPermissionStatus(status);
@@ -44,6 +37,16 @@ export function useStepCounter(dbSteps: number = 0, isTracking: boolean = false)
         const request = await Pedometer.requestPermissionsAsync();
         status = request.status;
         setPermissionStatus(status);
+      }
+
+      // 2. Agora verifica a disponibilidade física do sensor
+      const isAvailable = await Pedometer.isAvailableAsync();
+      setIsPedometerAvailable(isAvailable);
+
+      if (!isAvailable) {
+        setError('Sensor de passos não disponível neste dispositivo.');
+        setIsLoading(false);
+        return;
       }
 
       if (status === 'granted') {
@@ -70,6 +73,11 @@ export function useStepCounter(dbSteps: number = 0, isTracking: boolean = false)
     }
   };
 
+  // Verifica a disponibilidade do sensor e permissões logo no carregamento inicial da tela
+  useEffect(() => {
+    checkPermissionAndFetchSteps();
+  }, []);
+
   // Gerencia a ativação/desativação da escuta física do sensor com base no toggle do usuário
   useEffect(() => {
     if (!isTracking) {
@@ -92,9 +100,10 @@ export function useStepCounter(dbSteps: number = 0, isTracking: boolean = false)
           subscription = Pedometer.watchStepCount((result) => {
             currentSensorStepsRef.current = result.steps;
             if (Platform.OS === 'ios') {
+              // No iOS, atualizamos o total geral do dia via consulta
               checkPermissionAndFetchSteps();
             } else {
-              // Calcula o delta de passos dados na sessão desde o último ponto de salvamento
+              // No Android, calcula o delta de passos dados na sessão desde o último ponto de salvamento
               const delta = result.steps - lastSavedSensorStepsRef.current;
               setSteps(lastSavedDatabaseStepsRef.current + delta);
             }

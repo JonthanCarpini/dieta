@@ -285,7 +285,7 @@ export default function AtividadesScreen() {
               </Text>
             )}
 
-            {isPedometerAvailable && sensorError && (
+            {sensorError && (
               <Text style={styles.warningText}>
                 ⚠️ {sensorError}
               </Text>
