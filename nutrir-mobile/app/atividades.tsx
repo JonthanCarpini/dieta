@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -77,7 +78,7 @@ export default function AtividadesScreen() {
   const [exCustomCal, setExCustomCal] = useState('');
 
   // Hook do Pedometer Nativo
-  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps } = useStepCounter();
+  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps, resetBaseSteps } = useStepCounter(activity?.steps ?? 0);
 
   // Busca do perfil do usuário para obter o peso
   const { data: profileData } = useQuery({
@@ -100,9 +101,10 @@ export default function AtividadesScreen() {
         steps: newSteps,
         steps_target: activity?.steps_target ?? 10000,
       }),
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       refetch();
       qc.invalidateQueries({ queryKey: ['daily-summary'] });
+      resetBaseSteps(variables);
     },
     onError: () => Alert.alert('Erro', 'Não foi possível salvar os passos.'),
   });
@@ -244,7 +246,12 @@ export default function AtividadesScreen() {
                 <Text style={styles.actionBtnText}>Ajustar Passos</Text>
               </TouchableOpacity>
               {isPedometerAvailable && (
-                <TouchableOpacity style={[styles.actionButton, styles.syncBtn]} onPress={refetchSteps}>
+                <TouchableOpacity style={[styles.actionButton, styles.syncBtn]} onPress={() => {
+                  if (Platform.OS === 'android') {
+                    Alert.alert('Sincronização de Passos', 'No Android, os passos são monitorados e sincronizados em tempo real conforme você caminha com o aplicativo aberto.');
+                  }
+                  refetchSteps();
+                }}>
                   <Text style={styles.syncBtnText}>Sincronizar Sensor</Text>
                 </TouchableOpacity>
               )}
