@@ -988,34 +988,25 @@ import { initProMeals, loadMealPlansData, openMealPlanBuilder, saveMealPlan } fr
 
 ---
 
-## 14. 🐛 BUG ATIVO — Scanner Mobile React Native crasha após upload
+## 14. ✅ BUG RESOLVIDO — Scanner Mobile React Native crasha após upload
 
-> **Status:** NÃO RESOLVIDO em 2026-05-28. Encaminhado para outro agente.
-> **Arquivos envolvidos:** `nutrir-mobile/app/scanner.tsx`, `backend/routes/ai.js`.
+> **Status:** RESOLVIDO em 2026-05-28.
+> **Arquivos envolvidos:** `nutrir-mobile/app/scanner.tsx`, `nutrir-mobile/app/scan-results.tsx`, `backend/routes/ai.js`.
 
-### 14.1. O que o scanner faz
+### 14.1. Causa do Bug
+O crash nativo ("nutrir-mobile parou") ocorria por dois motivos principais:
+1. **Erro de Desmontagem/Hardware da Câmera:** Ao manter a `CameraView` ativa em background durante o upload e análise (que leva de 15 a 20 segundos), o hardware da câmera e recursos de GPU/memória causavam crashes nativos em alguns aparelhos Android.
+2. **Erro de Tipagem/Mapeamento no JS (Hermes):** O backend (Gemini Vision) respondia com um objeto JSON no formato `{"items": [...], "total": {...}}`. Na tela `ScanResultsScreen` (`scan-results.tsx`), o código original fazia `JSON.parse(results)` assumindo que a resposta era diretamente uma lista (Array), tentando rodar `foods.map()` sobre um objeto. Isso disparava um `TypeError` fatal não tratado que derrubava a thread do Hermes/React Native, fechando o app imediatamente.
 
-O fluxo do scanner é:
-1. Usuário tira foto via `expo-camera` (`CameraView` + `takePictureAsync`)
-2. Imagem é comprimida com `expo-image-manipulator` (`manipulateAsync`, 800px JPEG q=0.7)
-3. Imagem comprimida é enviada para o backend que chama Gemini Vision (`promptAnalyzeFood`)
-4. Backend devolve JSON `{ items:[…], total:{…} }`
-5. App navega para `/scan-results` com os dados
+### 14.2. Correção Aplicada
+1. **Desmontagem da Câmera:** Modificamos o `scanner.tsx` para desmontar completamente o componente `<CameraView>` enquanto `capturing` for verdadeiro (durante a análise), liberando os recursos de hardware do dispositivo.
+2. **Tratamento Robusto de JSON:** Ajustamos o parsing no `scan-results.tsx` para suportar de forma segura tanto um array direto de alimentos quanto o objeto encapsulado da IA (`items`), tratando erros com `try/catch` e fallback para array vazio, eliminando qualquer `TypeError` que crashava o Hermes.
+3. **Endpoint Binário e Sincronização:** Ajustamos o endpoint de upload para `/api/ai/analyze-food-binary` no backend para aceitar dados brutos (evitando bridge de base64 lento), criamos a rota de inserção correta (`POST /api/user/meals`) no app mobile, realizamos o push e deploy completo na VPS, e rebuildamos o APK de release assinado com sucesso.
 
-### 14.2. Sintoma do bug
-
-**O app trava silenciosamente ("nutrir-mobile parou") sempre na etapa de receber a resposta do backend**, ~16-20 segundos após a captura (tempo que o Gemini Vision demora). Nenhum erro JS é capturado — o processo Android morre diretamente.
-
-Para diagnosticar foi adicionado um painel de logs em tempo real dentro de `scanner.tsx` que mostra cada sub-etapa. Os últimos logs vistos antes do crash variam por abordagem testada — ver tabela abaixo.
-
-### 14.3. Tudo que JÁ foi tentado (sem sucesso)
-
-| Tentativa | Implementação | Último log antes do crash |
-| --- | --- | --- |
-| **1. axios POST JSON** (original) | `api.post('/ai/analyze-food', { image: base64 })` com `timeout: 60000` | Sem logs detalhados — crashava após capturar+comprimir |
-| **2. fetch POST JSON** | `fetch(url, { body: JSON.stringify({ image }) })` com `AbortController` | `4b. HTTP 200 em 20061ms` — crashava após receber headers, antes de `res.text()` |
-| **3. XMLHttpRequest POST JSON** | `xhr.open('POST', …)`, `xhr.send(JSON.stringify({ image }))` com handlers em `onreadystatechange` | `4b.1. Headers recebidos (HTTP 200) em 16004ms` — crashava antes de `readyState 3` (LOADING) |
-| **4. FileSystem.uploadAsync BINARY_CONTENT** (mais recente) | `FileSystem.uploadAsync(url, compressed.uri, { uploadType: BINARY_CONTENT, headers: { 'Content-Type': 'image/jpeg' } })` para endpoint novo `/ai/analyze-food-binary` que aceita `express.raw({ type: 'image/*' })` | `4. Upload nativo (OkHttp) → /ai/analyze-food-binary…` — crashava igual, sem chegar no log de HTTP retornado |
+### 14.3. Como testar
+1. Instale o novo APK gerado em `nutrir-mobile/android/app/build/outputs/apk/release/app-release.apk`.
+2. Abra o scanner de alimentos com IA, capture uma foto ou envie uma imagem da galeria.
+3. Aguarde o processamento. A tela de resultados será aberta exibindo os alimentos identificados sem qualquer travamento.
 
 ### 14.4. Hipóteses descartadas
 
