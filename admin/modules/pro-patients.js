@@ -145,7 +145,7 @@ export async function viewPatientDetails(patient) {
 
     if (waterStatus) waterStatus.innerText = 'Carregando...';
     if (fastingStatus) fastingStatus.innerText = 'Carregando...';
-    if (mealsBody) mealsBody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Carregando diário...</td></tr>`;
+    if (mealsBody) mealsBody.innerHTML = `<div style="text-align:center;color:var(--text-2);padding:32px;">Carregando diário...</div>`;
 
     fetch(`${API_URL}/professional/patients/${patient.id}/weight-log`, {
         headers: { 'Authorization': `Bearer ${adminState.token}` }
@@ -357,31 +357,102 @@ export function applyMealFilter(days) {
 }
 
 export function renderPatientMealsTable(meals) {
-    const mealsBody = document.getElementById('detail-meals-table-body');
-    if (!mealsBody) return;
-    mealsBody.innerHTML = '';
+    const container = document.getElementById('detail-meals-table-body');
+    if (!container) return;
+    container.innerHTML = '';
+
     if (!meals || meals.length === 0) {
-        mealsBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--color-text-muted); padding:20px;">Nenhuma refeição no período.</td></tr>`;
+        container.innerHTML = `<div style="text-align:center;color:var(--text-2);padding:40px;">Nenhuma refeição no período.</div>`;
         return;
     }
+
+    // Agrupa por data
+    const byDate = {};
     meals.forEach(m => {
-        const tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        const totalObj = m.total && typeof m.total === 'object' ? m.total : {};
-        const carbs    = totalObj.carbs    !== undefined ? `${totalObj.carbs}g`    : (m.carbs    ? `${m.carbs}g`    : '-');
-        const protein  = totalObj.protein  !== undefined ? `${totalObj.protein}g`  : (m.protein  ? `${m.protein}g`  : '-');
-        const fat      = totalObj.fat      !== undefined ? `${totalObj.fat}g`      : (m.fat      ? `${m.fat}g`      : '-');
-        const calVal   = totalObj.calories !== undefined ? `${totalObj.calories} kcal` : (m.calories ? `${m.calories} kcal` : '-');
-        tr.innerHTML = `
-            <td>${new Date(String(m.date).split('T')[0] + 'T00:00:00').toLocaleDateString('pt-BR')} ${m.time.substring(0,5)}</td>
-            <td><strong>${m.name}</strong><br><small>${m.description || ''}</small></td>
-            <td><span class="badge-role user" style="background-color:rgba(255,255,255,0.05);color:var(--color-text);">${getMealTypeLabel(m)}</span></td>
-            <td>${calVal}</td>
-            <td><small>C:${carbs} | P:${protein} | F:${fat}</small></td>
-        `;
-        tr.addEventListener('click', () => openAdminMealDetailsModal(m));
-        mealsBody.appendChild(tr);
+        const d = String(m.date).split('T')[0];
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(m);
     });
+
+    const today     = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const weekdays  = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+
+    const sortedDates = Object.keys(byDate).sort().reverse();
+
+    sortedDates.forEach((dateStr, idx) => {
+        const dayMeals = byDate[dateStr];
+
+        // Totais do dia
+        let totalKcal = 0, totalC = 0, totalP = 0, totalG = 0;
+        dayMeals.forEach(m => {
+            const t = m.total && typeof m.total === 'object' ? m.total : {};
+            totalKcal += parseFloat(t.calories ?? m.calories ?? 0);
+            totalC    += parseFloat(t.carbs    ?? m.carbs    ?? 0);
+            totalP    += parseFloat(t.protein  ?? m.protein  ?? 0);
+            totalG    += parseFloat(t.fat      ?? m.fat      ?? 0);
+        });
+
+        // Label da data
+        const [y, mo, d] = dateStr.split('-');
+        const dateFormatted = `${d}/${mo}/${y}`;
+        let dateLabel;
+        if (dateStr === today)     dateLabel = `Hoje — ${dateFormatted}`;
+        else if (dateStr === yesterday) dateLabel = `Ontem — ${dateFormatted}`;
+        else {
+            const dow = new Date(dateStr + 'T12:00:00').getDay();
+            dateLabel = `${weekdays[dow]} — ${dateFormatted}`;
+        }
+
+        const block = document.createElement('div');
+        block.className = `diary-day-block${idx === 0 ? ' expanded' : ''}`;
+
+        // Header do dia
+        const header = document.createElement('div');
+        header.className = 'diary-day-header';
+        header.innerHTML = `
+            <div class="diary-day-date">
+                <i data-lucide="calendar" style="width:13px;height:13px;"></i>
+                <span>${dateLabel}</span>
+                <span style="font-size:11px;font-weight:400;color:var(--text-2);">${dayMeals.length} refeição${dayMeals.length !== 1 ? 'ões' : ''}</span>
+            </div>
+            <div class="diary-day-macro-pills">
+                <span class="diary-macro-pill kcal">${Math.round(totalKcal)} kcal</span>
+                <span class="diary-macro-pill">C ${Math.round(totalC)}g</span>
+                <span class="diary-macro-pill">P ${Math.round(totalP)}g</span>
+                <span class="diary-macro-pill">G ${Math.round(totalG)}g</span>
+                <svg class="diary-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+        `;
+        header.addEventListener('click', () => block.classList.toggle('expanded'));
+
+        // Refeições do dia
+        const mealsDiv = document.createElement('div');
+        mealsDiv.className = 'diary-day-meals';
+
+        dayMeals.forEach(m => {
+            const t      = m.total && typeof m.total === 'object' ? m.total : {};
+            const kcal   = t.calories !== undefined ? parseFloat(t.calories) : parseFloat(m.calories ?? 0);
+            const typeLabel = getMealTypeLabel(m);
+
+            const row = document.createElement('div');
+            row.className = 'diary-meal-row';
+            row.innerHTML = `
+                <span class="diary-meal-time">${m.time.substring(0,5)}</span>
+                <span class="diary-meal-type-badge">${typeLabel}</span>
+                <span class="diary-meal-name">${m.name}</span>
+                <span class="diary-meal-kcal">${Math.round(kcal)} kcal</span>
+            `;
+            row.addEventListener('click', () => openAdminMealDetailsModal(m));
+            mealsDiv.appendChild(row);
+        });
+
+        block.appendChild(header);
+        block.appendChild(mealsDiv);
+        container.appendChild(block);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
 }
 
 export function renderPatientWeightChart(weights) {

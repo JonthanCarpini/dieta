@@ -1424,6 +1424,8 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     border-top: 1px solid var(--border);
 }
 .diary-day-block.expanded .diary-day-meals { display: block; }
+.diary-day-block.expanded .diary-chevron { transform: rotate(180deg); }
+.diary-chevron { transition: transform 0.2s; flex-shrink: 0; }
 .diary-meal-row {
     display: flex;
     align-items: center;
