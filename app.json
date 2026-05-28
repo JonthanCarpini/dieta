@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "b464ddda-e9a3-46d5-87f6-537a383f6b24"
+      }
+    },
+    "android": {
+      "package": "com.carpini.dieta"
+    }
+  }
+}

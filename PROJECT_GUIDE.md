@@ -384,11 +384,57 @@ docker exec nutrir_db psql -U postgres -d slimo -c "SQL_AQUI"
 
 ## 8. APK Android
 
+### 8.1 WebView Wrapper (legado)
 O projeto `mobile-android/` é um **WebView wrapper** que carrega `https://nutrir.online`. Não contém lógica nativa — todas as funcionalidades estão no frontend web.
 
 - Alterações de frontend/backend **não requerem rebuild do APK**.
 - Para gerar novo APK: `./gradlew clean assembleDebug` dentro de `mobile-android/`.
 - O APK de debug está em `mobile-android/app/build/outputs/apk/debug/app-debug.apk` (forçado no git com `git add -f`).
+
+### 8.2 React Native — Build Local via Gradle (recomendado para desenvolvimento)
+
+O projeto `nutrir-mobile/` é o app React Native nativo. O build local é preferível ao EAS Build para desenvolvimento pois é mais rápido (~3–5 min) e exibe erros em tempo real.
+
+#### Pré-requisitos
+- Android Studio instalado
+- `ANDROID_HOME` apontando para `%LOCALAPPDATA%\Android\Sdk`
+- Java 17+
+
+#### Fluxo de build local
+
+```powershell
+# 1. Gera o projeto Android nativo (só precisa rodar quando mudar plugins do app.json)
+cd nutrir-mobile
+npx expo prebuild --platform android --clean
+
+# 2. Builda o APK de debug
+cd android
+.\gradlew.bat assembleDebug
+```
+
+O APK gerado fica em:
+```
+nutrir-mobile/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Envie o arquivo para o celular por qualquer meio (USB, WhatsApp, Google Drive) e instale normalmente.
+
+#### Build de release (assinado)
+```powershell
+cd nutrir-mobile/android
+.\gradlew.bat assembleRelease
+```
+Requer keystore configurado em `nutrir-mobile/android/app/build.gradle`. O keystore gerado está em `nutrir-mobile/nutrir-release.keystore` (senha: ver `credentials.json`).
+
+#### Arquivos de configuração de build
+| Arquivo | Finalidade |
+|---------|-----------|
+| `nutrir-mobile/.npmrc` | `legacy-peer-deps=true` — necessário devido a conflitos de peer deps entre react-native-reanimated e expo-modules-core |
+| `nutrir-mobile/credentials.json` | Keystore local para assinatura (não commitar) |
+| `nutrir-mobile/nutrir-release.keystore` | Certificado de assinatura Android (não commitar) |
+| `nutrir-mobile/eas.json` | Configuração EAS Build (cloud) como alternativa ao build local |
+
+> **Atenção**: `credentials.json` e `nutrir-release.keystore` **nunca devem ser commitados** no git — contêm a chave privada de assinatura do app.
 
 ---
 
@@ -501,7 +547,7 @@ O app atual (`mobile-android/`) é um **WebView wrapper** — uma casca Android 
 | **Maps** | `react-native-maps` + Google Maps SDK | Para futuras funcionalidades de localização de profissionais |
 | **Gráficos** | `victory-native` ou `react-native-gifted-charts` | Substitui Chart.js; roda no thread nativo via Skia |
 | **UI/Ícones** | `lucide-react-native` | Mesmo set de ícones do web app |
-| **Build/Deploy** | EAS Build + EAS Submit | Publica direto na Google Play e App Store |
+| **Build/Deploy** | Gradle local + EAS Build (cloud) | Local: rápido para dev; EAS: CI/CD e iOS |
 
 ---
 
@@ -612,51 +658,170 @@ export const radii = {
 
 ### Fases de Implementação
 
-#### Fase 1 — Fundação (Semana 1–2)
+#### Fase 1 — Fundação ✅ CONCLUÍDA (2026-05-27)
 **Meta**: App roda, faz login, exibe o dashboard com dados reais.
 
-- [ ] `npx create-expo-app nutrir-mobile --template expo-template-blank-typescript`
-- [ ] Configurar Expo Router, React Navigation (Bottom Tabs + Drawer)
-- [ ] Implementar design system Obsidian: tokens de cor, `Card`, `Button`, `Input`
-- [ ] `authStore` com Zustand + `expo-secure-store` (token persistente)
-- [ ] Telas: Login, Registro, Onboarding
-- [ ] Tela Dashboard: anel de calorias (SVG), macros, lista de refeições do dia
-- [ ] `api/client.ts` com axios — interceptor injeta Bearer token automaticamente
+- [x] `npx create-expo-app nutrir-mobile --template expo-template-blank-typescript`
+- [x] Configurar Expo Router v56 + Bottom Tabs (4 abas: Diário, Receitas, Profissional, Clínico)
+- [x] Design system Obsidian: `src/constants/theme.ts` — cores, tipografia, espaçamento, raios
+- [x] `src/store/authStore.ts` — Zustand + `expo-secure-store` (token JWT persistente no Keystore)
+- [x] Auth guard em `app/_layout.tsx` — redireciona automaticamente entre login e tabs
+- [x] Tela Login (`app/(auth)/login.tsx`) — formulário com validação e feedback de erro
+- [x] Tela Registro (`app/(auth)/register.tsx`) — cadastro com confirmação de senha
+- [x] Tela Diário/Dashboard (`app/(tabs)/index.tsx`) — anel SVG de calorias, macros com barra de progresso, lista de refeições
+- [x] Tela Receitas (`app/(tabs)/receitas.tsx`) — listagem com busca local
+- [x] Tela Profissional (`app/(tabs)/profissional.tsx`) — card do nutricionista e consultas
+- [x] Tela Clínico (`app/(tabs)/clinico.tsx`) — perfil clínico com modo leitura/edição
+- [x] `src/api/client.ts` — axios com interceptor JWT automático e logout em 401
+- [x] `src/components/CalorieRing.tsx` — anel SVG animável com react-native-svg
 
-#### Fase 2 — Core de Rastreamento (Semana 3–4)
+**Arquitetura de arquivos criada:**
+```
+nutrir-mobile/
+├── app/
+│   ├── _layout.tsx              # Root layout + QueryClient + Auth guard
+│   ├── (auth)/
+│   │   ├── _layout.tsx          # Stack sem header
+│   │   ├── login.tsx
+│   │   └── register.tsx
+│   └── (tabs)/
+│       ├── _layout.tsx          # Bottom tab navigator
+│       ├── index.tsx            # Diário (Dashboard)
+│       ├── receitas.tsx
+│       ├── profissional.tsx
+│       └── clinico.tsx
+└── src/
+    ├── api/client.ts
+    ├── store/authStore.ts
+    ├── constants/theme.ts
+    └── components/CalorieRing.tsx
+```
+
+#### Fase 2 — Core de Rastreamento ✅ CONCLUÍDA (2026-05-27)
 **Meta**: Usuário consegue registrar tudo que registra hoje no web app.
 
-- [ ] Scanner IA: `expo-camera` + compressão → `/api/ai/analyze-food`
-- [ ] Tela de resultados do scanner: cards de alimentos, adicionar ao diário
-- [ ] Busca de alimentos manual (`/api/user/food-search`)
-- [ ] Registro de água (slider nativo)
-- [ ] Tela Histórico: `victory-native` substituindo Chart.js
-- [ ] Tela Jejum: timer com `expo-background-fetch`
+- [x] Scanner IA: `app/scanner.tsx` — `CameraView` (expo-camera v56), compressão com `expo-image-manipulator`, envio base64 → `/api/ai/analyze-food`
+- [x] Tela de resultados: `app/scan-results.tsx` — seleção de alimentos, escolha de refeição, adicionar ao diário via `POST /diario/add-foods`
+- [x] Busca manual de alimentos: `app/add-food.tsx` — busca debounced com `GET /user/food-search`, seleção de quantidade e refeição
+- [x] Registro de água: `src/components/WaterTracker.tsx` — botões de adição rápida (200/300/500ml), barra de progresso visual
+- [x] Tela Histórico: `app/historico.tsx` — gráficos de linha SVG nativos (sem victory-native), períodos 7/14/30 dias para calorias, proteína, água e peso
+- [x] Tela Jejum: `app/jejum.tsx` — timer em tempo real com anel SVG, persistência do timestamp via `expo-secure-store`, histórico de sessões, meta 16h configurável
 
-#### Fase 3 — Receitas e Plano Nutricional (Semana 5)
+**Novas rotas registradas no root layout (Stack):**
+- `app/scanner.tsx` — `fullScreenModal`
+- `app/scan-results.tsx`
+- `app/add-food.tsx`
+- `app/historico.tsx`
+- `app/jejum.tsx`
+
+**Novos componentes:**
+- `src/components/LineChart.tsx` — gráfico de linha SVG reutilizável (labels, dots, gradiente)
+- `src/components/WaterTracker.tsx` — tracker de hidratação com react-query
+
+**Pacote adicionado:** `expo-image-manipulator ~56.0.15`
+
+#### Fase 3 — Receitas e Plano Nutricional ✅ CONCLUÍDA (2026-05-27)
 **Meta**: Receitas IA e cardápio do nutricionista funcionando.
 
-- [ ] Tela Receitas: abas (Receitas do Nutricionista, Gerar com IA)
-- [ ] Gerador de receitas: `/api/ai/generate-recipe` e `/api/ai/generate-weekly`
-- [ ] Cardápio semanal: abas por dia da semana, cards de refeição
+- [x] **Tela Receitas com 3 abas internas** (`app/(tabs)/receitas.tsx`):
+  - **Aba Nutricionista** — lista filtrada com busca, pull-to-refresh, `GET /recipes?source=nutricionista`
+  - **Aba Gerador IA** — formulário com preferências, objetivo, tipo de refeição, porções → `POST /ai/generate-recipe` → resultado inline com opção de regenerar ou abrir detalhe
+  - **Aba Cardápio** — picker de dia da semana com indicador do dia atual, `GET /meal-plan/weekly`, `POST /ai/generate-weekly`, total de kcal por dia, lista de refeições clicáveis
+- [x] **Tela detalhe de receita** (`app/recipe-detail.tsx`):
+  - Lista de ingredientes com quantidades
+  - Passos numerados de preparo
+  - Card de macros (kcal, proteína, carb, gordura)
+  - Meta chips: tempo de preparo, porções, dificuldade com cor
+  - Suporte a receitas da API (por ID) e receitas geradas pela IA (via `params.data`)
+  - "Adicionar ao diário" com picker de refeição, "Salvar receita" para receitas IA
+- [x] **Componente `RecipeCard`** (`src/components/RecipeCard.tsx`) — card reutilizável com macros, badge de dificuldade colorido, tag "IA"
 
-#### Fase 4 — Perfil e Dados Clínicos (Semana 6)
+**Endpoints utilizados:**
+- `GET /recipes` + `GET /recipes/:id`
+- `POST /ai/generate-recipe` — { preferences, restrictions, goal, meal_type, servings }
+- `GET /meal-plan/weekly` + `POST /ai/generate-weekly`
+- `POST /recipes/save` — salvar receita IA no perfil
+- `POST /diario/add-recipe` — adicionar receita ao diário do dia
+
+#### Fase 4 — Perfil e Dados Clínicos ✅ CONCLUÍDA (2026-05-27)
 **Meta**: Toda a seção de perfil funcional.
 
-- [ ] Drawer lateral (substituindo o drawer web atual)
-- [ ] Tela Perfil: hero card, plano alimentar, histórico de peso
-- [ ] Tela Perfil Clínico: formulário de comorbidades/intolerâncias
-- [ ] Upload de exames: `expo-document-picker` + `expo-file-system`
+- [x] **Drawer lateral animado** (`src/components/AppDrawer.tsx`):
+  - Slide-in da esquerda com `Animated.spring` + backdrop com fade
+  - Itens: Meu Perfil, Histórico, Jejum, Meus Exames, Painel Admin (condicional por role)
+  - Avatar com iniciais, nome, email, badge de plano
+  - Botão "Sair" com logout + redirect para login
+  - `src/store/drawerStore.ts` — Zustand: `open()`, `close()`, `toggle()`
+- [x] **Hamburger em todas as abas** — `src/components/ScreenHeader.tsx` (reutilizável, prop `right` opcional)
+  - Dashboard: hamburger à esquerda + greeting centralizado
+  - Receitas, Profissional, Clínico: `<ScreenHeader />` substituindo títulos inline
+- [x] **Tela Perfil** (`app/perfil.tsx`):
+  - Avatar com tap-to-change via `expo-image-picker` (POST `/user/avatar` com base64)
+  - Grid de stats: idade, altura, peso, IMC calculado
+  - Widget de registro de peso (input + botão Salvar → `POST /profile/weight`)
+  - Gráfico de evolução do peso 30 dias com `LineChart` SVG
+  - Links para Perfil Clínico e Meus Exames
+  - Edição inline do nome via ícone Edit3
+- [x] **Tela Exames** (`app/exams.tsx`):
+  - Upload de PDF e imagens via `expo-document-picker` + leitura base64 com `expo-file-system`
+  - Validação de tamanho (máx 10 MB)
+  - Seletor de categoria: Hemograma, Bioquímica, Hormônios, Urina, Imagem, Outro
+  - Listagem com tipo, data, tamanho e botão de exclusão com confirmação
+- [x] **Tela Clínico atualizada** — link para Exames + `ScreenHeader` com botão Editar
+- [x] **Rotas adicionadas ao Stack**: `perfil`, `exams`
 
-#### Fase 5 — Área Profissional e Vídeo (Semana 7–8)
+**Novos arquivos:**
+- `src/store/drawerStore.ts`
+- `src/components/AppDrawer.tsx`
+- `src/components/ScreenHeader.tsx`
+- `app/perfil.tsx`
+- `app/exams.tsx`
+
+#### Fase 5 — Área Profissional e Vídeo (Semana 7–8) ✅ CONCLUÍDA
 **Meta**: Pacientes premium interagem com profissionais nativamente.
 
-- [ ] Tela Meu Acompanhamento: vinculação, orientações, agendamentos
-- [ ] Agendamento de consultas: calendário nativo (`react-native-calendars`)
-- [ ] **Vídeo chamada nativa** com `react-native-agora`:
-  - Substitui abertura do Jitsi no browser externo
-  - Chamada embutida no app com controles (mudo, câmera, encerrar)
-  - Backend gera `channelName` único por consulta (mesmo UUID atual)
+- [x] **Tela Agendamento de Consultas** (`app/schedule-appointment.tsx`)
+  - Calendário nativo com `react-native-calendars`, tema Obsidian customizado
+  - `minDate=hoje`, `maxDate=hoje+60 dias`
+  - Ao selecionar data: `GET /appointments/available?date=YYYY-MM-DD` retorna slots
+  - Grade de horários disponíveis/indisponíveis com chip visual
+  - Seletor de tipo: Vídeo chamada / Presencial (com ícone e check badge)
+  - Campo de Observações opcional (multiline)
+  - Card de Resumo e botão Confirmar: `POST /appointments`
+  - Sucesso: Alert + router.back()
+
+- [x] **Tela Vídeo Chamada Nativa** (`app/video-call.tsx`)
+  - Integração com `react-native-agora ^4.5.4`
+  - Import com guard dinâmico (require dentro de try/catch) — evita crash no Expo Go
+  - Fallback visual informativo quando `Constants.appOwnership === 'expo'`
+  - Vídeo remoto em tela cheia com `RtcSurfaceView`
+  - PiP de vídeo local (canto superior direito, 100×140)
+  - Controles: Mudo, Câmera off, Encerrar chamada (vermelho)
+  - Estados gerenciados: `connecting → connected`, `remoteUid`, `micMuted`, `camOff`
+  - Cleanup no unmount: `leaveChannel`, `unregisterEventHandler`, `release`
+  - Params via `useLocalSearchParams`: `channelName`, `token`, `appointmentId`
+
+- [x] **Tela Profissional atualizada** (`app/(tabs)/profissional.tsx`)
+  - Botão "Agendar consulta" → navega para `/schedule-appointment`
+  - `AppointmentCard` com botão "Entrar na consulta" para consultas de vídeo agendadas → navega para `/video-call` com params
+  - Seção "Meu Acompanhamento" com orientações do nutricionista (`GET /user/nutritionist-notes`)
+  - Interface `NutritionistNote` e cards de notas com data e conteúdo
+
+- [x] **Rotas adicionadas ao Stack** (`app/_layout.tsx`):
+  - `schedule-appointment` — `slide_from_right`
+  - `video-call` — `fullScreenModal + slide_from_bottom`
+
+**Pacotes instalados (Fase 5):**
+- `react-native-agora ^4.5.4` — vídeo chamada nativa (requer EAS Build)
+- `react-native-calendars ^1.1314.0` — calendário de agendamento
+
+**Permissões adicionadas ao `app.json`:**
+- iOS: `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`
+- Android: `CAMERA`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `BLUETOOTH`, `BLUETOOTH_CONNECT`
+
+**Novos arquivos:**
+- `app/schedule-appointment.tsx`
+- `app/video-call.tsx`
 
 #### Fase 6 — Push Notifications (Semana 9)
 **Meta**: Notificações reais que funcionam com app fechado.
@@ -674,9 +839,27 @@ export const radii = {
 
 - [ ] Testar tudo no simulador iOS (via EAS Build)
 - [ ] Configurar `eas.json` para perfis `development`, `preview`, `production`
-- [ ] Gerar APK/AAB para Google Play: `eas build --platform android --profile production`
-- [ ] Gerar IPA para App Store: `eas build --platform ios --profile production`
+- [ ] Gerar APK/AAB para Google Play:
+  - **Local**: `cd android && .\gradlew.bat bundleRelease`
+  - **Cloud**: `eas build --platform android --profile production`
+- [ ] Gerar IPA para App Store: `eas build --platform ios --profile production` (requer Mac ou EAS)
 - [ ] Submissão automática: `eas submit`
+
+---
+
+### .gitignore recomendado para `nutrir-mobile/`
+
+```gitignore
+node_modules/
+android/
+ios/
+dist/
+.expo/
+*.keystore
+credentials.json
+```
+
+> A pasta `android/` é gerada automaticamente por `npx expo prebuild` e **não deve ser versionada** — ela é recriada a partir do `app.json` e dos plugins. Versionar causaria conflitos ao rodar prebuild novamente.
 
 ---
 
@@ -716,11 +899,24 @@ O projeto RN deve viver em repositório separado (`nutrir-mobile`) para não mis
 # Inicializar o projeto RN
 npx create-expo-app nutrir-mobile --template expo-template-blank-typescript
 cd nutrir-mobile
+
+# Dependências principais (versões compatíveis com Expo SDK 56)
 npx expo install expo-router expo-secure-store expo-camera expo-image-picker \
-  expo-notifications expo-document-picker expo-file-system \
-  react-native-maps zustand @tanstack/react-query axios \
-  lucide-react-native victory-native react-native-agora
+  expo-notifications expo-document-picker expo-file-system expo-image-manipulator \
+  expo-linking expo-constants expo-modules-core expo-system-ui \
+  react-native-reanimated react-native-worklets react-native-gesture-handler \
+  react-native-svg react-native-safe-area-context react-native-screens \
+  react-native-agora react-native-calendars
+
+npm install zustand @tanstack/react-query axios lucide-react-native \
+  @react-navigation/native @react-navigation/bottom-tabs @react-navigation/stack \
+  --legacy-peer-deps
+
+# Criar .npmrc para resolver conflitos de peer deps
+echo "legacy-peer-deps=true" > .npmrc
 ```
+
+> **Nota importante**: O peer conflict entre `react-native-reanimated` (que exige `react-native-worklets@0.9.x`) e `expo-modules-core` (que quer `worklets@^0.7||^0.8`) é resolvido com `.npmrc`. Sempre instale novos pacotes com `--legacy-peer-deps` ou via `npx expo install`.
 
 ---
 
@@ -789,3 +985,81 @@ import { initProMeals, loadMealPlansData, openMealPlanBuilder, saveMealPlan } fr
 - **Listeners estáticos**: Registre em funções `init*()` chamadas no `DOMContentLoaded` do `admin.js`. Nunca dentro de funções `load*()` que executam após chamadas à API.
 - **Listeners dinâmicos**: Se o elemento é gerado em tempo de execução (ex: botão de linha de tabela), associe o listener diretamente no momento da renderização do HTML.
 - **Novo módulo**: crie o arquivo em `admin/modules/`, exporte as funções públicas, importe no `admin.js` e adicione a chamada de init e load no fluxo de `initAdmin()` / `loadTab()`.
+
+---
+
+## 14. 🐛 BUG ATIVO — Scanner Mobile React Native crasha após upload
+
+> **Status:** NÃO RESOLVIDO em 2026-05-28. Encaminhado para outro agente.
+> **Arquivos envolvidos:** `nutrir-mobile/app/scanner.tsx`, `backend/routes/ai.js`.
+
+### 14.1. O que o scanner faz
+
+O fluxo do scanner é:
+1. Usuário tira foto via `expo-camera` (`CameraView` + `takePictureAsync`)
+2. Imagem é comprimida com `expo-image-manipulator` (`manipulateAsync`, 800px JPEG q=0.7)
+3. Imagem comprimida é enviada para o backend que chama Gemini Vision (`promptAnalyzeFood`)
+4. Backend devolve JSON `{ items:[…], total:{…} }`
+5. App navega para `/scan-results` com os dados
+
+### 14.2. Sintoma do bug
+
+**O app trava silenciosamente ("nutrir-mobile parou") sempre na etapa de receber a resposta do backend**, ~16-20 segundos após a captura (tempo que o Gemini Vision demora). Nenhum erro JS é capturado — o processo Android morre diretamente.
+
+Para diagnosticar foi adicionado um painel de logs em tempo real dentro de `scanner.tsx` que mostra cada sub-etapa. Os últimos logs vistos antes do crash variam por abordagem testada — ver tabela abaixo.
+
+### 14.3. Tudo que JÁ foi tentado (sem sucesso)
+
+| Tentativa | Implementação | Último log antes do crash |
+| --- | --- | --- |
+| **1. axios POST JSON** (original) | `api.post('/ai/analyze-food', { image: base64 })` com `timeout: 60000` | Sem logs detalhados — crashava após capturar+comprimir |
+| **2. fetch POST JSON** | `fetch(url, { body: JSON.stringify({ image }) })` com `AbortController` | `4b. HTTP 200 em 20061ms` — crashava após receber headers, antes de `res.text()` |
+| **3. XMLHttpRequest POST JSON** | `xhr.open('POST', …)`, `xhr.send(JSON.stringify({ image }))` com handlers em `onreadystatechange` | `4b.1. Headers recebidos (HTTP 200) em 16004ms` — crashava antes de `readyState 3` (LOADING) |
+| **4. FileSystem.uploadAsync BINARY_CONTENT** (mais recente) | `FileSystem.uploadAsync(url, compressed.uri, { uploadType: BINARY_CONTENT, headers: { 'Content-Type': 'image/jpeg' } })` para endpoint novo `/ai/analyze-food-binary` que aceita `express.raw({ type: 'image/*' })` | `4. Upload nativo (OkHttp) → /ai/analyze-food-binary…` — crashava igual, sem chegar no log de HTTP retornado |
+
+### 14.4. Hipóteses descartadas
+
+- ❌ **Tamanho da imagem em base64 (~178 KB)**: testado — o problema persiste mesmo com imagem pequena
+- ❌ **Hermes não suporta `JSON.stringify` de string grande**: o log mostra que `JSON.stringify` completa OK
+- ❌ **Bridge JS↔Native do RN Networking**: a tentativa #4 usa `FileSystem.uploadAsync` que utiliza OkHttp nativo DIRETO (a mesma abordagem que o app Kotlin nativo em `mobile-android/` usa e funciona) — ainda assim crashou
+- ❌ **Backend não respondendo**: nas tentativas 2 e 3 vemos HTTP 200 chegando antes do crash
+- ❌ **Memória excessiva (OOM)**: o telefone tem 12+ GB livres no momento do teste
+- ❌ **Permissão de câmera/galeria**: ambas estão concedidas e funcionando
+- ❌ **`expo-file-system` deprecado**: corrigido com `import * as FileSystem from 'expo-file-system/legacy'`
+- ❌ **API fluente nova do `ImageManipulator`**: corrigido voltando para `manipulateAsync` (API estável)
+
+### 14.5. Pistas que podem ajudar o próximo agente
+
+1. **A versão Kotlin nativa (`mobile-android/`) já existe e funciona** com o mesmo backend. Comparar como ela manda imagem e processa resposta.
+2. **`backend/routes/ai.js` log mostra `Gemini OK: gemini-2.5-flash (v1beta)`** — então o backend SEMPRE responde com sucesso. O crash é puramente no client.
+3. O endpoint `POST /api/ai/analyze-food-binary` foi adicionado e está funcional (retorna `401` sem token, `200` com token). Pode ser usado.
+4. **Pode ser um native crash** (não JS). Vale rodar `adb logcat` enquanto reproduz o crash para capturar o stack trace nativo. Não foi feito ainda.
+5. **Verificar limit de memória do Hermes**: app pode estar segurando referências de bitmaps antigos da câmera. Talvez `cameraRef.current.pausePreview()` antes do upload ajude.
+6. Configuração relevante de `app.json`:
+   - SDK Expo 56
+   - `jsEngine: 'hermes'` (padrão)
+   - Permissões: `CAMERA`, `READ_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`
+7. **Modelo do device de teste:** Android com Realme/Oppo UI — pode ter restrições agressivas de OEM (background killing, OOM agressivo).
+
+### 14.6. Build do APK
+
+```powershell
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+Set-Location "C:\Users\admin\Desktop\Dieta\nutrir-mobile\android"
+.\gradlew.bat assembleRelease
+# APK em: app\build\outputs\apk\release\app-release.apk (372 MB devido Agora SDK)
+```
+
+### 14.7. Outras correções APLICADAS na mesma sessão (essas funcionam!)
+
+1. **Tab bar respeitando navbar do Android** — `_layout.tsx` usa `useSafeAreaInsets().bottom`
+2. **Perfil mostrando `--`** — `r.data.profile.height/weight` (não `height_cm/weight_kg`)
+3. **Perfil Clínico não salvando** — rota correta `/user/clinical` (não `/profile/clinical`), método POST, `useEffect` em vez de `onSuccess` (deprecated no TanStack v5)
+4. **Coluna `medications` / `health_goals`** — adicionada migração idempotente em `backend/server.js` (`ALTER TABLE IF NOT EXISTS`)
+5. **Macros invisíveis no dashboard** — `MacroCard` redesenhado com `/240g` na mesma cor do macro e percentual abaixo da barra
+6. **Galeria adicionada ao scanner** — botão `ImagePicker.launchImageLibraryAsync` ao lado do botão de captura
+
+### 14.8. Memória/contexto importante
+
+- **Deploy workflow obrigatório:** `git add` → `git commit` → **`git push`** → `node deploy.js`. O `deploy.js` faz `git pull origin master` na VPS, então sem push o servidor pega código antigo.
+- Container Docker mantém versão antiga rodando se o novo build falha. Bug com `const` duplicado fez SyntaxError silencioso — a rota nova retornava 404 enquanto outras funcionavam.
