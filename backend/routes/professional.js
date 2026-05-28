@@ -470,4 +470,25 @@ router.delete('/patients/:id/measurements/:measId', verifyPatientAccess, async (
   }
 });
 
+// POST /professional/patients/:id/target-calories — salva meta calórica do cálculo energético
+router.post('/patients/:id/target-calories', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  const { target_calories } = req.body;
+  if (!target_calories || isNaN(target_calories)) {
+    return res.status(400).json({ error: 'Valor de meta calórica inválido.' });
+  }
+  try {
+    await db.query(
+      `INSERT INTO profiles (user_id, target_calories)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET target_calories = EXCLUDED.target_calories`,
+      [patientId, Math.round(target_calories)]
+    );
+    res.json({ message: 'Meta calórica atualizada.', target_calories: Math.round(target_calories) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar meta calórica.' });
+  }
+});
+
 module.exports = router;

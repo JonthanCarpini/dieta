@@ -2,7 +2,7 @@
  * pro-energy.js — Cálculo Energético (TMB/GET)
  * Portado diretamente das fórmulas do WebDiet (webdiet_calculo_energetico.py)
  */
-import { adminState } from './state.js';
+import { API_URL, adminState } from './state.js';
 
 // ── Fórmulas adulto ───────────────────────────────────────────────────────────
 const FORMULAS_ADULTO = [
@@ -15,7 +15,7 @@ const FORMULAS_ADULTO = [
     { id: 9,  nome: 'Henry & Rees (1991)',              req_mlg: false },
     { id: 11, nome: 'GET por fórmula de bolso',         req_mlg: false },
     { id: 12, nome: 'Tinsley — por peso (2018)',        req_mlg: false },
-    { id: 13, nome: 'Tinsley — por MLG (2018)',        req_mlg: true  },
+    { id: 13, nome: 'Tinsley — por MLG (2018)',         req_mlg: true  },
 ];
 
 const FATORES_ATIVIDADE = [
@@ -58,7 +58,27 @@ const FATORES_INJURIA = [
     { id: 27, fator: 1.150, desc: 'Ventilação mecânica' },
 ];
 
-// ── Funções FAO/WHO e Henry & Rees (por faixa etária) ────────────────────────
+// ── Utilitário: calcula idade a partir de birthdate ───────────────────────────
+function _calcAge(birthdate) {
+    if (!birthdate) return null;
+    const today = new Date();
+    const birth = new Date(birthdate);
+    if (isNaN(birth)) return null;
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age > 0 ? age : null;
+}
+
+// ── Normaliza valor de gênero do banco para 'M' ou 'F' ───────────────────────
+function _normalizeGender(raw) {
+    if (!raw) return 'F';
+    const v = String(raw).toLowerCase();
+    if (v === 'm' || v === 'male' || v === 'masculino' || v === 'masc') return 'M';
+    return 'F';
+}
+
+// ── Funções FAO/WHO e Henry & Rees ────────────────────────────────────────────
 function _faoWho(peso, alturaM, idadeMeses, genero) {
     if (genero === 'M') {
         if (idadeMeses < 36)  return (0.255 * peso - 0.141 * alturaM + 2.690) * 239;
@@ -108,42 +128,32 @@ function calcTmb(formulaId, peso, altura, idade, genero, mlg) {
         tmb = genero === 'M'
             ? 66.4730 + 13.7516 * peso + 5.0033 * altura - 6.7550 * idade
             : 655.0955 + 9.5634 * peso + 1.8494 * altura - 4.6756 * idade;
-
     } else if (formulaId === 2) {
         tmb = genero === 'M'
             ? 88.362 + 13.397 * peso + 4.799 * altura - 5.677 * idade
             : 447.593 + 9.247 * peso + 3.098 * altura - 4.330 * idade;
-
     } else if (formulaId === 3) {
         if (!mlg) return null;
         tmb = 370 + 21.6 * mlg;
-
     } else if (formulaId === 4) {
         if (!mlg) return null;
         tmb = genero === 'M' ? 500 + 22 * mlg : 481 + 22 * mlg;
-
     } else if (formulaId === 6) {
         tmb = genero === 'M'
             ? 9.99 * peso + 6.25 * altura - 4.92 * idade + 5
             : 9.99 * peso + 6.25 * altura - 4.92 * idade - 161;
-
     } else if (formulaId === 8) {
         tmb = _faoWho(peso, alturaM, idadeMeses, genero);
-
     } else if (formulaId === 9) {
         tmb = _henryRees(peso, alturaM, idadeMeses, genero);
-
     } else if (formulaId === 11) {
         tmb = genero === 'M' ? peso * 25 : peso * 20;
         obs = 'Fórmula de bolso — valor já representa o GET direto (sem multiplicar por fator de atividade)';
-
     } else if (formulaId === 12) {
         tmb = 24.8 * peso + 10;
-
     } else if (formulaId === 13) {
         if (!mlg) return null;
         tmb = 25.9 * mlg + 284;
-
     } else {
         return null;
     }
@@ -152,7 +162,7 @@ function calcTmb(formulaId, peso, altura, idade, genero, mlg) {
 }
 
 function _applyFactors(tmb, formulaId, fatAtiv, fatInj) {
-    if (formulaId === 11) return Math.round(tmb * 10) / 10; // bolso = GET direto
+    if (formulaId === 11) return Math.round(tmb * 10) / 10;
     const fa = fatAtiv === 1.0 ? 1 : fatAtiv;
     const fi = fatInj  === 1.0 ? 1 : fatInj;
     return Math.round(tmb * fa * fi * 10) / 10;
@@ -171,7 +181,48 @@ function _getFormValues() {
     };
 }
 
-// ── Ação: Calcular e exibir resultado ─────────────────────────────────────────
+// ── Salvar GET como meta calórica do paciente ─────────────────────────────────
+async function _saveTargetCalories(get) {
+    const patient = adminState._currentPatient;
+    if (!patient) return;
+
+    const btn = document.getElementById('btn-ec-salvar');
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+
+    try {
+        const res = await fetch(`${API_URL}/professional/patients/${patient.id}/target-calories`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminState.token}`
+            },
+            body: JSON.stringify({ target_calories: Math.round(get) })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Erro ao salvar');
+        }
+
+        // Atualiza adminState e o badge da sidebar
+        adminState._currentPatient.target_calories = Math.round(get);
+        const sidebarEl = document.getElementById('ps-stat-calories');
+        if (sidebarEl) sidebarEl.textContent = `${Math.round(get)} kcal`;
+
+        if (btn) {
+            btn.textContent = '✓ Salvo!';
+            btn.style.background = '#22c55e';
+            setTimeout(() => {
+                if (btn) { btn.disabled = false; btn.textContent = 'Salvar como meta do paciente'; btn.style.background = ''; }
+            }, 2500);
+        }
+    } catch (err) {
+        alert('Erro ao salvar: ' + err.message);
+        if (btn) { btn.disabled = false; btn.textContent = 'Salvar como meta do paciente'; }
+    }
+}
+
+// ── Calcular e renderizar resultado ──────────────────────────────────────────
 function _calcAndRender() {
     const { peso, altura, idade, genero, mlg, formulaId, fatAtiv, fatInj } = _getFormValues();
     if (!peso || !altura || !idade) {
@@ -180,7 +231,7 @@ function _calcAndRender() {
     }
     const formula = FORMULAS_ADULTO.find(f => f.id === formulaId);
     if (formula?.req_mlg && !mlg) {
-        alert(`A fórmula "${formula.nome}" requer MLG (Massa Livre de Gordura). Preencha o campo correspondente.`);
+        alert(`A fórmula "${formula.nome}" requer MLG. Preencha o campo MLG.`);
         return;
     }
     const result = calcTmb(formulaId, peso, altura, idade, genero, mlg);
@@ -193,36 +244,52 @@ function _calcAndRender() {
 
     const box = document.getElementById('ec-result-box');
     if (!box) return;
+
     box.classList.remove('hidden');
     box.innerHTML = `
-        <div class="ec-result-header"><strong>${formula.nome}</strong></div>
-        <div class="ec-result-grid">
-            <div class="ec-result-item ec-tmb">
-                <span class="ec-result-label">TMB</span>
-                <span class="ec-result-value">${tmb.toFixed(0)}<small> kcal/dia</small></span>
-                <span class="ec-result-sub">${(tmb / peso).toFixed(1)} kcal/kg</span>
+        <div style="margin-bottom:16px;">
+            <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-2); margin-bottom:4px;">Fórmula</div>
+            <div style="font-size:14px; font-weight:700; color:var(--text);">${formula.nome}</div>
+        </div>
+
+        <!-- TMB e GET em destaque -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+            <div style="background:var(--bg-surface-alt); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:center;">
+                <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-2); margin-bottom:6px;">TMB</div>
+                <div style="font-size:28px; font-weight:800; color:var(--accent); letter-spacing:-0.03em;">${tmb.toFixed(0)}</div>
+                <div style="font-size:11px; color:var(--text-2);">kcal/dia · ${(tmb / peso).toFixed(1)} kcal/kg</div>
             </div>
-            <div class="ec-result-item ec-get">
-                <span class="ec-result-label">GET</span>
-                <span class="ec-result-value">${get.toFixed(0)}<small> kcal/dia</small></span>
-                <span class="ec-result-sub">${(get / peso).toFixed(1)} kcal/kg</span>
-            </div>
-            <div class="ec-result-item">
-                <span class="ec-result-label">Fat. Atividade</span>
-                <span class="ec-result-value" style="font-size:16px;">${fatAtiv}</span>
-                <span class="ec-result-sub">${fatAtivDesc}</span>
-            </div>
-            <div class="ec-result-item">
-                <span class="ec-result-label">Fat. Injúria</span>
-                <span class="ec-result-value" style="font-size:16px;">${fatInj}</span>
-                <span class="ec-result-sub">${fatInjDesc}</span>
+            <div style="background:var(--accent-dim); border:1px solid rgba(245,193,77,0.25); border-radius:10px; padding:16px; text-align:center;">
+                <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--accent); margin-bottom:6px;">GET</div>
+                <div style="font-size:28px; font-weight:800; color:var(--accent); letter-spacing:-0.03em;">${get.toFixed(0)}</div>
+                <div style="font-size:11px; color:var(--text-2);">kcal/dia · ${(get / peso).toFixed(1)} kcal/kg</div>
             </div>
         </div>
-        ${obs ? `<p class="description" style="margin-top:8px; font-size:11px; color:var(--color-primary);">${obs}</p>` : ''}
+
+        <!-- Fatores usados -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;">
+            <div style="background:var(--bg-surface-alt); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
+                <div style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-2); margin-bottom:3px;">Atividade</div>
+                <div style="font-size:13px; font-weight:600; color:var(--text);">${fatAtiv} <span style="font-size:11px; font-weight:400; color:var(--text-2);">— ${fatAtivDesc}</span></div>
+            </div>
+            <div style="background:var(--bg-surface-alt); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
+                <div style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-2); margin-bottom:3px;">Injúria</div>
+                <div style="font-size:13px; font-weight:600; color:var(--text);">${fatInj} <span style="font-size:11px; font-weight:400; color:var(--text-2);">— ${fatInjDesc}</span></div>
+            </div>
+        </div>
+
+        ${obs ? `<p style="font-size:11px; color:var(--accent); background:var(--accent-dim); border-radius:8px; padding:8px 12px; margin-bottom:16px;">${obs}</p>` : ''}
+
+        <!-- Botão salvar -->
+        <button id="btn-ec-salvar" class="btn-primary w-full" style="font-size:13px; padding:12px;">
+            Salvar ${get.toFixed(0)} kcal como meta calórica do paciente
+        </button>
     `;
+
+    document.getElementById('btn-ec-salvar')?.addEventListener('click', () => _saveTargetCalories(get));
 }
 
-// ── Ação: Tabela comparativa de todas as fórmulas ─────────────────────────────
+// ── Tabela comparativa ────────────────────────────────────────────────────────
 function _renderComparison() {
     const { peso, altura, idade, genero, mlg, fatAtiv, fatInj } = _getFormValues();
     if (!peso || !altura || !idade) {
@@ -248,54 +315,79 @@ function _renderComparison() {
         const isMiddle = i === Math.floor(rows.length / 2);
         return `<tr style="${isMiddle ? 'background:rgba(245,193,77,0.05);' : ''}">
             <td>${r.nome}</td>
-            <td style="font-weight:600; color:var(--color-primary);">${r.tmb.toFixed(0)} kcal</td>
-            <td style="color:var(--color-text-muted);">${r.tmbPerKg.toFixed(1)}</td>
+            <td style="font-weight:600; color:var(--accent);">${r.tmb.toFixed(0)} kcal</td>
+            <td style="color:var(--text-2);">${r.tmbPerKg.toFixed(1)}</td>
             <td style="font-weight:600;">${r.get.toFixed(0)} kcal</td>
-            <td style="color:var(--color-text-muted);">${r.getPerKg.toFixed(1)}</td>
+            <td style="color:var(--text-2);">${r.getPerKg.toFixed(1)}</td>
         </tr>`;
     }).join('');
 
-    document.getElementById('ec-comparison-col')?.classList.remove('hidden');
+    document.getElementById('ec-comparison-wrap')?.classList.remove('hidden');
 }
 
-// ── Renderiza a aba de Cálculo Energético no painel do paciente ───────────────
+// ── Renderiza a aba de Cálculo Energético ─────────────────────────────────────
 export function renderEnergyCalcTab(container, patient) {
+    // Dados do paciente
     const peso   = patient?.weight  || '';
     const altura = patient?.height  || '';
 
+    // Idade e sexo a partir do perfil completo armazenado no estado
+    const profile   = adminState._currentPatientProfile || {};
+    const birthdate = profile.birthdate || profile.birth_date || null;
+    const age       = _calcAge(birthdate) ?? (profile.age ? parseInt(profile.age) : '');
+    const genderVal = _normalizeGender(profile.gender || profile.sex || profile.biological_sex || '');
+
+    // MLG da avaliação mais recente
+    const measurements = adminState._currentPatientMeasurements || [];
+    let mlgAuto = '';
+    let pesoAuto = peso;
+    let alturaAuto = altura;
+    if (measurements.length > 0) {
+        const latest = measurements[0];
+        if (latest.muscle_mass_kg) {
+            mlgAuto = parseFloat(latest.muscle_mass_kg).toFixed(1);
+        } else if (latest.body_fat_pct && latest.weight_kg) {
+            mlgAuto = (latest.weight_kg * (1 - latest.body_fat_pct / 100)).toFixed(1);
+        }
+        if (!pesoAuto   && latest.weight_kg) pesoAuto   = parseFloat(latest.weight_kg).toFixed(1);
+        if (!alturaAuto && latest.height_cm) alturaAuto = parseFloat(latest.height_cm).toFixed(1);
+    }
+
     container.innerHTML = `
-        <div class="energy-calc-wrap">
-            <div class="energy-calc-form-col">
-                <h3 style="margin:0 0 4px; font-size:14px; font-weight:700; color:var(--color-text-main);">
-                    Cálculo Energético — TMB / GET
-                </h3>
-                <p class="description" style="margin-bottom:20px; font-size:12px;">
-                    Calcule a Taxa Metabólica Basal e o Gasto Energético Total com base nas principais fórmulas clínicas. Dados do paciente são pré-preenchidos automaticamente.
-                </p>
+        <div class="pp-header">
+            <h1>Cálculo Energético — TMB / GET</h1>
+            <p>Calcule a Taxa Metabólica Basal e o Gasto Energético Total. Dados do perfil são pré-preenchidos automaticamente.</p>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:flex-start;">
+
+            <!-- COLUNA ESQUERDA: Formulário -->
+            <div class="pp-section">
+                <div class="pp-section-title"><i data-lucide="calculator"></i> Parâmetros</div>
 
                 <div class="energy-form-grid">
                     <div class="energy-field">
                         <label>Peso (kg)</label>
-                        <input type="number" id="ec-peso" step="0.1" min="1" value="${peso}" placeholder="Ex: 72.5">
+                        <input type="number" id="ec-peso" step="0.1" min="1" value="${pesoAuto}" placeholder="Ex: 72.5">
                     </div>
                     <div class="energy-field">
                         <label>Altura (cm)</label>
-                        <input type="number" id="ec-altura" step="0.1" min="1" value="${altura}" placeholder="Ex: 168">
+                        <input type="number" id="ec-altura" step="0.1" min="1" value="${alturaAuto}" placeholder="Ex: 168">
                     </div>
                     <div class="energy-field">
                         <label>Idade (anos)</label>
-                        <input type="number" id="ec-idade" step="1" min="1" max="120" placeholder="Ex: 35">
+                        <input type="number" id="ec-idade" step="1" min="1" max="120" value="${age}" placeholder="Ex: 35">
                     </div>
                     <div class="energy-field">
                         <label>Sexo biológico</label>
                         <select id="ec-genero">
-                            <option value="F">Feminino</option>
-                            <option value="M">Masculino</option>
+                            <option value="F"${genderVal === 'F' ? ' selected' : ''}>Feminino</option>
+                            <option value="M"${genderVal === 'M' ? ' selected' : ''}>Masculino</option>
                         </select>
                     </div>
                     <div class="energy-field energy-field-span2">
-                        <label>MLG — Massa Livre de Gordura (kg) <span style="font-weight:400; color:var(--color-text-muted);">opcional, obrigatório em fórmulas *</span></label>
-                        <input type="number" id="ec-mlg" step="0.1" min="0" placeholder="Preenchido automaticamente se houver avaliação antropométrica">
+                        <label>MLG — Massa Livre de Gordura (kg) <span style="font-weight:400; color:var(--text-2);">opcional, obrigatório em *</span></label>
+                        <input type="number" id="ec-mlg" step="0.1" min="0" value="${mlgAuto}" placeholder="Calculado da antropometria se disponível">
                     </div>
                     <div class="energy-field energy-field-span2">
                         <label>Fórmula de Cálculo</label>
@@ -317,69 +409,51 @@ export function renderEnergyCalcTab(container, patient) {
                     </div>
                 </div>
 
-                <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
-                    <button class="btn-primary" id="btn-ec-calcular" style="flex:1; min-width:140px;">
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn-primary" id="btn-ec-calcular" style="flex:1;">
                         <i data-lucide="calculator" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;"></i>
                         Calcular TMB / GET
                     </button>
-                    <button class="btn-secondary" id="btn-ec-comparar" style="min-width:140px;">
+                    <button class="btn-secondary" id="btn-ec-comparar">
                         <i data-lucide="bar-chart-2" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;"></i>
-                        Comparar fórmulas
+                        Comparar
                     </button>
                 </div>
 
-                <div id="ec-result-box" class="ec-result-box hidden" style="margin-top:18px;"></div>
+                <p style="margin-top:16px; font-size:11px; color:var(--text-2); border-top:1px solid var(--border); padding-top:12px; line-height:1.5;">
+                    * Requerem MLG. Calcule: MLG = Peso × (1 − %Gordura ÷ 100). Fonte: WebDiet — Motor de Cálculo Energético.
+                </p>
             </div>
 
-            <div id="ec-comparison-col" class="energy-comparison-col hidden">
-                <h4 style="margin:0 0 12px; font-size:13px; font-weight:700;">Comparação entre Fórmulas</h4>
-                <p class="description" style="font-size:11px; margin-bottom:12px;">
-                    Ordenado por TMB crescente. Fórmulas com * requeriam MLG e foram omitidas se não preenchido.
-                </p>
-                <div class="table-responsive">
-                    <table class="data-table" style="font-size:12px;">
-                        <thead>
-                            <tr>
-                                <th>Fórmula</th>
-                                <th>TMB</th>
-                                <th>TMB/kg</th>
-                                <th>GET</th>
-                                <th>GET/kg</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ec-comparison-body"></tbody>
-                    </table>
+            <!-- COLUNA DIREITA: Resultado + Comparação -->
+            <div style="display:flex; flex-direction:column; gap:16px;">
+
+                <!-- Resultado principal (preenchido ao calcular) -->
+                <div id="ec-result-box" class="pp-section hidden"></div>
+
+                <!-- Tabela comparativa (preenchida ao clicar Comparar) -->
+                <div id="ec-comparison-wrap" class="pp-section hidden">
+                    <div class="pp-section-title"><i data-lucide="bar-chart-2"></i> Comparação entre Fórmulas</div>
+                    <p style="font-size:11px; color:var(--text-2); margin-bottom:12px;">Ordenado por TMB crescente. Fórmulas com * foram omitidas se MLG não preenchido.</p>
+                    <div class="table-responsive">
+                        <table class="data-table" style="font-size:12px;">
+                            <thead>
+                                <tr>
+                                    <th>Fórmula</th>
+                                    <th>TMB</th>
+                                    <th>TMB/kg</th>
+                                    <th>GET</th>
+                                    <th>GET/kg</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ec-comparison-body"></tbody>
+                        </table>
+                    </div>
                 </div>
+
             </div>
         </div>
-        <p class="description" style="margin-top:14px; font-size:11px; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">
-            * Requerem Massa Livre de Gordura (MLG). Calcule: MLG = Peso × (1 − %Gordura ÷ 100). Fonte: WebDiet — Motor de Cálculo Energético.
-        </p>
     `;
-
-    // Auto-fill MLG a partir da avaliação antropométrica mais recente
-    const measurements = adminState._currentPatientMeasurements;
-    if (measurements?.length > 0) {
-        const latest = measurements[0];
-        const ecMlgInput = document.getElementById('ec-mlg');
-        if (ecMlgInput) {
-            if (latest.muscle_mass_kg) {
-                ecMlgInput.value = parseFloat(latest.muscle_mass_kg).toFixed(1);
-            } else if (latest.body_fat_pct && latest.weight_kg) {
-                const mlg = latest.weight_kg * (1 - latest.body_fat_pct / 100);
-                ecMlgInput.value = mlg.toFixed(1);
-            }
-        }
-        // Auto-fill peso da avaliação mais recente se não veio do perfil
-        const ecPesoInput = document.getElementById('ec-peso');
-        if (ecPesoInput && !ecPesoInput.value && latest.weight_kg) {
-            ecPesoInput.value = parseFloat(latest.weight_kg).toFixed(1);
-        }
-        const ecAlturaInput = document.getElementById('ec-altura');
-        if (ecAlturaInput && !ecAlturaInput.value && latest.height_cm) {
-            ecAlturaInput.value = parseFloat(latest.height_cm).toFixed(1);
-        }
-    }
 
     document.getElementById('btn-ec-calcular')?.addEventListener('click', _calcAndRender);
     document.getElementById('btn-ec-comparar')?.addEventListener('click', _renderComparison);
@@ -388,5 +462,5 @@ export function renderEnergyCalcTab(container, patient) {
 }
 
 export function initProEnergy() {
-    // Todos os listeners são criados via renderEnergyCalcTab()
+    // Listeners criados via renderEnergyCalcTab()
 }

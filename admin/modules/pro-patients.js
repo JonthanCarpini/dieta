@@ -191,6 +191,7 @@ export async function viewPatientDetails(patient) {
 
         adminState._allMeals = data.meals || [];
         adminState._patientTargetCalories = data.profile?.target_calories || 0;
+        adminState._currentPatientProfile = data.profile || {};
 
         document.querySelectorAll('.diary-filter-btn').forEach(b => b.classList.remove('active'));
         const btn7 = document.querySelector('.diary-filter-btn[data-days="7"]');
