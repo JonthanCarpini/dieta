@@ -219,7 +219,9 @@ db.query(`
     `);
     console.log('Banco de alimentos TACO inicializado com sucesso.');
   }
-  }).catch(e => console.error('Foods migration error:', e.message));
+  } catch (e) {
+    console.error('Foods migration error:', e.message);
+  }
 })();
 
 // Registro das rotas da API
