@@ -18,6 +18,7 @@ import {
   LogOut,
   ChevronRight,
   ShieldCheck,
+  Flame,
 } from 'lucide-react-native';
 import { useDrawerStore } from '../store/drawerStore';
 import { useAuthStore } from '../store/authStore';
@@ -35,10 +36,11 @@ interface DrawerItem {
 const ITEMS: DrawerItem[] = [
   { icon: <User size={20} color={colors.accentGreen} />, label: 'Meu Perfil', path: '/perfil' },
   { icon: <History size={20} color={colors.accentBlue} />, label: 'Histórico', path: '/historico' },
-  { icon: <Timer size={20} color={colors.accentOrange} />, label: 'Jejum Intermitente', path: '/jejum' },
+  { icon: <Flame size={20} color={colors.accentOrange} />, label: 'Atividades e Passos', path: '/atividades' },
+  { icon: <Timer size={20} color={colors.accentYellow} />, label: 'Jejum Intermitente', path: '/jejum' },
   { icon: <FileText size={20} color={colors.accentPurple} />, label: 'Meus Exames', path: '/exams' },
   {
-    icon: <ShieldCheck size={20} color={colors.accentYellow} />,
+    icon: <ShieldCheck size={20} color={colors.textPrimary} />,
     label: 'Painel Admin',
     path: '/admin',
     roles: ['admin', 'nutricionista'],

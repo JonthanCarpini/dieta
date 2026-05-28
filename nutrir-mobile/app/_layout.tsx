@@ -48,6 +48,7 @@ function AuthGuard() {
       <Stack.Screen name="add-food" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="historico" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="jejum" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="atividades" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="recipe-detail" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="perfil" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="exams" options={{ animation: 'slide_from_right' }} />

@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { History, ScanLine, Plus, Search, Menu, X, AlertTriangle, Trash2, Edit3 } from 'lucide-react-native';
+import { History, ScanLine, Plus, Search, Menu, X, AlertTriangle, Trash2, Edit3, Award } from 'lucide-react-native';
 import { useAuthStore } from '../../src/store/authStore';
 import { useDrawerStore } from '../../src/store/drawerStore';
 import api from '../../src/api/client';
@@ -52,6 +52,17 @@ interface DailySummary {
     fats: number;
     items: MealItemDetail[];
   }>;
+  activity: {
+    steps: number;
+    steps_target: number;
+    steps_calories: number;
+    exercises: Array<{
+      name: string;
+      duration_min: number;
+      calories: number;
+      time: string;
+    }>;
+  };
 }
 
 function MacroCard({ label, consumed, goal, color }: { label: string; consumed: number; goal: number; color: string }) {
@@ -126,13 +137,17 @@ export default function DiarioScreen() {
     queryKey: ['daily-summary'],
     queryFn: async () => {
       const today = getLocalDateString();
-      const [profileRes, mealsRes] = await Promise.all([
+      const [profileRes, mealsRes, activityRes] = await Promise.all([
         api.get('/user/profile'),
         api.get('/user/meals'),
+        api.get(`/user/activity?date=${today}`).catch(() => ({
+          data: { steps: 0, steps_target: 10000, steps_calories: 0.0, exercises: [] }
+        }))
       ]);
       const profile = profileRes.data.profile;
       const allMeals: any[] = mealsRes.data ?? [];
       const todayMeals = allMeals.filter((m) => m.date?.startsWith(today));
+      const activityData = activityRes.data ?? { steps: 0, steps_target: 10000, steps_calories: 0.0, exercises: [] };
 
       let totalCal = 0, totalPro = 0, totalCarb = 0, totalFat = 0;
       const meals = todayMeals.map((meal) => {
@@ -168,6 +183,7 @@ export default function DiarioScreen() {
         carbs:    { consumed: Math.round(totalCarb), goal: Number(profile?.target_carbs    ?? 250)  },
         fats:     { consumed: Math.round(totalFat),  goal: Number(profile?.target_fat      ?? 70)   },
         meals,
+        activity: activityData,
       } as DailySummary;
     },
   });
@@ -183,7 +199,15 @@ export default function DiarioScreen() {
 
   const consumedCal = data?.calories.consumed ?? 0;
   const goalCal = data?.calories.goal ?? 2000;
-  const calPct = goalCal > 0 ? consumedCal / goalCal : 0;
+
+  const stepsCount = data?.activity?.steps ?? 0;
+  const stepsCalories = Number(data?.activity?.steps_calories ?? 0);
+  const exercises = data?.activity?.exercises ?? [];
+  const exercisesCalories = exercises.reduce((acc, curr) => acc + Number(curr.calories), 0);
+  const totalBurned = Math.round(stepsCalories + exercisesCalories);
+  
+  const netConsumedCal = Math.max(0, Math.round(consumedCal - totalBurned));
+  const calPct = goalCal > 0 ? netConsumedCal / goalCal : 0;
 
   // Lógica de Exclusão de Refeição Inteira
   const handleDeleteMeal = (mealId: string) => {
@@ -398,9 +422,25 @@ export default function DiarioScreen() {
             {/* Calorie Ring */}
             <View style={styles.ringSection}>
               <CalorieRing
-                consumed={data?.calories.consumed ?? 0}
+                consumed={netConsumedCal}
                 goal={data?.calories.goal ?? 2000}
               />
+              <View style={styles.netCalRow}>
+                <View style={styles.netCalItem}>
+                  <Text style={styles.netCalVal}>{consumedCal}</Text>
+                  <Text style={styles.netCalLabel}>Consumido</Text>
+                </View>
+                <View style={[styles.netCalItem, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border }]}>
+                  <Text style={[styles.netCalVal, { color: colors.accentOrange }]}>{totalBurned}</Text>
+                  <Text style={styles.netCalLabel}>Gasto</Text>
+                </View>
+                <View style={styles.netCalItem}>
+                  <Text style={styles.netCalVal}>
+                    {Math.max(0, goalCal - netConsumedCal)}
+                  </Text>
+                  <Text style={styles.netCalLabel}>Restante</Text>
+                </View>
+              </View>
             </View>
 
             {/* Macros */}
@@ -412,6 +452,35 @@ export default function DiarioScreen() {
 
             {/* Water tracker */}
             <WaterTracker />
+
+            {/* Card de Atividade Física (Passos + Exercícios) */}
+            <TouchableOpacity
+              style={styles.activityCardHome}
+              onPress={() => router.push('/atividades')}
+              activeOpacity={0.85}
+            >
+              <View style={styles.actCardHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <Award size={18} color={colors.accentGreen} />
+                  <Text style={styles.actCardTitle}>Atividade de Hoje</Text>
+                </View>
+                <Text style={styles.actCardLink}>Ver mais &gt;</Text>
+              </View>
+              <View style={styles.actCardBody}>
+                <View style={styles.actCol}>
+                  <Text style={styles.actVal}>{stepsCount.toLocaleString('pt-BR')}</Text>
+                  <Text style={styles.actLabel}>Passos</Text>
+                </View>
+                <View style={[styles.actCol, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }]}>
+                  <Text style={styles.actVal}>{totalBurned} kcal</Text>
+                  <Text style={styles.actLabel}>Gasto Total</Text>
+                </View>
+                <View style={styles.actCol}>
+                  <Text style={styles.actVal}>{exercises.length}</Text>
+                  <Text style={styles.actLabel}>Atividades</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
 
             {/* Meals */}
             <View style={styles.section}>
@@ -1006,5 +1075,81 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: '#000',
     fontWeight: '700',
+  },
+
+  // Estilos de Atividade e Calorias Líquidas no Dashboard
+  netCalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  netCalItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  netCalVal: {
+    ...typography.label,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  netCalLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+
+  activityCardHome: {
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  actCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  actCardTitle: {
+    ...typography.label,
+    color: colors.textPrimary,
+    fontSize: 14,
+  },
+  actCardLink: {
+    ...typography.caption,
+    color: colors.accentGreen,
+    fontWeight: '600',
+  },
+  actCardBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  actCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actVal: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontSize: 18,
+  },
+  actLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 2,
   },
 });
