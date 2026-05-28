@@ -281,7 +281,7 @@ Responda com exatamente este JSON (sem campos extras):
 
 // ── Routes ────────────────────────────────────────────────────
 
-// POST /api/ai/analyze-food
+// POST /api/ai/analyze-food (JSON body com base64 - usado pelo web)
 router.post('/analyze-food', authenticateToken, async (req, res) => {
   const t0 = Date.now();
   try {
@@ -297,6 +297,35 @@ router.post('/analyze-food', authenticateToken, async (req, res) => {
     res.status(502).json({ error: 'Falha ao analisar imagem com IA.', detail: err.message });
   }
 });
+
+// POST /api/ai/analyze-food-binary (upload binário direto - usado pelo mobile)
+// Aceita corpo image/jpeg ou image/png cru, sem JSON. Permite o mobile usar
+// FileSystem.uploadAsync (OkHttp nativo), evitando passar 200KB+ base64 pelo
+// bridge JS->Native do RN, que estava causando crash do app durante a leitura
+// da resposta.
+const express = require('express');
+router.post(
+  '/analyze-food-binary',
+  authenticateToken,
+  express.raw({ type: ['image/*', 'application/octet-stream'], limit: '15mb' }),
+  async (req, res) => {
+    const t0 = Date.now();
+    try {
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ error: 'Body vazio. Envie a imagem como image/jpeg ou image/png.' });
+      }
+      const image = req.body.toString('base64');
+      const cfg = await getLLMConfig();
+      const { text, provider, model } = await callLLM(cfg, promptAnalyzeFood(), image);
+      const result = JSON.parse(text);
+      result._meta = { provider, model, latency_ms: Date.now() - t0, bytes: req.body.length };
+      res.json(result);
+    } catch (err) {
+      console.error('Erro analyze-food-binary:', err.message);
+      res.status(502).json({ error: 'Falha ao analisar imagem com IA.', detail: err.message });
+    }
+  }
+);
 
 // POST /api/ai/generate-recipe
 router.post('/generate-recipe', authenticateToken, async (req, res) => {
