@@ -88,7 +88,7 @@ function getDRI(age, gender) {
     return tbl['70+'];
 }
 
-function rnd(v, d = 1) { return parseFloat((v || 0).toFixed(d)); }
+function rnd(v, d = 1) { const n = parseFloat(v) || 0; return parseFloat(n.toFixed(d)); }
 function calcFactor(grams) { return (grams || 0) / 100; }
 
 function calcItemMacrosAndMicros(per100, grams) {
