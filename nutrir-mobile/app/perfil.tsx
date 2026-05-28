@@ -141,7 +141,7 @@ export default function PerfilScreen() {
   const weightLabels = weightHistory?.map((e) => e.label) ?? [];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <ChevronLeft size={24} color={colors.textPrimary} />

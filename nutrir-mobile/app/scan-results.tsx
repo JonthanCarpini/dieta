@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronLeft, Plus, Minus } from 'lucide-react-native';
@@ -74,6 +74,7 @@ export default function ScanResultsScreen() {
   const { results } = useLocalSearchParams<{ results: string }>();
   const router = useRouter();
   const qc = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   let parsedFoods: FoodItem[] = [];
   try {
@@ -218,7 +219,7 @@ export default function ScanResultsScreen() {
           </ScrollView>
 
           {/* Footer */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(spacing.md, insets.bottom) }]}>
             <View>
               <Text style={styles.footerLabel}>{selected.size} alimento(s) selecionado(s)</Text>
               <Text style={styles.footerCalories}>{totalCal} kcal total</Text>

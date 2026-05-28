@@ -10,7 +10,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Search, Plus, Minus, Check } from 'lucide-react-native';
@@ -55,6 +55,8 @@ export default function AddFoodScreen() {
   const [mealType, setMealType] = useState('almoco');
   const router = useRouter();
   const qc = useQueryClient();
+  const insets = useSafeAreaInsets();
+
 
   // Debounce search
   const onSearchChange = useCallback((text: string) => {
@@ -90,7 +92,7 @@ export default function AddFoodScreen() {
   const macros = selectedFood ? calcMacros(selectedFood, grams) : null;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <ChevronLeft size={24} color={colors.textPrimary} />
@@ -150,7 +152,7 @@ export default function AddFoodScreen() {
       <Modal visible={!!selectedFood} transparent animationType="slide">
         {selectedFood && (
           <View style={styles.modalOverlay}>
-            <View style={styles.modalSheet}>
+            <View style={[styles.modalSheet, { paddingBottom: Math.max(spacing.lg, insets.bottom) }]}>
               <Text style={styles.modalFoodName}>{selectedFood.name}</Text>
 
               {/* Macros preview */}
