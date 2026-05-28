@@ -77,7 +77,7 @@ export default function AtividadesScreen() {
   const [exCustomCal, setExCustomCal] = useState('');
 
   // Hook do Pedometer Nativo
-  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, refetchSteps } = useStepCounter();
+  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps } = useStepCounter();
 
   // Busca do perfil do usuário para obter o peso
   const { data: profileData } = useQuery({
@@ -253,6 +253,12 @@ export default function AtividadesScreen() {
             {!isPedometerAvailable && (
               <Text style={styles.warningText}>
                 ⚠️ Sensor nativo indisponível. Passos inseridos manualmente.
+              </Text>
+            )}
+
+            {isPedometerAvailable && sensorError && (
+              <Text style={styles.warningText}>
+                ⚠️ {sensorError}
               </Text>
             )}
           </View>

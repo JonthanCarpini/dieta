@@ -17,7 +17,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Para vídeo chamadas com seu nutricionista",
         "NSMicrophoneUsageDescription": "Para vídeo chamadas com seu nutricionista",
-        "NSPhotoLibraryUsageDescription": "Para selecionar sua foto de perfil e exames"
+        "NSPhotoLibraryUsageDescription": "Para selecionar sua foto de perfil e exames",
+        "NSMotionUsageDescription": "Para contar seus passos diários e calcular as calorias queimadas"
       }
     },
     "android": {
@@ -35,7 +36,8 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.READ_MEDIA_IMAGES"
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.ACTIVITY_RECOGNITION"
       ]
     },
     "web": {
