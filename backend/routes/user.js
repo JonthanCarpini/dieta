@@ -995,6 +995,29 @@ router.get('/diario/historico', async (req, res) => {
 // ==========================================
 // RASTREADOR DE PASSOS E ATIVIDADES FÍSICAS
 // ==========================================
+router.get('/activity/history', async (req, res) => {
+  const limit = parseInt(req.query.limit) || 30;
+  try {
+    const historyRes = await db.query(`
+      SELECT 
+        TO_CHAR(date, 'YYYY-MM-DD') as date_str,
+        steps,
+        steps_target,
+        steps_calories,
+        exercises
+      FROM activity_log 
+      WHERE user_id = $1
+      ORDER BY date DESC
+      LIMIT $2
+    `, [req.user.id, limit]);
+    
+    res.json(historyRes.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico de atividades.' });
+  }
+});
+
 router.get('/activity', async (req, res) => {
   const date = req.query.date || new Date().toISOString().split('T')[0];
   try {
