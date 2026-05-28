@@ -711,10 +711,13 @@ const path = require('path');
 router.get('/clinical', async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT comorbidities, intolerances, dietary_restrictions, notes FROM profiles WHERE user_id = $1',
+      'SELECT comorbidities, intolerances, dietary_restrictions, medications, health_goals, notes FROM profiles WHERE user_id = $1',
       [req.user.id]
     );
-    res.json(result.rows[0] || { comorbidities: '', intolerances: '', dietary_restrictions: '', notes: '' });
+    res.json(result.rows[0] || {
+      comorbidities: '', intolerances: '', dietary_restrictions: '',
+      medications: '', health_goals: '', notes: '',
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar dados clínicos.' });
@@ -722,17 +725,19 @@ router.get('/clinical', async (req, res) => {
 });
 
 router.post('/clinical', async (req, res) => {
-  const { comorbidities, intolerances, dietary_restrictions } = req.body;
+  const { comorbidities, intolerances, dietary_restrictions, medications, health_goals } = req.body;
   try {
     await db.query(`
-      INSERT INTO profiles (user_id, comorbidities, intolerances, dietary_restrictions, updated_at)
-      VALUES ($1, $2, $3, $4, NOW())
+      INSERT INTO profiles (user_id, comorbidities, intolerances, dietary_restrictions, medications, health_goals, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
       ON CONFLICT (user_id) DO UPDATE SET
         comorbidities = EXCLUDED.comorbidities,
         intolerances = EXCLUDED.intolerances,
         dietary_restrictions = EXCLUDED.dietary_restrictions,
+        medications = EXCLUDED.medications,
+        health_goals = EXCLUDED.health_goals,
         updated_at = NOW()
-    `, [req.user.id, comorbidities, intolerances, dietary_restrictions]);
+    `, [req.user.id, comorbidities, intolerances, dietary_restrictions, medications, health_goals]);
     res.json({ message: 'Perfil clínico atualizado com sucesso.' });
   } catch (err) {
     console.error(err);

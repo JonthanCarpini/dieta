@@ -22,6 +22,13 @@ app.use(cors({
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
+// One-time idempotent migration for clinical profile columns
+db.query(`
+  ALTER TABLE profiles
+    ADD COLUMN IF NOT EXISTS medications TEXT DEFAULT '',
+    ADD COLUMN IF NOT EXISTS health_goals TEXT DEFAULT ''
+`).catch((e) => console.error('Migration skip:', e.message));
+
 // Registro das rotas da API
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
