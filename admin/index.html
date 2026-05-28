@@ -700,6 +700,12 @@
                                 <button class="patient-tab-btn" data-patient-tab="measurements" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
                                     <i data-lucide="ruler" style="width: 14px; height: 14px;"></i> Antropometria
                                 </button>
+                                <button class="patient-tab-btn" data-patient-tab="meal-plan" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
+                                    <i data-lucide="clipboard-list" style="width: 14px; height: 14px;"></i> Cardápio
+                                </button>
+                                <button class="patient-tab-btn" data-patient-tab="energy" style="background: transparent; border: none; color: var(--color-text-muted); font-weight: 600; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; transition: all 0.2s;">
+                                    <i data-lucide="calculator" style="width: 14px; height: 14px;"></i> Cálculo Energético
+                                </button>
                             </div>
 
                             <!-- CONTEÚDO DE ABAS -->
@@ -913,6 +919,20 @@
                                                 <tr><td colspan="4" style="text-align: center; color: var(--color-text-muted); padding: 20px;">Nenhum exame enviado por este paciente.</td></tr>
                                             </tbody>
                                         </table>
+                                    </div>
+                                </div>
+
+                                <!-- ABA 5: CARDÁPIO DO PACIENTE -->
+                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-meal-plan">
+                                    <div style="text-align:center; padding:40px; color:var(--color-text-muted);">
+                                        <p style="font-size:13px;">Clique na aba Cardápio para carregar os planos alimentares deste paciente.</p>
+                                    </div>
+                                </div>
+
+                                <!-- ABA 6: CÁLCULO ENERGÉTICO -->
+                                <div class="patient-tab-content-panel hidden" id="patient-tab-content-energy">
+                                    <div style="text-align:center; padding:40px; color:var(--color-text-muted);">
+                                        <p style="font-size:13px;">Clique na aba Cálculo Energético para abrir o calculador de TMB e GET.</p>
                                     </div>
                                 </div>
 

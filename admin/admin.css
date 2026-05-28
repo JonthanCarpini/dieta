@@ -1793,3 +1793,143 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
 .micro-bar-fill.out-range { background:#f59e0b; }
 .micro-bar-center { position:absolute; left:50%; top:0; width:1px; height:100%; background:rgba(255,255,255,0.2); }
 .micro-pct-val { font-size:12px; font-family:var(--font-mono); color:var(--color-text-muted); min-width:40px; text-align:right; }
+
+/* ==========================================================
+   CÁLCULO ENERGÉTICO (pro-energy.js)
+   ========================================================== */
+
+.energy-calc-wrap {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.energy-calc-form-col {
+    flex: 1;
+    min-width: 320px;
+    max-width: 600px;
+}
+
+.energy-comparison-col {
+    flex: 1;
+    min-width: 280px;
+}
+
+.energy-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.energy-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.energy-field label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.energy-field input,
+.energy-field select {
+    background: rgba(255,250,240,0.05);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text-main);
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.energy-field input:focus,
+.energy-field select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.energy-field-span2 {
+    grid-column: span 2;
+}
+
+/* Caixa de resultado */
+.ec-result-box {
+    background: rgba(245,193,77,0.06);
+    border: 1px solid rgba(245,193,77,0.18);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.ec-result-header {
+    font-size: 12px;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(245,193,77,0.12);
+}
+
+.ec-result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+}
+
+@media (max-width: 900px) {
+    .ec-result-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.ec-result-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: rgba(255,250,240,0.04);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.ec-result-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-text-muted);
+}
+
+.ec-result-value {
+    font-size: 22px;
+    font-weight: 800;
+    font-family: var(--font-display);
+    color: var(--color-text-main);
+    line-height: 1.1;
+}
+
+.ec-result-value small {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--color-text-muted);
+}
+
+.ec-result-sub {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+}
+
+.ec-tmb .ec-result-value { color: var(--color-primary); }
+.ec-get .ec-result-value { color: #4ade80; }
+
+/* Aba Cardápio do paciente — estilos mínimos adicionais */
+#patient-tab-content-meal-plan .table-responsive {
+    max-height: 480px;
+    overflow-y: auto;
+}

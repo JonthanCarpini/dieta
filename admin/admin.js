@@ -22,6 +22,7 @@ import { initProSchedule, loadScheduleData } from './modules/pro-schedule.js';
 import { initProPatients, loadPatientsData } from './modules/pro-patients.js';
 import { loadAppointmentsData } from './modules/pro-appointments.js';
 import { initProMeals, loadMealPlansData, openMealPlanBuilder, saveMealPlan } from './modules/pro-meals.js';
+import { initProEnergy } from './modules/pro-energy.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Inicialização
@@ -35,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initProSchedule();
         initProPatients();
         initProMeals();
+        initProEnergy();
 
         // Autentica e inicia
         await initAuth(() => {
@@ -120,6 +122,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     async function loadTab(tabId) {
+        // Captura e limpa o flag antes de qualquer lógica para evitar race conditions
+        const preservePatient = adminState._preservePatientDetail;
+        adminState._preservePatientDetail = false;
+
         // Atualiza a classe active nos botões da sidebar
         const navButtons = document.querySelectorAll('.nav-btn');
         navButtons.forEach(btn => {
@@ -138,8 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeTab = document.getElementById(`tab-${tabId}`);
         if (activeTab) activeTab.classList.add('active');
 
-        // Se for a aba de pacientes, certifique-se de voltar para a lista padrão caso estivesse em detalhes
-        if (tabId === 'patients') {
+        // Se for a aba de pacientes, decide se mostra lista ou preserva a view de detalhes
+        if (tabId === 'patients' && !preservePatient) {
             const listLayout = document.getElementById('patients-list-view');
             const detailsLayout = document.getElementById('patient-details-view');
             if (listLayout) listLayout.classList.remove('hidden');
@@ -160,7 +166,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (tabId === 'billing') {
             await loadBillingData();
         } else if (tabId === 'patients') {
-            await loadPatientsData();
+            // Só recarrega a lista se não estamos preservando a view do paciente
+            if (!preservePatient) {
+                await loadPatientsData();
+            }
         } else if (tabId === 'schedule') {
             await loadScheduleData();
         } else if (tabId === 'appointments') {

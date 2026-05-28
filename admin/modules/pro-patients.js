@@ -3,6 +3,8 @@
  */
 import { API_URL, adminState } from './state.js';
 import { loadAppointmentsData } from './pro-appointments.js';
+import { openMealPlanBuilder } from './pro-meals.js';
+import { renderEnergyCalcTab } from './pro-energy.js';
 
 let localStream = null;
 let peerConnection = null;
@@ -106,9 +108,11 @@ export function getMealTypeLabel(meal) {
 }
 
 export async function viewPatientDetails(patient) {
+    adminState._currentPatient = patient;
+
     const listLayout = document.getElementById('patients-list-view');
     const detailsLayout = document.getElementById('patient-details-view');
-    
+
     if (listLayout) listLayout.classList.add('hidden');
     if (detailsLayout) detailsLayout.classList.remove('hidden');
     
@@ -1493,6 +1497,13 @@ export function initProPatients() {
                 activePanel.classList.remove('hidden');
                 activePanel.classList.add('active');
             }
+
+            const patient = adminState._currentPatient;
+            if (tabId === 'meal-plan' && patient) {
+                _loadPatientMealPlansInTab(patient.id);
+            } else if (tabId === 'energy' && patient) {
+                renderEnergyCalcTab(activePanel, patient);
+            }
         });
     });
 
@@ -1565,6 +1576,8 @@ export async function loadPatientMeasurements(patientId) {
 }
 
 function _renderMeasurementsTable(measurements, patientId) {
+    adminState._currentPatientMeasurements = measurements || [];
+
     const tbody = document.getElementById('meas-history-body');
     if (!tbody) return;
 
@@ -1699,4 +1712,101 @@ function _setupMeasFormListeners(patientId) {
             alert(err.message);
         }
     });
+}
+
+// ==========================================
+// CARDÁPIO DO PACIENTE (aba inline)
+// ==========================================
+
+async function _loadPatientMealPlansInTab(patientId) {
+    const container = document.getElementById('patient-tab-content-meal-plan');
+    if (!container) return;
+    container.innerHTML = '<p class="description" style="text-align:center; padding:24px;">Carregando cardápios...</p>';
+
+    try {
+        const res = await fetch(`${API_URL}/professional/weekly-plans`, {
+            headers: { 'Authorization': `Bearer ${adminState.token}` }
+        });
+        if (!res.ok) throw new Error('Não foi possível carregar os cardápios.');
+        const allPlans = await res.json();
+        const plans = allPlans.filter(p => String(p.patient_id) === String(patientId));
+        _renderPatientPlansInTab(container, plans, patientId);
+    } catch (err) {
+        container.innerHTML = `<p style="color:var(--color-danger); text-align:center; padding:24px;">${err.message}</p>`;
+    }
+}
+
+function _renderPatientPlansInTab(container, plans, patientId) {
+    const patient = adminState._currentPatient;
+
+    const plansHtml = plans.length === 0
+        ? `<div style="text-align:center; padding:40px; color:var(--color-text-muted);">
+               <p style="font-size:13px; margin-bottom:4px;">Nenhum cardápio criado para este paciente ainda.</p>
+               <p class="description" style="font-size:11px;">Clique em "Novo Cardápio" para começar.</p>
+           </div>`
+        : `<div class="table-responsive" style="margin-top:4px;">
+               <table class="data-table" style="font-size:13px;">
+                   <thead>
+                       <tr>
+                           <th>Nome do Cardápio</th>
+                           <th>Atualizado em</th>
+                           <th>Status</th>
+                           <th>Ações</th>
+                       </tr>
+                   </thead>
+                   <tbody>
+                       ${plans.map(p => {
+                           const updatedAt = p.updated_at
+                               ? new Date(p.updated_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' })
+                               : '-';
+                           const statusBadge = p.is_active
+                               ? `<span style="color:#4ade80; font-size:11px; font-weight:600;">● Ativo</span>`
+                               : `<span style="color:var(--color-text-muted); font-size:11px;">○ Inativo</span>`;
+                           return `<tr>
+                               <td><strong>${p.name}</strong></td>
+                               <td>${updatedAt}</td>
+                               <td>${statusBadge}</td>
+                               <td>
+                                   <button class="btn-primary btn-sm btn-open-plan-from-patient"
+                                       data-plan-id="${p.id}"
+                                       style="font-size:11px;">
+                                       <i data-lucide="pencil" style="width:12px;height:12px;vertical-align:middle;margin-right:3px;"></i> Editar
+                                   </button>
+                               </td>
+                           </tr>`;
+                       }).join('')}
+                   </tbody>
+               </table>
+           </div>`;
+
+    container.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+            <div>
+                <h3 style="margin:0; font-size:14px; font-weight:700;">Cardápios de ${patient?.name || 'Paciente'}</h3>
+                <p class="description" style="margin:4px 0 0; font-size:11px;">${plans.length} cardápio${plans.length !== 1 ? 's' : ''} encontrado${plans.length !== 1 ? 's' : ''}</p>
+            </div>
+            <button class="btn-primary btn-sm" id="btn-new-plan-for-patient">
+                <i data-lucide="plus" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Novo Cardápio
+            </button>
+        </div>
+        ${plansHtml}
+    `;
+
+    container.querySelector('#btn-new-plan-for-patient')?.addEventListener('click', () => {
+        adminState._fromPatient    = patientId;
+        adminState._newPlanPatientId = patientId;
+        if (window.switchTab) window.switchTab('meal-plans');
+        setTimeout(() => openMealPlanBuilder(null), 200);
+    });
+
+    container.querySelectorAll('.btn-open-plan-from-patient').forEach(btn => {
+        btn.addEventListener('click', () => {
+            adminState._fromPatient = patientId;
+            const planId = parseInt(btn.dataset.planId);
+            if (window.switchTab) window.switchTab('meal-plans');
+            setTimeout(() => openMealPlanBuilder(planId), 200);
+        });
+    });
+
+    if (window.lucide) window.lucide.createIcons();
 }

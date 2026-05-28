@@ -329,6 +329,12 @@ export async function openMealPlanBuilder(planId) {
             document.getElementById('plan-patient-select').value = p2.patient_id || '';
             updateBuilderClinicalBanner(p2.patient_id);
         } catch {}
+    } else if (adminState._newPlanPatientId) {
+        // Pré-seleciona o paciente quando o cardápio é criado a partir da aba do paciente
+        const patientSelect = document.getElementById('plan-patient-select');
+        if (patientSelect) patientSelect.value = adminState._newPlanPatientId;
+        updateBuilderClinicalBanner(adminState._newPlanPatientId);
+        adminState._newPlanPatientId = null;
     }
     if (window.lucide) window.lucide.createIcons();
 }
@@ -1289,8 +1295,21 @@ export function initProMeals() {
     // Lista de planos
     document.getElementById('btn-new-meal-plan')?.addEventListener('click', () => openMealPlanBuilder(null));
     document.getElementById('btn-back-to-plans')?.addEventListener('click', () => {
+        const fromPatient = adminState._fromPatient;
+        adminState._fromPatient = null;
+
         document.getElementById('meal-plans-builder-view').classList.add('hidden');
         document.getElementById('meal-plans-list-view').classList.remove('hidden');
+
+        if (fromPatient) {
+            // Volta para a view do paciente preservando os detalhes abertos
+            adminState._preservePatientDetail = true;
+            if (window.switchTab) window.switchTab('patients');
+            setTimeout(() => {
+                const mealPlanTabBtn = document.querySelector('.patient-tab-btn[data-patient-tab="meal-plan"]');
+                if (mealPlanTabBtn) mealPlanTabBtn.click();
+            }, 150);
+        }
     });
     document.getElementById('btn-save-meal-plan')?.addEventListener('click', saveMealPlan);
 
