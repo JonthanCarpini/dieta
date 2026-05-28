@@ -19,6 +19,7 @@ import Svg, { Circle, G } from 'react-native-svg';
 import api from '../src/api/client';
 import { colors, spacing, radius, typography } from '../src/constants/theme';
 import { useStepCounter } from '../src/hooks/useStepCounter';
+import { useStepTrackerStore } from '../src/store/stepTrackerStore';
 
 // Configurações do Anel de Progresso
 const RING_SIZE = 180;
@@ -83,10 +84,10 @@ export default function AtividadesScreen() {
     queryFn: () => api.get(`/user/activity?date=${today}`).then((r) => r.data),
   });
 
-  const [isTracking, setIsTracking] = useState(false);
+  const { isTracking, setTracking } = useStepTrackerStore();
 
   // Hook do Pedometer Nativo
-  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps, onSaveSuccess } = useStepCounter(activity?.steps ?? 0, isTracking);
+  const { steps: sensorSteps, isPedometerAvailable, permissionStatus, error: sensorError, refetchSteps, onSaveSuccess } = useStepCounter(activity?.steps ?? 0);
 
   // Busca do perfil do usuário para obter o peso
   const { data: profileData } = useQuery({
@@ -242,7 +243,7 @@ export default function AtividadesScreen() {
             {isPedometerAvailable && (
               <TouchableOpacity 
                 style={[styles.trackingToggleBtn, isTracking ? styles.trackingBtnActive : styles.trackingBtnInactive]} 
-                onPress={() => setIsTracking(prev => !prev)}
+                onPress={() => setTracking(!isTracking)}
                 activeOpacity={0.85}
               >
                 {isTracking ? (

@@ -8,7 +8,7 @@ import { useAuthStore } from '../src/store/authStore';
 import { colors } from '../src/constants/theme';
 import AppDrawer from '../src/components/AppDrawer';
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, staleTime: 30_000 },
   },
