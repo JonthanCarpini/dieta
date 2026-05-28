@@ -1561,3 +1561,235 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     padding: 6px 12px !important;
     line-height: 1.4;
 }
+
+/* =============================================
+   WEBDIET STYLE — CARDÁPIO BUILDER
+   ============================================= */
+
+/* Chips de macros (header do dia e linha de refeição) */
+.wd-chip { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; font-family:var(--font-mono); }
+.wd-chip.ptn  { color:#ef4444; }
+.wd-chip.lip  { color:#f59e0b; }
+.wd-chip.cho  { color:#3b82f6; }
+.wd-chip.kcal { color:var(--color-text-muted); font-weight:600; }
+
+/* Cabeçalho do dia */
+.wd-day-header { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+.wd-day-title  { display:flex; align-items:center; gap:12px; flex:1; }
+.wd-day-title h3 { margin:0; font-size:17px; font-weight:700; }
+.wd-day-total-chips { display:flex; gap:4px; flex-wrap:wrap; }
+.wd-day-header-btns { display:flex; gap:8px; }
+
+/* Lista de refeições */
+.wd-meals-list { display:flex; flex-direction:column; gap:0; margin-bottom:16px; border:1px solid var(--color-border); border-radius:12px; overflow:hidden; }
+
+/* Linha de refeição */
+.wd-meal-row { border-bottom:1px solid var(--color-border); background:rgba(255,250,240,0.02); }
+.wd-meal-row:last-child { border-bottom:none; }
+.wd-meal-row-bar {
+    display:flex; align-items:center; gap:10px; padding:12px 16px;
+    flex-wrap:wrap; cursor:default; transition:background 0.12s;
+}
+.wd-meal-row-bar:hover { background:rgba(255,250,240,0.03); }
+.wd-meal-time { font-size:12px; color:var(--color-text-muted); font-family:var(--font-mono); min-width:40px; }
+.wd-meal-label { font-size:13px; font-weight:700; min-width:120px; }
+.wd-meal-macro-chips { display:flex; gap:6px; flex:1; flex-wrap:wrap; }
+.wd-meal-row-actions { display:flex; gap:6px; align-items:center; margin-left:auto; }
+
+/* Botão ver alimentos */
+.btn-ver-alimentos {
+    background: rgba(255,250,240,0.06); border:1px solid var(--color-border);
+    color:var(--color-text-muted); border-radius:20px; padding:4px 12px; font-size:11px;
+    font-weight:600; cursor:pointer; transition:all 0.15s; white-space:nowrap;
+}
+.btn-ver-alimentos:hover, .btn-ver-alimentos.open { color:var(--color-primary); border-color:rgba(var(--color-primary-rgb,74,222,128),0.3); background:rgba(var(--color-primary-rgb,74,222,128),0.07); }
+
+/* Ícone botão perigo */
+.wd-icon-btn { background:none; border:none; cursor:pointer; padding:4px 6px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; color:var(--color-text-muted); transition:all 0.12s; }
+.wd-icon-btn:hover { background:rgba(255,255,255,0.06); }
+.wd-icon-btn.danger:hover { color:var(--color-danger, #ff5050); background:rgba(255,80,80,0.1); }
+
+/* Detalhe de refeição */
+.wd-hidden { display:none !important; }
+.wd-meal-detail { background:rgba(255,250,240,0.015); border-top:1px solid var(--color-border); }
+.wd-meal-detail-inner { padding:16px; }
+.wd-add-food-bar { margin-bottom:16px; }
+.wd-btn-add-alimento { font-size:12px !important; padding:7px 16px !important; }
+
+/* Seções colapsáveis dentro do detalhe */
+.wd-section { border:1px solid var(--color-border); border-radius:10px; margin-bottom:12px; overflow:hidden; }
+.wd-section-hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(255,250,240,0.03); cursor:pointer; }
+.wd-section-hdr span { font-size:13px; font-weight:700; }
+.wd-section-toggle { background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:12px; padding:2px 6px; }
+.wd-section-body { padding:12px 14px; }
+
+/* Tabela de alimentos prescritos */
+.wd-table-wrap { overflow-x:auto; }
+.wd-foods-table { width:100%; border-collapse:collapse; font-size:12px; }
+.wd-foods-table th { padding:6px 10px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-text-muted); border-bottom:1px solid var(--color-border); white-space:nowrap; }
+.wd-foods-table td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+.wd-foods-table tr:last-child td { border-bottom:none; }
+.wd-foods-tfoot td { border-top:1px solid var(--color-border) !important; border-bottom:none !important; padding-top:10px; }
+
+.ptn-col { color:#ef4444; font-family:var(--font-mono); font-weight:600; }
+.lip-col { color:#f59e0b; font-family:var(--font-mono); font-weight:600; }
+.cho-col { color:#3b82f6; font-family:var(--font-mono); font-weight:600; }
+.kcal-col { color:var(--color-text-main); font-family:var(--font-mono); font-weight:700; }
+
+.wd-food-name-cell { font-weight:600; min-width:130px; }
+.wd-food-medida-cell { min-width:150px; }
+.wd-food-qty-cell { min-width:70px; }
+.wd-food-actions-cell { white-space:nowrap; }
+.wd-medida-static { font-size:12px; color:var(--color-text-muted); }
+.wd-empty-msg { font-size:12px; color:var(--color-text-muted); font-style:italic; padding:4px 0; }
+
+.wd-medida-select, .wd-qty-input {
+    background: rgba(255,250,240,0.05); border:1px solid var(--color-border);
+    border-radius:6px; color:var(--color-text); padding:4px 8px;
+    font-size:12px; font-family:var(--font-sans); cursor:pointer;
+}
+.wd-medida-select { min-width:140px; max-width:200px; }
+.wd-qty-input { width:60px; text-align:center; font-family:var(--font-mono); }
+.wd-medida-select:focus, .wd-qty-input:focus { outline:none; border-color:var(--color-primary); }
+
+/* Análise da refeição */
+.wd-analysis-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+@media (max-width: 900px) { .wd-analysis-grid { grid-template-columns:1fr; } }
+.wd-analysis-h5 { font-size:12px; font-weight:700; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.06em; margin:0 0 10px; }
+
+.wd-macro-list { display:flex; flex-direction:column; gap:6px; }
+.wd-macro-row { display:flex; align-items:center; gap:8px; font-size:13px; }
+.wd-macro-dot { display:inline-block; width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.wd-macro-dot.ptn  { background:#ef4444; }
+.wd-macro-dot.lip  { background:#f59e0b; }
+.wd-macro-dot.cho  { background:#3b82f6; }
+.wd-macro-dot.kcal { background:var(--color-primary); }
+.wd-macro-dot.gray { background:rgba(255,255,255,0.3); }
+.wd-macro-lbl { flex:1; color:var(--color-text-muted); font-size:12px; }
+.wd-macro-val { font-weight:700; font-family:var(--font-mono); font-size:13px; }
+
+/* Caloric density bar */
+.wd-density-bar-outer { position:relative; margin:8px 0 4px; height:14px; }
+.wd-density-bar-grad { height:12px; border-radius:6px; background:linear-gradient(to right,#3b82f6,#22c55e,#84cc16,#f59e0b,#ef4444); }
+.wd-density-marker { position:absolute; top:-2px; width:3px; height:18px; background:#fff; border-radius:2px; box-shadow:0 0 4px rgba(0,0,0,0.5); transform:translateX(-50%); }
+.wd-density-value { font-size:20px; font-weight:800; font-family:var(--font-mono); color:var(--color-text-main); margin-top:4px; }
+.wd-density-class { font-size:11px; margin:2px 0 0; color:var(--color-text-muted); }
+.dens-vlow  { color:#3b82f6; }
+.dens-low   { color:#22c55e; }
+.dens-mid   { color:#84cc16; }
+.dens-high  { color:#f59e0b; }
+.dens-vhigh { color:#ef4444; }
+.wd-help-tip { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:rgba(255,255,255,0.1); font-size:9px; cursor:help; color:var(--color-text-muted); vertical-align:middle; }
+
+/* Chart */
+.wd-chart-wrap { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.wd-donut-wrap { flex-shrink:0; }
+.wd-chart-legend { display:flex; flex-direction:column; gap:6px; }
+.wd-legend-row { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--color-text-muted); }
+.wd-legend-row .wd-macro-dot { flex-shrink:0; }
+
+/* Observações */
+.wd-obs-info { background:rgba(245,193,77,0.06); border:1px solid rgba(245,193,77,0.15); border-radius:8px; padding:8px 12px; font-size:11px; color:var(--color-text-muted); margin-bottom:10px; }
+.wd-obs-textarea { width:100%; min-height:80px; background:rgba(255,250,240,0.04); border:1px solid var(--color-border); border-radius:8px; color:var(--color-text); padding:8px 12px; font-size:12px; font-family:var(--font-sans); resize:vertical; box-sizing:border-box; }
+.wd-obs-textarea:focus { outline:none; border-color:var(--color-primary); }
+
+/* Nova refeição */
+.wd-btn-nova-refeicao { width:100%; padding:12px; background:rgba(255,250,240,0.02); border:1px dashed rgba(255,255,255,0.12); border-radius:10px; color:var(--color-text-muted); font-size:13px; font-weight:600; cursor:pointer; margin-bottom:24px; transition:all 0.15s; }
+.wd-btn-nova-refeicao:hover { border-color:var(--color-primary); color:var(--color-primary); background:rgba(var(--color-primary-rgb,74,222,128),0.04); }
+
+/* Análise do dia */
+.wd-day-analysis { background:rgba(255,250,240,0.02); border:1px solid var(--color-border); border-radius:12px; padding:20px; margin-top:8px; }
+.wd-day-analysis-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:8px; }
+.wd-day-analysis-hdr h3 { margin:0; font-size:15px; font-weight:700; }
+.wd-day-analysis-body { display:grid; grid-template-columns:1fr auto; gap:24px; align-items:start; }
+@media (max-width: 800px) { .wd-day-analysis-body { grid-template-columns:1fr; } }
+.wd-day-analysis-table { width:100%; border-collapse:collapse; font-size:13px; }
+.wd-day-analysis-table th { padding:6px 10px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-text-muted); border-bottom:1px solid var(--color-border); }
+.wd-day-analysis-table td { padding:7px 10px; border-bottom:1px solid rgba(255,255,255,0.04); }
+.wd-day-analysis-table td:first-child { color:var(--color-text-muted); }
+.wd-diff-pos { color:#22c55e; font-weight:600; }
+.wd-diff-neg { color:#ef4444; font-weight:600; }
+.wd-day-analysis-chart { text-align:center; }
+
+/* =============================================
+   MODAL BUSCA DE ALIMENTOS
+   ============================================= */
+.fsm-box {
+    background:var(--color-surface);
+    border:1px solid var(--color-border);
+    border-radius:14px; width:92%; max-width:820px;
+    max-height:82vh; display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 24px 80px rgba(0,0,0,0.6);
+}
+.fsm-header { display:flex; align-items:flex-start; justify-content:space-between; padding:18px 20px 12px; border-bottom:1px solid var(--color-border); }
+.fsm-close-btn { background:none; border:none; font-size:22px; color:var(--color-text-muted); cursor:pointer; line-height:1; padding:0 4px; }
+.fsm-close-btn:hover { color:var(--color-text-main); }
+.fsm-tabs-bar { display:flex; gap:4px; padding:10px 16px 0; border-bottom:1px solid var(--color-border); }
+.fsm-tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--color-text-muted); font-size:13px; font-weight:600; padding:6px 14px 10px; cursor:pointer; transition:all 0.15s; }
+.fsm-tab:hover { color:var(--color-text-main); }
+.fsm-tab.active { color:var(--color-primary); border-bottom-color:var(--color-primary); }
+.fsm-panel { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+.fsm-search-row { display:flex; gap:8px; padding:14px 16px 10px; }
+.fsm-search-row input { flex:1; background:rgba(255,250,240,0.05); border:1px solid var(--color-border); border-radius:8px; color:var(--color-text); padding:8px 12px; font-size:13px; font-family:var(--font-sans); }
+.fsm-search-row input:focus { outline:none; border-color:var(--color-primary); }
+
+.fsm-results-header {
+    display:grid;
+    grid-template-columns: 3fr 1.8fr 1fr 60px 60px 60px 60px 80px;
+    padding:4px 16px 6px;
+    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-text-muted);
+    border-bottom:1px solid var(--color-border);
+}
+.fsm-results { overflow-y:auto; flex:1; min-height:0; }
+.fsm-result-row {
+    display:grid;
+    grid-template-columns: 3fr 1.8fr 1fr 60px 60px 60px 60px 80px;
+    align-items:center; gap:6px;
+    padding:10px 16px; border-bottom:1px solid rgba(255,255,255,0.04);
+    transition:background 0.1s;
+}
+.fsm-result-row:hover { background:rgba(255,250,240,0.03); }
+.fsm-result-row:last-child { border-bottom:none; }
+.fsm-food-name-col strong { font-size:13px; display:block; margin-bottom:2px; }
+.fsm-food-cat { color:var(--color-text-muted); font-size:10px; display:block; }
+.fsm-per100 { color:var(--color-text-muted); font-size:10px; display:block; margin-top:2px; font-family:var(--font-mono); }
+.fsm-medida-col select { width:100%; background:rgba(255,250,240,0.05); border:1px solid var(--color-border); border-radius:6px; color:var(--color-text); padding:4px 6px; font-size:11px; }
+.fsm-qty-col { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.fsm-qty-col input { width:55px; background:rgba(255,250,240,0.05); border:1px solid var(--color-border); border-radius:6px; color:var(--color-text); padding:4px 6px; font-size:12px; text-align:center; font-family:var(--font-mono); }
+.fsm-total-g { font-size:10px; color:var(--color-primary); font-family:var(--font-mono); }
+.fsm-ptn-col, .fsm-lip-col, .fsm-cho-col, .fsm-kcal-col { font-size:12px; font-family:var(--font-mono); text-align:right; }
+.fsm-ptn-col { color:#ef4444; } .fsm-lip-col { color:#f59e0b; } .fsm-cho-col { color:#3b82f6; }
+.fsm-add-col { text-align:right; }
+
+/* Manual food form */
+.fsm-manual-form { padding:16px; }
+.fsm-manual-row { display:flex; gap:10px; flex-wrap:wrap; }
+.fsm-manual-row > div { display:flex; flex-direction:column; gap:4px; flex:1; min-width:80px; }
+.fsm-manual-row label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-text-muted); }
+.fsm-manual-row input { background:rgba(255,250,240,0.05); border:1px solid var(--color-border); border-radius:6px; color:var(--color-text); padding:6px 8px; font-size:13px; font-family:var(--font-sans); }
+.fsm-manual-row input:focus { outline:none; border-color:var(--color-primary); }
+
+/* =============================================
+   MODAL MICRONUTRIENTES
+   ============================================= */
+.micro-modal-box {
+    background:var(--color-surface); border:1px solid var(--color-border);
+    border-radius:14px; width:92%; max-width:680px;
+    max-height:82vh; display:flex; flex-direction:column;
+    box-shadow:0 24px 80px rgba(0,0,0,0.6); overflow:hidden;
+}
+.micro-modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px 12px; border-bottom:1px solid var(--color-border); }
+.micro-legend-bar { display:flex; align-items:center; gap:6px; padding:10px 20px; font-size:12px; color:var(--color-text-muted); border-bottom:1px solid var(--color-border); }
+.micro-leg-dot { display:inline-block; width:10px; height:10px; border-radius:50%; }
+.micro-leg-dot.in  { background:#22c55e; }
+.micro-leg-dot.out { background:#f59e0b; }
+.micro-table { width:100%; border-collapse:collapse; font-size:13px; }
+.micro-table th { padding:6px 10px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-text-muted); border-bottom:1px solid var(--color-border); position:sticky; top:0; background:var(--color-surface); }
+.micro-table td { padding:7px 10px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+.micro-bar-wrap { display:flex; align-items:center; gap:8px; }
+.micro-bar-track { flex:1; height:8px; background:rgba(255,255,255,0.06); border-radius:4px; position:relative; overflow:hidden; max-width:200px; }
+.micro-bar-fill { height:100%; border-radius:4px; transition:width 0.3s; }
+.micro-bar-fill.in-range  { background:#22c55e; }
+.micro-bar-fill.out-range { background:#f59e0b; }
+.micro-bar-center { position:absolute; left:50%; top:0; width:1px; height:100%; background:rgba(255,255,255,0.2); }
+.micro-pct-val { font-size:12px; font-family:var(--font-mono); color:var(--color-text-muted); min-width:40px; text-align:right; }

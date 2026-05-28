@@ -392,7 +392,9 @@ router.get('/food-db', requireRole(['admin', 'nutritionist', 'trainer']), async 
     const webResult = await db.query(
       `SELECT id, nome AS name, COALESCE(grupo, 'Geral') AS category,
               kcal AS energy_kcal, ptn AS protein_g, cho AS carbs_g, lip AS fat_g, fibras AS fiber_g,
-              COALESCE(origem, 'WebDiet') AS source
+              COALESCE(origem, 'WebDiet') AS source,
+              ca, mg, p, fe, na, k, co, zn, se,
+              re, rea, tiamina, riboflavina, piridoxina, niacina, vitc, vitb12, vitb9, vite, vitd
        FROM alimentos
        WHERE nome ILIKE $1 AND (tipo IS NULL OR tipo = 'alimento')
        ORDER BY
