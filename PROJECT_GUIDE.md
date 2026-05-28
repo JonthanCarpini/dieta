@@ -1049,6 +1049,7 @@ Set-Location "C:\Users\admin\Desktop\Dieta\nutrir-mobile\android"
 4. **Coluna `medications` / `health_goals`** — adicionada migração idempotente em `backend/server.js` (`ALTER TABLE IF NOT EXISTS`)
 5. **Macros invisíveis no dashboard** — `MacroCard` redesenhado com `/240g` na mesma cor do macro e percentual abaixo da barra
 6. **Galeria adicionada ao scanner** — botão `ImagePicker.launchImageLibraryAsync` ao lado do botão de captura
+7. **Suporte à Safe Area Bottom nas telas avulsas e rodapés:** Adicionado suporte a `edges={['top', 'bottom']}` nas `SafeAreaView` de todas as telas avulsas e cálculo dinâmico com `useSafeAreaInsets()` nos rodapés/modais (`scan-results.tsx` e `add-food.tsx`) para evitar que botões ou campos fossem cobertos pela barra de navegação/ações nativa do Android.
 
 ### 14.8. Memória/contexto importante
 
