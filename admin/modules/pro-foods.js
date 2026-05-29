@@ -254,6 +254,7 @@ async function _runScan() {
 
         // Preenche campos
         if (d.name)            _setField('pf-name',          d.name);
+        if (d.category)        _setField('pf-category',      d.category);
         if (d.portion_grams)   _setField('pf-portion',       Math.round(d.portion_grams));
         if (d.energy_kcal_100g)  _setField('pf-kcal',          parseFloat(d.energy_kcal_100g).toFixed(1));
         if (d.protein_g)         _setField('pf-protein',       parseFloat(d.protein_g).toFixed(1));

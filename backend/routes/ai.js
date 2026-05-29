@@ -494,6 +494,7 @@ Analise TODAS as imagens fornecidas e extraia as informações completas do prod
 Retorne SOMENTE um JSON válido com a seguinte estrutura (sem markdown, sem explicações):
 {
   "name": "nome completo do produto incluindo marca, sabor e variante (ex: Requeijão Cremoso Light Vigor), se visível, senão null",
+  "category": "categoria do alimento em português (ex: Laticínios, Grãos e Cereais, Carnes, Bebidas, Biscoitos, Massas, Temperos, Frutas, Vegetais, Suplementos, Industrializados), senão null",
   "portion_grams": porção de referência em gramas (número),
   "energy_kcal_100g": kcal por 100g (número),
   "energy_kcal_portion": kcal por porção (número ou null),
