@@ -412,6 +412,9 @@ function renderMealRow(dow, meal) {
                 <button class="btn-ver-alimentos${isOpen ? ' open' : ''}" data-dow="${dow}" data-meal-type="${meal.type}">
                     ${isOpen ? '▲ fechar' : '▼ ver alimentos'}
                 </button>
+                <button class="wd-icon-btn btn-dup-meal" title="Duplicar para outros dias" data-dow="${dow}" data-meal-type="${meal.type}" data-meal-label="${meal.label}">
+                    <i data-lucide="copy" style="width:13px;height:13px;"></i>
+                </button>
                 <button class="wd-icon-btn danger btn-clear-meal" title="Limpar refeição" data-dow="${dow}" data-meal-type="${meal.type}">
                     <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
                 </button>
@@ -683,6 +686,13 @@ function bindDayViewEvents(dow, dayData) {
             recalcMealTotal(dayIdx, mealIdx);
             if (_expandedMeal?.dow === d && _expandedMeal?.type === t) _expandedMeal = null;
             renderPlanDayEditor(d);
+        });
+    });
+
+    // Duplicar refeição para outros dias
+    container.querySelectorAll('.btn-dup-meal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            _showDuplicateModal(parseInt(btn.dataset.dow), btn.dataset.mealType, btn.dataset.mealLabel);
         });
     });
 
@@ -1286,6 +1296,144 @@ export async function updateBuilderClinicalBanner(patientId) {
     } catch {
         banner.classList.add('hidden');
     }
+}
+
+// ==========================================
+// DUPLICAR REFEIÇÃO
+// ==========================================
+
+function _showDuplicateModal(sourceDow, mealType, mealLabel) {
+    // Remove modal anterior se existir
+    document.getElementById('wd-dup-overlay')?.remove();
+
+    const plan = adminState._editingPlanData;
+    if (!plan) return;
+
+    const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const DAY_FULL_L = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
+    // Verifica quais dias já têm itens nesta refeição
+    const dayCards = plan.days
+        .filter(d => d.dow !== sourceDow)
+        .map(d => {
+            const meal = d.meals.find(m => m.type === mealType);
+            const hasItems = meal?.items?.length > 0;
+            return `
+                <label class="wd-dup-day-card${hasItems ? ' has-items' : ''}">
+                    <input type="checkbox" class="wd-dup-day-check" value="${d.dow}" ${hasItems ? '' : 'checked'}>
+                    <div class="wd-dup-day-inner">
+                        <span class="wd-dup-day-abbr">${DAY_LABELS[d.dow]}</span>
+                        <span class="wd-dup-day-name">${DAY_FULL_L[d.dow]}</span>
+                        ${hasItems ? '<span class="wd-dup-day-warn">substituirá</span>' : '<span class="wd-dup-day-empty">vazio</span>'}
+                    </div>
+                </label>`;
+        }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'wd-dup-overlay';
+    overlay.className = 'wd-dup-overlay';
+    overlay.innerHTML = `
+        <div class="wd-dup-modal">
+            <div class="wd-dup-modal-header">
+                <div>
+                    <h3 style="margin:0 0 3px;font-size:16px;font-weight:700;">Duplicar refeição</h3>
+                    <p style="margin:0;font-size:12px;color:var(--text-2);">Copiar <strong style="color:var(--text);">${mealLabel}</strong> da ${DAY_FULL_L[sourceDow]} para:</p>
+                </div>
+                <button id="wd-dup-close" style="background:none;border:none;font-size:22px;color:var(--text-2);cursor:pointer;line-height:1;padding:0 4px;">×</button>
+            </div>
+
+            <div class="wd-dup-days">
+                ${dayCards}
+            </div>
+
+            <div class="wd-dup-warning">
+                <i data-lucide="alert-triangle" style="width:13px;height:13px;flex-shrink:0;"></i>
+                Dias marcados como <em>substituirá</em> já têm alimentos nessa refeição — eles serão substituídos pelos da ${DAY_FULL_L[sourceDow]}.
+            </div>
+
+            <div class="wd-dup-footer">
+                <button id="wd-dup-select-all" class="btn-secondary btn-sm">Selecionar todos</button>
+                <div style="display:flex;gap:8px;">
+                    <button id="wd-dup-cancel" class="btn-secondary">Cancelar</button>
+                    <button id="wd-dup-confirm" class="btn-primary">
+                        <i data-lucide="copy" style="width:13px;height:13px;display:inline;vertical-align:middle;margin-right:4px;"></i>
+                        Duplicar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+
+    // Fechar
+    const close = () => overlay.remove();
+    overlay.querySelector('#wd-dup-close').addEventListener('click', close);
+    overlay.querySelector('#wd-dup-cancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    // Selecionar todos
+    overlay.querySelector('#wd-dup-select-all').addEventListener('click', () => {
+        overlay.querySelectorAll('.wd-dup-day-check').forEach(cb => { cb.checked = !cb.checked || (cb.checked = true); });
+    });
+
+    // Confirmar
+    overlay.querySelector('#wd-dup-confirm').addEventListener('click', () => {
+        const targets = [...overlay.querySelectorAll('.wd-dup-day-check:checked')]
+            .map(cb => parseInt(cb.value));
+        if (targets.length === 0) { alert('Selecione ao menos um dia.'); return; }
+        _duplicateMealToDays(sourceDow, mealType, targets);
+        close();
+    });
+}
+
+function _duplicateMealToDays(sourceDow, mealType, targetDows) {
+    const plan = adminState._editingPlanData;
+    if (!plan) return;
+
+    const sourceDayIdx  = plan.days.findIndex(d => d.dow === sourceDow);
+    if (sourceDayIdx === -1) return;
+    const sourceMeal = plan.days[sourceDayIdx].meals.find(m => m.type === mealType);
+    if (!sourceMeal) return;
+
+    // Deep-copy dos itens e instruções
+    const itemsCopy        = JSON.parse(JSON.stringify(sourceMeal.items || []));
+    const instructionsCopy = sourceMeal.instructions || '';
+
+    let count = 0;
+    targetDows.forEach(targetDow => {
+        const targetDayIdx = plan.days.findIndex(d => d.dow === targetDow);
+        if (targetDayIdx === -1) return;
+
+        const targetMealIdx = plan.days[targetDayIdx].meals.findIndex(m => m.type === mealType);
+        if (targetMealIdx === -1) {
+            // Adiciona a refeição ao dia destino se não existir
+            plan.days[targetDayIdx].meals.push({
+                type: sourceMeal.type,
+                label: sourceMeal.label,
+                time: sourceMeal.time,
+                items: JSON.parse(JSON.stringify(itemsCopy)),
+                instructions: instructionsCopy,
+                total: { calories:0, protein:0, carbs:0, fat:0, fiber:0, grams:0 }
+            });
+            const newIdx = plan.days[targetDayIdx].meals.length - 1;
+            recalcMealTotal(targetDayIdx, newIdx);
+        } else {
+            // Substitui itens e instruções
+            plan.days[targetDayIdx].meals[targetMealIdx].items        = JSON.parse(JSON.stringify(itemsCopy));
+            plan.days[targetDayIdx].meals[targetMealIdx].instructions = instructionsCopy;
+            recalcMealTotal(targetDayIdx, targetMealIdx);
+        }
+        count++;
+    });
+
+    // Re-renderiza o dia atual para feedback imediato
+    renderPlanDayEditor(sourceDow);
+
+    const DAY_FULL_L = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+    const names = targetDows.map(d => DAY_FULL_L[d]).join(', ');
+    alert(`✓ Refeição duplicada para: ${names}.\n\nNão esqueça de salvar o cardápio.`);
 }
 
 // ==========================================
