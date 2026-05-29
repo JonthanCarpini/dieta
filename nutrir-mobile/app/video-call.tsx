@@ -80,6 +80,9 @@ export default function VideoCallScreen() {
         originWhitelist={['*']}
         geolocationEnabled={false}
         androidHardwareAccelerationDisabled={false}
+        onPermissionRequest={(event) => {
+          event.grant(event.resources);
+        }}
       />
     </SafeAreaView>
   );
