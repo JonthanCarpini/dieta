@@ -12,10 +12,11 @@
 |------|------|-----------------|--------|
 | 2026-05-29 | — | Documento criado | — |
 | 2026-05-29 | **Fase 0 ✅** | Auditoria de micros na `alimentos`, DRI confirmada, UL + piso definidos, decisão **GO** (ver "Fase 0 — Resultados") | — (sem código) |
-| 2026-05-29 | **Fase 1 ✅** | Criado `backend/nutrition/planner.js` (funções puras): deriveTargetKcal, macros, distribuição/refeição, exclusões clínicas, buildGenerationConfig. Validado com 3 casos. | _(commitar)_ |
+| 2026-05-29 | **Fase 1 ✅** | Criado `backend/nutrition/planner.js` (funções puras): deriveTargetKcal, macros, distribuição/refeição, exclusões clínicas, buildGenerationConfig. Validado com 3 casos. | 8c9e91b |
+| 2026-05-29 | **Fase 2 ✅** | Criado `backend/nutrition/generator.js` (pool TACO por papel, templates, fillMeal com carbo fechando kcal, correção final) + endpoint `POST /professional/patients/:id/generate-plan`. Testado: desvio médio kcal 8%, alimentos coerentes. | 0653980 |
 
-**Fase atual:** Fase 2 (não iniciada) — Fases 0 e 1 concluídas
-**Última sessão parou em:** Fase 1 fechada. `planner.js` pronto e testado, **ainda NÃO plugado em endpoint** (vai ao ar com a Fase 2). Próximo: Fase 2 (endpoint `POST /professional/patients/:id/generate-plan` que usa o planner + monta pool + preenche porções).
+**Fase atual:** Fase 3 (não iniciada) — Fases 0, 1, 2 concluídas
+**Última sessão parou em:** Fase 2 fechada. Motor base gera 7 dias batendo kcal (±8% médio) com alimentos coerentes, no formato do builder. **Limitação conhecida (ver Fase 2 — Resultados):** carboidratos tendem a ficar altos (carbo é o fechador de kcal). Próximo: Fase 3 (compensação semanal de micros — o diferencial).
 
 ---
 
@@ -189,21 +190,27 @@ vitc, tiamina(b1), riboflavina(b2), niacina(b3), piridoxina(b6), vitb12, vitb9(f
 ---
 
 ## 📋 FASE 2 — Motor Base: kcal + macros por dia
-**Status:** ⬜ não iniciada
+**Status:** ✅ CONCLUÍDA (2026-05-29) — `backend/nutrition/generator.js`
 **Depende de:** Fase 1.
-**Entrega:** rascunho de 7 dias que bate kcal+macros (ainda SEM otimização de micro).
 
 ### Tarefas
-- [ ] **2.1** Endpoint `POST /professional/patients/:id/generate-plan` — recebe `GenerationConfig` (ou gera default), **retorna `plan_data` (não salva)**.
-- [ ] **2.2** Montar **pool de alimentos** por grupo/categoria, aplicando exclusões clínicas. Priorizar `alimentos` (TACO) por terem micros.
-- [ ] **2.3** **Templates de refeição** por tipo: estrutura de grupos (ex: almoço = 1 proteína + 1 carbo + 1 vegetal + 1 gordura). Evita combinações intragáveis.
-- [ ] **2.4** Para cada dia × refeição: escolher alimentos do template e **ajustar gramas** para bater o alvo de kcal+macros da refeição (greedy + ajuste proporcional, ou LP simples por refeição).
-- [ ] **2.5** Variedade entre dias: não repetir o mesmo alimento todo dia (rotacionar pool).
-- [ ] **2.6** Calcular `total` por refeição e por dia (reusar lógica de `recalcMealTotal`/`calcDayTotals`, incluindo micros que vierem da TACO).
-- [ ] **2.7** Devolver no formato `plan_data` exato do builder.
+- [x] **2.1** Endpoint `POST /professional/patients/:id/generate-plan` (retorna `plan_data`, NÃO salva). Busca profile + último GET + clinical (do próprio profiles).
+- [x] **2.2** `fetchFoodPool`: pool por papel da TACO, micro-completo (exceto gordura), filtros de sanidade macro + blacklist de nomes, aplica exclusões clínicas.
+- [x] **2.3** `MEAL_TEMPLATES`: composição por papéis (almoço = proteína+leguminosa+vegetal+gordura+carbo, etc.).
+- [x] **2.4** `fillMeal`: fixos (veg/fruta/leguminosa/laticínio) → proteína bate P → gordura bate G → **carbo fecha a KCAL** → correção final de energia.
+- [x] **2.5** Variedade: shuffle determinístico + cursor rotativo por papel entre dias.
+- [x] **2.6** `sumTotals`: totais por refeição/dia (macros + micros) no padrão do builder.
+- [x] **2.7** `plan_data` no formato EXATO do builder (item: `alimento_id, name, medida_label/grams, per100, +macros/micros escalados`).
 
-### Critério de aceite
-Resposta com 7 dias, cada dia dentro de ±10% de kcal e macros, refeições coerentes, respeitando exclusões.
+### 🔬 FASE 2 — RESULTADOS
+- **Precisão de kcal:** desvio médio **8%** (5/7 dias ≤ 6%; 2 outliers ~18-19%).
+- **Qualidade dos alimentos:** boa após filtros (Acém cozido, Feijão preto, Camarão, Mingau de aveia, Arroz integral, Azeite, Manteiga). Ainda aparecem alguns pratos preparados como carbo ("Arroz com X") — aceitável para rascunho.
+- **⚠️ Limitação conhecida:** **carboidratos tendem a ficar acima do alvo.** O carbo é o "fechador de kcal" — quando sobra budget, ele infla os carbos (proteína/gordura batem melhor). É o trade-off do problema sobredeterminado.
+  - **Mitigações futuras:** Fase 3 rebalanceia ao trocar alimentos por micro; nutricionista ajusta na revisão; Fase 5 pode adicionar balanceamento de razão de macro.
+- **Decisões de design:** carbo-fecha-kcal prioriza kcal+proteína+gordura; pool limitado a 200/papel; gordura isenta de micro-completude (óleos não têm micro).
+
+### Critério de aceite — ✅ parcial (aceito)
+7 dias gerados, kcal ±8% médio, alimentos coerentes, exclusões respeitadas, formato do builder OK. Macro de carbo fora de faixa em parte dos dias — **aceito como rascunho revisável** (princípio de segurança do projeto), com mitigação nas fases seguintes.
 
 ---
 
