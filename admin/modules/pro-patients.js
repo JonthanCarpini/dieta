@@ -265,21 +265,67 @@ export async function loadPatientExamsData(patientId) {
             const filename = exam.file_path.substring(exam.file_path.lastIndexOf('/') + 1);
             const downloadUrl = `${API_URL}/professional/exams/download/${filename}`;
 
-            tr.innerHTML = `
-                <td>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <i data-lucide="file-text" style="color:var(--color-primary); width:16px; height:16px;"></i>
-                        <strong>${exam.file_name}</strong>
+            let markersHtml = '';
+            if (exam.markers && exam.markers.length > 0) {
+                markersHtml = `
+                    <div class="exam-markers-container" style="margin-top:10px; display:flex; flex-direction:column; gap:6px; font-size:11px; padding-left:24px;">
+                        <span style="font-weight:700; color:var(--text-1); font-size:10px; text-transform:uppercase; letter-spacing:0.5px;">Biomarcadores Extraídos:</span>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:8px; margin-top:4px;">
+                            ${exam.markers.map(m => {
+                                let statusColor = '#a8a8a8';
+                                let statusBg = 'rgba(255,255,255,0.05)';
+                                if (m.status === 'high' || m.status === 'abnormal') {
+                                    statusColor = '#ef4444';
+                                    statusBg = 'rgba(239,68,68,0.12)';
+                                } else if (m.status === 'low') {
+                                    statusColor = '#3b82f6';
+                                    statusBg = 'rgba(59,130,246,0.12)';
+                                } else if (m.status === 'normal') {
+                                    statusColor = '#10b981';
+                                    statusBg = 'rgba(16,185,129,0.12)';
+                                }
+                                const refStr = m.reference_range ? ` (Ref: ${m.reference_range})` : '';
+                                return `
+                                    <div style="background:${statusBg}; border:1px solid rgba(255,255,255,0.08); padding:8px 12px; border-radius:8px; display:flex; flex-direction:column; gap:2px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                                            <strong style="color:var(--text-1); font-size:12px;">${m.marker_name}</strong>
+                                            <span style="color:${statusColor}; font-weight:700; font-size:9px; text-transform:uppercase; background:${statusColor}18; padding:1px 6px; border-radius:4px; border:1px solid ${statusColor}30;">${m.status}</span>
+                                        </div>
+                                        <div style="color:var(--text-1); font-size:14px; font-weight:700; margin-top:2px;">
+                                            ${m.marker_value} <span style="font-size:11px; font-weight:500; color:var(--text-2);">${m.unit || ''}</span>
+                                        </div>
+                                        ${m.reference_range ? `<div style="color:var(--color-text-muted); font-size:10px; margin-top:1px;">Ref: ${m.reference_range}</div>` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
                     </div>
+                `;
+            } else {
+                markersHtml = `
+                    <div style="margin-top:6px; font-size:11px; color:var(--color-text-muted); padding-left:24px; font-style:italic;">
+                        Nenhum marcador extraído (ou processamento em andamento)...
+                    </div>
+                `;
+            }
+
+            tr.innerHTML = `
+                <td style="vertical-align: top; padding-bottom:16px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <i data-lucide="file-text" style="color:var(--color-primary); width:18px; height:18px;"></i>
+                        <strong style="font-size:14px; color:var(--text-1);">${exam.file_name}</strong>
+                        ${exam.category ? `<span style="font-size:9px; background:rgba(74,222,128,0.15); color:var(--color-primary); padding:2px 8px; border-radius:12px; font-weight:700; text-transform:uppercase;">${exam.category}</span>` : ''}
+                    </div>
+                    ${markersHtml}
                 </td>
-                <td>${dateStr}</td>
-                <td>
+                <td style="vertical-align: top; padding-top:12px;">${dateStr}</td>
+                <td style="vertical-align: top; padding-top:12px;">
                     <div style="display:flex; gap:8px; align-items:center;">
                         <input type="text" class="pro-exam-note-input" data-exam-id="${exam.id}" value="${exam.notes || ''}" placeholder="Adicionar notas..." style="flex:1; font-size:12px; padding:4px 8px; height:auto;">
                         <button class="btn-primary btn-save-exam-note" data-exam-id="${exam.id}" style="font-size:10px; padding:4px 8px;">Salvar</button>
                     </div>
                 </td>
-                <td>
+                <td style="vertical-align: top; padding-top:12px;">
                     <a href="${downloadUrl}" download="${exam.file_name}" class="btn-secondary" style="font-size:11px; padding:4px 8px; text-decoration:none; display:inline-block;">
                         <i data-lucide="download" style="width:12px; height:12px; vertical-align:middle; margin-right:4px;"></i> Baixar
                     </a>

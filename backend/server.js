@@ -444,6 +444,26 @@ async function runMigrations() {
   await db.query(`
     CREATE INDEX IF NOT EXISTS idx_patient_exams_patient ON patient_exams(patient_id)
   `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS patient_exam_markers (
+      id SERIAL PRIMARY KEY,
+      exam_id INTEGER REFERENCES patient_exams(id) ON DELETE CASCADE,
+      patient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      marker_name VARCHAR(150) NOT NULL,
+      marker_value VARCHAR(100) NOT NULL,
+      numeric_value DECIMAL(10,2),
+      unit VARCHAR(50),
+      reference_range VARCHAR(255),
+      status VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_exam_markers_exam ON patient_exam_markers(exam_id)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_exam_markers_patient ON patient_exam_markers(patient_id)
+  `);
   console.log('Migrações executadas com sucesso.');
 }
 

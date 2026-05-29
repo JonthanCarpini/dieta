@@ -851,6 +851,140 @@ router.get('/weekly-plan', async (req, res) => {
 const fs = require('fs');
 const path = require('path');
 
+async function analyzeExamFile(examId, patientId, relativePath, mimeType) {
+  try {
+    // 1. Busca chave de API do Gemini nas configurações do sistema
+    const geminiKeyRes = await db.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const apiKey = geminiKeyRes.rows[0] ? geminiKeyRes.rows[0].value : null;
+
+    if (!apiKey) {
+      console.warn('[EXAM_PARSER] Chave gemini_api_key não configurada no system_settings. Abortando análise automática.');
+      return;
+    }
+
+    // 2. Lê o arquivo do disco e converte para base64
+    const absolutePath = path.join(__dirname, '..', relativePath);
+    if (!fs.existsSync(absolutePath)) {
+      console.error(`[EXAM_PARSER] Arquivo não encontrado: ${absolutePath}`);
+      return;
+    }
+    const fileBuffer = fs.readFileSync(absolutePath);
+    const base64Data = fileBuffer.toString('base64');
+
+    // 3. Define prompt para o Gemini
+    const prompt = `Você é um assistente de nutrição e saúde especialista em interpretar laudos de exames laboratoriais.
+Analise o exame fornecido (que pode estar em formato PDF ou imagem) e extraia todos os biomarcadores/valores de exames presentes nele.
+Retorne SEMPRE uma resposta em formato JSON contendo um array de objetos chamado "markers".
+Cada objeto no array deve conter exatamente as seguintes chaves:
+- "marker_name": nome do exame/marcador (ex: "Glicose", "Colesterol Total", "Hemoglobina", etc.). Sempre padronize e limpe os nomes.
+- "marker_value": o valor do resultado exatamente como consta no exame (ex: "95", "Ausente", "Negativo").
+- "numeric_value": o valor numérico convertido para float/decimal caso seja um número (ex: 95.0, 1.25), ou null caso não seja um número.
+- "unit": unidade de medida do marcador (ex: "mg/dL", "g/dL", "%", "U/L"), ou null se não houver.
+- "reference_range": o intervalo ou valor de referência normal (ex: "70 a 99 mg/dL", "Desejável menor que 190").
+- "status": a classificação do resultado com base nos valores de referência fornecidos no próprio laudo. Deve ser estritamente um destes valores: "normal", "high", "low" ou "abnormal" (para resultados qualitativos fora do normal).
+
+Exemplo de formato esperado:
+{
+  "markers": [
+    {
+      "marker_name": "Glicose",
+      "marker_value": "95",
+      "numeric_value": 95.0,
+      "unit": "mg/dL",
+      "reference_range": "70 a 99 mg/dL",
+      "status": "normal"
+    }
+  ]
+}`;
+
+    // 4. Executa a chamada para os candidatos de modelos do Gemini (com fallback)
+    const candidates = [
+      { api: 'v1beta', model: 'gemini-2.5-flash' },
+      { api: 'v1beta', model: 'gemini-2.0-flash' },
+      { api: 'v1beta', model: 'gemini-2.0-flash-lite' },
+      { api: 'v1beta', model: 'gemini-flash-latest' }
+    ];
+
+    let parsedResult = null;
+    let lastErr = null;
+
+    for (const { api, model } of candidates) {
+      const url = `https://generativelanguage.googleapis.com/${api}/models/${model}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Data
+                }
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json'
+        }
+      };
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          const resJson = await response.json();
+          const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            parsedResult = JSON.parse(rawText);
+            console.log(`[EXAM_PARSER] Gemini OK com o modelo: ${model}`);
+            break;
+          }
+        } else {
+          const errText = await response.text();
+          lastErr = `HTTP ${response.status} (${model}): ${errText}`;
+        }
+      } catch (err) {
+        lastErr = err.message;
+      }
+    }
+
+    if (!parsedResult) {
+      throw new Error(lastErr || 'Não foi possível obter resposta válida da IA para os modelos testados.');
+    }
+
+    const markers = parsedResult.markers || [];
+    console.log(`[EXAM_PARSER] Extraídos ${markers.length} marcadores do exame ${examId}.`);
+
+    // 5. Salva os marcadores no banco de dados
+    if (markers.length > 0) {
+      for (const marker of markers) {
+        const numVal = marker.numeric_value !== undefined && marker.numeric_value !== null ? parseFloat(marker.numeric_value) : null;
+        await db.query(`
+          INSERT INTO patient_exam_markers (exam_id, patient_id, marker_name, marker_value, numeric_value, unit, reference_range, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [
+          examId,
+          patientId,
+          marker.marker_name,
+          marker.marker_value,
+          numVal,
+          marker.unit || null,
+          marker.reference_range || null,
+          marker.status || 'normal'
+        ]);
+      }
+    }
+
+  } catch (err) {
+    console.error(`[EXAM_PARSER] Erro na análise do exame ${examId}:`, err);
+  }
+}
+
 router.get('/clinical', async (req, res) => {
   try {
     const result = await db.query(
@@ -899,10 +1033,24 @@ router.post('/exams', async (req, res) => {
   } = req.body;
 
   const fName = name || fileName;
-  const mType = mimeType || mime_type || (type === 'image' ? 'image/png' : 'application/pdf');
+  let mType = mimeType || mime_type || (type === 'image' ? 'image/png' : 'application/pdf');
   const fBase64 = base64 || fileBase64;
   const fSize = size_kb || sizeKb || 0;
   const fCategory = category || 'Outro';
+
+  // Normalização caso o client envie 'application/octet-stream'
+  if (fName && mType === 'application/octet-stream') {
+    const ext = fName.substring(fName.lastIndexOf('.')).toLowerCase();
+    if (ext === '.pdf') {
+      mType = 'application/pdf';
+    } else if (ext === '.jpg' || ext === '.jpeg') {
+      mType = 'image/jpeg';
+    } else if (ext === '.png') {
+      mType = 'image/png';
+    } else if (ext === '.webp') {
+      mType = 'image/webp';
+    }
+  }
 
   if (!fName || !mType || !fBase64) {
     return res.status(400).json({ error: 'Arquivo ou metadados ausentes.' });
@@ -931,6 +1079,12 @@ router.post('/exams', async (req, res) => {
     `, [req.user.id, fName, relativePath, mType, fCategory, fSize, notes || '']);
 
     const row = result.rows[0];
+
+    // Dispara análise por IA em background (assíncrona)
+    analyzeExamFile(row.id, req.user.id, relativePath, mType).catch(e => {
+      console.error('[EXAM_PARSER] Falha ao disparar análise em background:', e);
+    });
+
     res.status(201).json({
       id: row.id,
       name: row.name,
@@ -953,14 +1107,27 @@ router.get('/exams', async (req, res) => {
       [req.user.id]
     );
 
-    const mapped = result.rows.map(row => ({
+    const exams = result.rows;
+    let markers = [];
+    if (exams.length > 0) {
+      const examIds = exams.map(e => e.id);
+      const markersRes = await db.query(
+        'SELECT * FROM patient_exam_markers WHERE exam_id = ANY($1::int[]) ORDER BY marker_name ASC',
+        [examIds]
+      );
+      markers = markersRes.rows;
+    }
+
+    const mapped = exams.map(row => ({
       id: row.id,
       name: row.file_name,
       type: row.mime_type.startsWith('image/') ? 'image' : 'pdf',
       size_kb: row.size_kb || 0,
       uploaded_at: row.created_at,
       category: row.category || 'Outro',
-      url: `https://nutrir.online/api/user/exams/download/${path.basename(row.file_path)}`
+      notes: row.notes,
+      url: `https://nutrir.online/api/user/exams/download/${path.basename(row.file_path)}`,
+      markers: markers.filter(m => m.exam_id === row.id)
     }));
 
     res.json(mapped);
@@ -1020,6 +1187,45 @@ router.get('/exams/download/:filename', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao baixar exame.' });
+  }
+});
+
+router.get('/exams/markers', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT m.id, m.exam_id, m.marker_name, m.marker_value, m.numeric_value, m.unit, m.reference_range, m.status, m.created_at, e.file_name AS exam_name
+       FROM patient_exam_markers m
+       JOIN patient_exams e ON m.exam_id = e.id
+       WHERE m.patient_id = $1
+       ORDER BY m.created_at DESC, m.marker_name ASC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico de marcadores.' });
+  }
+});
+
+router.get('/exams/:id/markers', async (req, res) => {
+  const examId = parseInt(req.params.id);
+  try {
+    const checkExam = await db.query('SELECT patient_id FROM patient_exams WHERE id = $1', [examId]);
+    if (checkExam.rows.length === 0) {
+      return res.status(404).json({ error: 'Exame não encontrado.' });
+    }
+    if (checkExam.rows[0].patient_id !== req.user.id) {
+      return res.status(403).json({ error: 'Não autorizado.' });
+    }
+
+    const result = await db.query(
+      'SELECT id, marker_name, marker_value, numeric_value, unit, reference_range, status, created_at FROM patient_exam_markers WHERE exam_id = $1 ORDER BY marker_name ASC',
+      [examId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar marcadores do exame.' });
   }
 });
 

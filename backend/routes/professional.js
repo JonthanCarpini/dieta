@@ -339,10 +339,25 @@ router.get('/patients/:id/exams', verifyPatientAccess, async (req, res) => {
   const patientId = parseInt(req.params.id);
   try {
     const result = await db.query(
-      'SELECT id, file_name, file_path, mime_type, notes, created_at FROM patient_exams WHERE patient_id = $1 ORDER BY created_at DESC',
+      'SELECT id, file_name, file_path, mime_type, category, size_kb, notes, created_at FROM patient_exams WHERE patient_id = $1 ORDER BY created_at DESC',
       [patientId]
     );
-    res.json(result.rows);
+    const exams = result.rows;
+
+    if (exams.length > 0) {
+      const examIds = exams.map(e => e.id);
+      const markersRes = await db.query(
+        'SELECT * FROM patient_exam_markers WHERE exam_id = ANY($1::int[]) ORDER BY marker_name ASC',
+        [examIds]
+      );
+      const markers = markersRes.rows;
+
+      exams.forEach(exam => {
+        exam.markers = markers.filter(m => m.exam_id === exam.id);
+      });
+    }
+
+    res.json(exams);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar exames do paciente.' });
