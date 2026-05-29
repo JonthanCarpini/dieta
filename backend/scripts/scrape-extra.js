@@ -53,14 +53,21 @@ const FIELDS = [
   { code: 'infnutricFibraAlim',       key: 'fiber_g',     vdRef: 25   },
 ];
 
-// ── HTTP ──────────────────────────────────────────────────────────────────────
+// ── HTTP (com timeout p/ não pendurar o processo) ─────────────────────────────
+const FETCH_TIMEOUT = 15000;
+async function _fetchT(url, opts = {}, ms = FETCH_TIMEOUT) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
 async function _getText(url) {
-  const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'pt-BR' } });
+  const r = await _fetchT(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'pt-BR' } });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.text();
 }
 async function _search(terms, page) {
-  const r = await fetch(`${API}/search/search`, {
+  const r = await _fetchT(`${API}/search/search`, {
     method: 'POST',
     headers: { 'User-Agent': UA, 'Content-Type': 'application/json', 'Accept': 'application/json', 'x-origin': 'CATALOG' },
     body: JSON.stringify({
@@ -71,6 +78,13 @@ async function _search(terms, page) {
   });
   if (!r.ok) throw new Error(`search HTTP ${r.status}`);
   return r.json();
+}
+
+// Dedup rápida por nome (evita re-baixar páginas de produtos já importados)
+async function _existsByName(name) {
+  if (!name) return false;
+  try { const r = await db.query(`SELECT 1 FROM foods WHERE LOWER(name)=LOWER($1) LIMIT 1`, [name]); return r.rows.length > 0; }
+  catch { return false; }
 }
 
 // ── Descoberta de termos (árvore de categorias) ───────────────────────────────
@@ -215,6 +229,13 @@ async function main() {
         seen.add(p.id);
         stats.products++;
 
+        // Dedup rápida: se já existe pelo nome do resultado, pula sem baixar a página
+        if (!DRY && await _existsByName((p.name || '').replace(/\s+/g, ' ').trim())) {
+          stats.skipped++;
+          if (stats.products % 25 === 0) console.log(`  … ${stats.products} vistos | ${stats.inserted} novos | ${stats.skipped} já existiam`);
+          continue;
+        }
+
         try {
           const food = await _fetchProduct(p.urlDetails, term);
           if (!food || !food.name) { stats.failed++; }
@@ -224,8 +245,9 @@ async function main() {
             const ok = await _insert(food);
             if (ok) console.log(`  ✓ ${food.name.slice(0, 48)} — ${food.energy_kcal}kcal P${food.protein_g} C${food.carbs_g} G${food.fat_g} [${food._basis}/${food._portion ?? '?'}g]`);
           }
-        } catch (e) { stats.failed++; }
+        } catch (e) { stats.failed++; if (stats.failed % 10 === 0) console.warn(`  ⚠ ${stats.failed} falhas (última: ${e.message})`); }
 
+        if (stats.products % 25 === 0) console.log(`  … ${stats.products} vistos | ${stats.inserted} novos | ${stats.skipped} já existiam | ${stats.noTable} sem tabela`);
         await sleep(DELAY);
       }
       page++;
