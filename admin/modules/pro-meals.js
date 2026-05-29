@@ -905,12 +905,38 @@ async function runFoodSearch() {
     hdrDiv.style.display = 'none';
 
     try {
-        const res  = await fetch(`${API_URL}/admin/food-db?q=${encodeURIComponent(q)}&limit=20`, {
-            headers: { 'Authorization': `Bearer ${adminState.token}` }
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Erro na busca');
-        _currentFoodResults = data.items || [];
+        // Busca no banco principal + banco do nutricionista em paralelo
+        const [resMain, resPro] = await Promise.all([
+            fetch(`${API_URL}/admin/food-db?q=${encodeURIComponent(q)}&limit=20`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            }),
+            fetch(`${API_URL}/professional/foods?q=${encodeURIComponent(q)}`, {
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            })
+        ]);
+
+        const dataMain = await resMain.json();
+        const dataPro  = resPro.ok ? await resPro.json() : [];
+
+        // Converte alimentos do nutricionista para o mesmo formato do banco principal
+        const proItems = (Array.isArray(dataPro) ? dataPro : []).map(f => ({
+            id:          `pro_${f.id}`,
+            name:        f.name,
+            category:    f.category || 'Meus Alimentos',
+            source:      'Meu Banco',
+            energy_kcal: f.energy_kcal ?? 0,
+            protein_g:   f.protein_g ?? 0,
+            fat_g:        f.fat_g ?? 0,
+            carbs_g:     f.carbs_g ?? 0,
+            fiber_g:     f.fiber_g ?? 0,
+            sodium_mg:   f.sodium_mg ?? 0,
+            measures:    [{ label: 'grama(s)', grams: 1 }],
+            _isPro: true,
+            _proId: f.id,
+        }));
+
+        if (!resMain.ok) throw new Error(dataMain.error || 'Erro na busca');
+        _currentFoodResults = [...proItems, ...(dataMain.items || [])];
 
         if (!_currentFoodResults.length) {
             resultsDiv.innerHTML = '<p style="padding:20px;text-align:center;color:var(--color-text-muted);">Nenhum alimento encontrado. Tente a aba "Alimento Manual".</p>';
@@ -925,10 +951,13 @@ async function runFoodSearch() {
                 ? measures.slice(0, 10).map(m => `<option value="${m.grams}" data-label="${m.label}">${m.label} (${m.grams}g)</option>`).join('')
                 : '<option value="1" data-label="grama(s)">grama(s) (1g)</option>';
 
+            const proLabel = food._isPro
+                ? `<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);background:var(--accent-dim);padding:1px 6px;border-radius:4px;margin-left:5px;">Meu Banco</span>`
+                : '';
             return `
-            <div class="fsm-result-row">
+            <div class="fsm-result-row${food._isPro ? ' fsm-row-pro' : ''}">
                 <div class="fsm-food-name-col">
-                    <strong>${food.name}</strong>
+                    <strong>${food.name}</strong>${proLabel}
                     <small class="fsm-food-cat">${food.category} · ${food.source}</small>
                     <small class="fsm-per100">${Math.round(food.energy_kcal||0)} kcal · P:${rnd(food.protein_g||0)} · L:${rnd(food.fat_g||0)} · C:${rnd(food.carbs_g||0)} /100g</small>
                 </div>

@@ -74,6 +74,9 @@
                 <button class="nav-btn" data-tab="appointments" id="nav-appointments">
                     <i data-lucide="video"></i> Consultas
                 </button>
+                <button class="nav-btn" data-tab="foods" id="nav-foods">
+                    <i data-lucide="database"></i> Meus Alimentos
+                </button>
                 <button class="nav-btn" data-tab="settings" id="nav-settings">
                     <i data-lucide="key-round"></i> Credenciais
                 </button>
@@ -315,6 +318,138 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <!-- ABA: MEUS ALIMENTOS -->
+                <section id="tab-foods" class="tab-content">
+                    <div class="header-section">
+                        <h1>Meus Alimentos</h1>
+                        <p>Banco de alimentos personalizado. Esses alimentos ficam disponíveis na busca ao montar cardápios.</p>
+                    </div>
+
+                    <div class="dashboard-row" style="align-items:flex-start;">
+
+                        <!-- Formulário de cadastro / edição -->
+                        <div class="dashboard-card col-4" style="position:sticky;top:24px;">
+                            <h3 id="pf-form-title">Cadastrar Alimento</h3>
+
+                            <!-- Scanner de tabela nutricional -->
+                            <div style="margin-bottom:16px;">
+                                <button id="pf-btn-scan" class="btn-secondary w-full" style="font-size:13px;padding:12px;gap:8px;">
+                                    <i data-lucide="scan-line" style="width:15px;height:15px;display:inline;vertical-align:middle;margin-right:5px;"></i>
+                                    Escanear Tabela Nutricional
+                                </button>
+                                <p id="pf-scan-status" style="display:none;font-size:11px;margin-top:6px;padding:8px 10px;background:var(--bg-surface-alt);border-radius:6px;color:var(--text-2);"></p>
+                            </div>
+
+                            <form id="pf-form" style="display:flex;flex-direction:column;gap:0;">
+                                <!-- Grade de campos: gerada do FIELDS array — aqui a versão HTML estática -->
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+                                    <div class="form-group" style="grid-column:span 2;margin-bottom:0;">
+                                        <label for="pf-name">Nome do Alimento *</label>
+                                        <input type="text" id="pf-name" placeholder="Ex: Iogurte grego natural integral" required>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom:0;">
+                                        <label for="pf-category">Categoria</label>
+                                        <input type="text" id="pf-category" placeholder="Ex: Laticínios">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom:0;">
+                                        <label for="pf-portion">Porção referência (g)</label>
+                                        <input type="number" id="pf-portion" placeholder="100" min="1" step="0.1">
+                                    </div>
+                                </div>
+
+                                <!-- Macros principais -->
+                                <div style="background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">
+                                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:10px;">Macronutrientes por 100g</div>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-kcal">Kcal *</label>
+                                            <input type="number" id="pf-kcal" placeholder="Ex: 250" min="0" step="0.1" required>
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-protein">Proteínas (g)</label>
+                                            <input type="number" id="pf-protein" placeholder="Ex: 10.5" min="0" step="0.1">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-fat">Lipídios (g)</label>
+                                            <input type="number" id="pf-fat" placeholder="Ex: 5.2" min="0" step="0.1">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-carbs">Carboidratos (g)</label>
+                                            <input type="number" id="pf-carbs" placeholder="Ex: 30" min="0" step="0.1">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-fiber">Fibras (g)</label>
+                                            <input type="number" id="pf-fiber" placeholder="Ex: 2.1" min="0" step="0.1">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-sodium">Sódio (mg)</label>
+                                            <input type="number" id="pf-sodium" placeholder="Ex: 120" min="0" step="1">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Micronutrientes / detalhes -->
+                                <div style="background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
+                                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);margin-bottom:10px;">Detalhe de Gorduras e Minerais por 100g</div>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-saturated-fat">Gord. Saturada (g)</label>
+                                            <input type="number" id="pf-saturated-fat" placeholder="Ex: 1.8" min="0" step="0.1">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-trans-fat">Gord. Trans (g)</label>
+                                            <input type="number" id="pf-trans-fat" placeholder="Ex: 0" min="0" step="0.01">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-calcium">Cálcio (mg)</label>
+                                            <input type="number" id="pf-calcium" placeholder="Ex: 150" min="0" step="1">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="pf-iron">Ferro (mg)</label>
+                                            <input type="number" id="pf-iron" placeholder="Ex: 0.5" min="0" step="0.01">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style="display:flex;gap:8px;">
+                                    <button type="submit" class="btn-primary" id="pf-btn-save" style="flex:1;">Salvar Alimento</button>
+                                    <button type="button" class="btn-secondary hidden" id="pf-btn-cancel">Cancelar</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Lista de alimentos -->
+                        <div class="dashboard-card col-8">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+                                <h3 style="margin:0;">Alimentos Cadastrados</h3>
+                                <div class="search-box" style="flex:1;max-width:320px;">
+                                    <i data-lucide="search"></i>
+                                    <input type="text" id="pf-search-input" placeholder="Buscar por nome...">
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome / Categoria</th>
+                                            <th style="text-align:right;">Porção</th>
+                                            <th style="text-align:right;">Kcal/100g</th>
+                                            <th style="text-align:right;">Ptn (g)</th>
+                                            <th style="text-align:right;">Lip (g)</th>
+                                            <th style="text-align:right;">Carb (g)</th>
+                                            <th style="text-align:right;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pf-table-body">
+                                        <tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-2);">Nenhum alimento cadastrado ainda.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                     </div>
                 </section>
 

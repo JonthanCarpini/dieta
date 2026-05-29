@@ -398,6 +398,45 @@ router.post('/test', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/ai/scan-nutrition-label — lê tabela nutricional de uma foto
+router.post('/scan-nutrition-label', authenticateToken, async (req, res) => {
+  const t0 = Date.now();
+  try {
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ error: 'Imagem base64 obrigatória.' });
+
+    const prompt = `Você é um sistema de extração de dados nutricionais. Analise a imagem de um rótulo ou tabela nutricional e extraia as informações.
+
+Retorne SOMENTE um JSON válido com a seguinte estrutura (sem markdown, sem explicações):
+{
+  "name": "nome do produto se visível, senão null",
+  "portion_grams": porção de referência em gramas (número),
+  "energy_kcal_100g": kcal por 100g (número),
+  "energy_kcal_portion": kcal por porção (número ou null),
+  "protein_g": proteínas por 100g (número),
+  "fat_g": lipídios/gorduras totais por 100g (número),
+  "saturated_fat_g": gordura saturada por 100g (número ou null),
+  "trans_fat_g": gordura trans por 100g (número ou null),
+  "carbs_g": carboidratos totais por 100g (número),
+  "fiber_g": fibra alimentar por 100g (número ou null),
+  "sodium_mg": sódio em mg por 100g (número ou null),
+  "calcium_mg": cálcio em mg por 100g (número ou null),
+  "iron_mg": ferro em mg por 100g (número ou null)
+}
+
+IMPORTANTE: Normalize todos os valores para 100g (se a tabela mostrar valores por porção, converta usando a porção em gramas). Se um campo não estiver visível ou legível, use null.`;
+
+    const cfg = await getLLMConfig();
+    const { text, provider, model } = await callLLM(cfg, prompt, image);
+    const result = JSON.parse(extractJson(text));
+    result._meta = { provider, model, latency_ms: Date.now() - t0 };
+    res.json(result);
+  } catch (err) {
+    console.error('Erro scan-nutrition-label:', err.message);
+    res.status(502).json({ error: 'Falha ao analisar tabela nutricional.', detail: err.message });
+  }
+});
+
 router.getLLMConfig = getLLMConfig;
 router.callLLM = callLLM;
 

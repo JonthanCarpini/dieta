@@ -23,6 +23,7 @@ import { initProPatients, loadPatientsData } from './modules/pro-patients.js';
 import { loadAppointmentsData } from './modules/pro-appointments.js';
 import { initProMeals, loadMealPlansData, openMealPlanBuilder, saveMealPlan } from './modules/pro-meals.js';
 import { initProEnergy } from './modules/pro-energy.js';
+import { initProFoods, loadProFoodsData } from './modules/pro-foods.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initAdmin();
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initProPatients();
         initProMeals();
         initProEnergy();
+        initProFoods();
 
         await initAuth(() => {
             const defaultTab = adminState.user.role === 'admin' ? 'overview' : 'patients';
@@ -157,6 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadScheduleData();
         } else if (tabId === 'appointments') {
             await loadAppointmentsData();
+        } else if (tabId === 'foods') {
+            await loadProFoodsData();
         }
 
         if (window.lucide) window.lucide.createIcons();
