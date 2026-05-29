@@ -6,6 +6,7 @@
  * Ver GERADOR_CARDAPIO.md.
  */
 const planner = require('./planner');
+const { ARCHETYPES } = require('./archetypes');
 
 // Mesma ordem/chaves de MICRO_KEYS do builder (pro-meals.js) — compatibilidade do item
 const MICRO_KEYS = ['ca','mg','p','fe','na','k','co','zn','se','re','rea','tiamina','riboflavina','piridoxina','niacina','vitc','vitb12','vitb9','vite','vitd'];
@@ -19,6 +20,7 @@ const ROLE_GROUPS = {
   fruit:     ['Frutas e derivados'],
   dairy:     ['Leite e derivados'],
   fat:       ['Gorduras e azeites', 'Gorduras e óleos'],
+  bebida:    ['Bebidas'],
 };
 
 // Filtro de sanidade macro por papel (por 100g): preferir alimentos MAGROS/LIMPOS
@@ -59,12 +61,12 @@ const MEAL_TEMPLATES = {
 //  - owns 'kcal': CARBO fecha a energia restante (lever de calorias)
 const ROLE_OWNS = { protein: 'protein', fat: 'fat', carb: 'kcal', legume: null, dairy: null, vegetable: null, fruit: null };
 const ROLE_FALLBACK = { protein: 'legume', dairy: null };
-const FIXED_PORTION = { vegetable: 90, fruit: 130, legume: 80, dairy: 200 };
+const FIXED_PORTION = { vegetable: 90, fruit: 130, legume: 80, dairy: 200, bebida: 200 };
 // mínimos baixos para NÃO inflar porções caseiras curadas (ex: queijo 30g) — antes
 // dairy mínimo 120 forçava queijo a 120g = ~400kcal, estourando a meta.
-const CLAMP = { protein: [30, 220], carb: [20, 400], legume: [30, 180], dairy: [15, 250], fat: [3, 30], fruit: [30, 220], vegetable: [25, 180] };
-// fixos primeiro, depois proteína, gordura, e CARBO por último (fecha kcal)
-const ROLE_ORDER = ['vegetable', 'fruit', 'legume', 'dairy', 'protein', 'fat', 'carb'];
+const CLAMP = { protein: [30, 220], carb: [20, 400], legume: [30, 180], dairy: [15, 250], fat: [3, 30], fruit: [30, 220], vegetable: [25, 180], bebida: [50, 300] };
+// ordem de resolução: fixos primeiro, depois owns protein/fat, e owns 'kcal' por último (fecha energia)
+const ROLE_ORDER = ['vegetable', 'fruit', 'legume', 'dairy', 'bebida', 'protein', 'fat', 'carb'];
 
 const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const round1 = n => Math.round(n * 10) / 10;
@@ -169,14 +171,22 @@ function scaleItem(food, grams) {
   return item;
 }
 
-// Preenche uma refeição: fixos (veg/fruta/leguminosa/laticínio) → proteína (alvo P)
-// → gordura (alvo G restante) → carbo (fecha a KCAL restante).
+// Ordem de resolução: fixos → owns protein/fat → owns 'kcal' (fecha energia) por último.
+function _pickOrder(pick) {
+  const owns = pick.owns !== undefined ? pick.owns : ROLE_OWNS[pick.role];
+  if (owns === 'kcal') return 100;            // sempre por último
+  if (owns === 'protein' || owns === 'fat') return 50;
+  return ROLE_ORDER.indexOf(pick.role);       // fixos pela ordem dos papéis
+}
+
+// Preenche uma refeição. Cada pick pode trazer `owns` (do arquétipo); senão usa ROLE_OWNS.
 function fillMeal(target, picks) {
-  const ordered = [...picks].sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+  const ordered = [...picks].sort((a, b) => _pickOrder(a) - _pickOrder(b));
   const remaining = { protein: target.protein_g, fat: target.fat_g, kcal: target.kcal };
   const items = [];
-  for (const { role, food } of ordered) {
-    const owns = ROLE_OWNS[role];
+  for (const pick of ordered) {
+    const { role, food } = pick;
+    const owns = pick.owns !== undefined ? pick.owns : ROLE_OWNS[role];
     let grams;
     if (!owns) {
       grams = food.portion || FIXED_PORTION[role] || 100;        // porção caseira curada, senão padrão
@@ -191,35 +201,35 @@ function fillMeal(target, picks) {
     grams = Math.max(clamp[0], Math.min(clamp[1], grams));
     grams = Math.max(5, Math.round(grams / 5) * 5);             // múltiplos de 5g
     const item = scaleItem(food, grams);
-    item.role = role; item._food = food;
+    item.role = role; item._food = food; item._owns = owns;
     items.push(item);
     remaining.protein -= item.protein;
     remaining.fat     -= item.fat;
     remaining.kcal    -= item.calories;
   }
 
-  // Correção final de KCAL: escala os itens de energia (não-proteína/não-gordura)
-  // para encaixar no alvo da refeição — resolve overshoot de lanches/ceia.
-  const lockedKcal = items.filter(it => it.role === 'protein' || it.role === 'fat')
+  // Correção final de KCAL: mantém travados os macro-donos (owns protein/fat) e escala
+  // todo o resto (fecha-kcal + fixos de energia) para encaixar no alvo da refeição.
+  const lockedKcal = items.filter(it => it._owns === 'protein' || it._owns === 'fat')
                           .reduce((s, it) => s + it.calories, 0);
-  const energyItems = items.filter(it => ENERGY_ROLES.has(it.role));
-  const energyKcal  = energyItems.reduce((s, it) => s + it.calories, 0);
+  const scalable    = items.filter(it => it._owns !== 'protein' && it._owns !== 'fat');
+  const scalableKcal = scalable.reduce((s, it) => s + it.calories, 0);
   const budget = Math.max(0, target.kcal - lockedKcal);
-  if (energyKcal > 0 && Math.abs(energyKcal - budget) / Math.max(1, budget) > 0.10) {
-    let factor = budget / energyKcal;
+  if (scalableKcal > 0 && Math.abs(scalableKcal - budget) / Math.max(1, budget) > 0.10) {
+    let factor = budget / scalableKcal;
     factor = Math.max(0.4, Math.min(1.8, factor));
-    energyItems.forEach(it => {
+    scalable.forEach(it => {
       const cl = CLAMP[it.role] || [20, 300];
       let g = Math.max(cl[0], Math.min(cl[1], it.grams * factor));
       g = Math.max(5, Math.round(g / 5) * 5);
       const scaled = scaleItem(it._food, g);
-      scaled.role = it.role; scaled._food = it._food;
+      scaled.role = it.role; scaled._food = it._food; scaled._owns = it._owns;
       Object.assign(it, scaled);
     });
   }
 
-  // limpa só o campo interno _food (mantém role para a Fase 3)
-  items.forEach(it => { delete it._food; });
+  // limpa campos internos (mantém role para a Fase 3)
+  items.forEach(it => { delete it._food; delete it._owns; });
   return items;
 }
 
@@ -269,19 +279,49 @@ function generatePlan(pool, config) {
     return f;
   };
 
+  // arquétipos viáveis por refeição (todos os slots required têm pool); embaralhados p/ variedade
+  const archByMeal = {}; const archCursor = {};
+  const hasRole = (meal, role) => {
+    const direct = shuffled[meal] && shuffled[meal][role] && shuffled[meal][role].length;
+    const fb = ROLE_FALLBACK[role] && shuffled[meal] && shuffled[meal][ROLE_FALLBACK[role]] && shuffled[meal][ROLE_FALLBACK[role]].length;
+    return !!(direct || fb);
+  };
+  for (const meal of MEAL_KEYS) {
+    const list = (ARCHETYPES[meal] || []).filter(a =>
+      a.slots.every(s => s.required === false || hasRole(meal, s.role))
+    );
+    archByMeal[meal] = shuffle(list, (config.kcal || 2000) + meal.length * 3);
+    archCursor[meal] = 0;
+  }
+  const nextArchetype = meal => {
+    const list = archByMeal[meal];
+    if (!list || !list.length) return null;
+    const a = list[archCursor[meal] % list.length];
+    archCursor[meal]++;
+    return a;
+  };
+
   const days = [];
   const summary = [];
   for (const dow of DOW_ORDER) {
     const meals = [];
     for (const [mealType, mt] of Object.entries(config.perMeal)) {
-      const template = MEAL_TEMPLATES[mealType] || [];
+      const arch = nextArchetype(mealType);
+      // monta os picks a partir dos slots do arquétipo (fallback: template legado)
+      const slots = arch ? arch.slots : (MEAL_TEMPLATES[mealType] || []).map(role => ({ role }));
       const picks = [];
-      for (const role of template) {
-        const f = nextFood(mealType, role);
-        if (f) picks.push({ role, food: f });
+      for (const slot of slots) {
+        const f = nextFood(mealType, slot.role);
+        if (f) picks.push({ role: slot.role, food: f, owns: slot.owns, _slotKcal: slot.owns === 'kcal' });
+      }
+      // garante um fechador de kcal: se nenhum pick ficou com owns:'kcal', promove o carbo ou o de maior caloria
+      if (picks.length && !picks.some(p => p.owns === 'kcal')) {
+        const carb = picks.find(p => p.role === 'carb') ||
+                     picks.slice().sort((a, b) => (b.food.per100.calories || 0) - (a.food.per100.calories || 0))[0];
+        if (carb) carb.owns = 'kcal';
       }
       const items = picks.length ? fillMeal(mt, picks) : [];
-      meals.push({ type: mealType, label: mt.label, time: mt.time, items, instructions: '', total: sumTotals(items) });
+      meals.push({ type: mealType, label: mt.label, time: mt.time, archetype: arch ? arch.name : null, items, instructions: '', total: sumTotals(items) });
     }
     const dayTotal = sumTotals(meals.flatMap(m => m.items));
     days.push({ dow, meals });

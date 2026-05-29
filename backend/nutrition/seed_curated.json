@@ -88,7 +88,7 @@
   { "name": "Leite desnatado",            "q": "leite de vaca desnatado","role": "dairy",   "meals": ["cafe","ceia"],          "portion": 200 },
   { "name": "Iogurte natural",            "q": "iogurte natural",      "role": "dairy",     "meals": ["cafe","lanche","ceia"], "portion": 170 },
   { "name": "Queijo minas frescal",       "q": "queijo minas",         "role": "dairy",     "meals": ["cafe","lanche"],        "portion": 30 },
-  { "name": "Queijo muçarela",            "q": "queijo mozarela",      "role": "dairy",     "meals": ["cafe","lanche"],        "portion": 30 },
+  { "name": "Queijo muçarela",            "q": "queijo mozarela",      "role": "dairy",     "meals": ["cafe","lanche","almoco","jantar"], "portion": 30 },
   { "name": "Queijo prato",               "q": "queijo prato",         "role": "dairy",     "meals": ["cafe","lanche"],        "portion": 30 },
   { "name": "Requeijão cremoso",          "q": "requeijão",            "role": "dairy",     "meals": ["cafe","lanche"],        "portion": 20 },
   { "name": "Ricota",                     "q": "ricota",               "role": "dairy",     "meals": ["cafe","lanche"],        "portion": 40 },
@@ -208,5 +208,11 @@
   { "name": "Gergelim",                   "q": "gergelim",             "role": "fat",       "meals": ["almoco","jantar"], "portion": 10 },
   { "name": "Pasta de amendoim",          "q": "pasta de amendoim",    "role": "fat",       "meals": ["cafe","lanche"], "portion": 20 },
   { "name": "Óleo de coco",               "q": "óleo de coco",         "role": "fat",       "meals": ["almoco","jantar"], "portion": 8 },
-  { "name": "Coco ralado",                "q": "coco ralado",          "role": "fat",       "meals": ["cafe","lanche"], "portion": 15 }
+  { "name": "Coco ralado",                "q": "coco ralado",          "role": "fat",       "meals": ["cafe","lanche"], "portion": 15 },
+
+  { "name": "Café",                       "q": "café",                 "role": "bebida",    "meals": ["cafe","lanche"], "portion": 50 },
+  { "name": "Chá",                        "q": "chá",                  "role": "bebida",    "meals": ["cafe","lanche","ceia"], "portion": 200 },
+  { "name": "Refrigerante zero",          "q": "refrigerante",         "role": "bebida",    "meals": ["almoco","jantar"], "portion": 200 },
+  { "name": "Suco de laranja natural",    "q": "suco de laranja",      "role": "bebida",    "meals": ["cafe","almoco"], "portion": 200 },
+  { "name": "Água de coco",               "q": "água de coco",         "role": "bebida",    "meals": ["lanche"], "portion": 200 }
 ]
