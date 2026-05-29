@@ -18,13 +18,20 @@ function _push(line) {
   if (logLines.length > MAX_LINES) logLines.shift();
 }
 
+const SCRIPTS = {
+  extra:  'scrape-extra.js',
+  tabela: 'scrape-tabela.js',
+};
+
 function start(opts = {}) {
   if (proc) return { ok: false, error: 'O importador já está em execução.' };
 
-  const scriptPath = path.join(__dirname, 'scrape-extra.js');
+  const source = SCRIPTS[opts.source] ? opts.source : 'extra';
+  const scriptPath = path.join(__dirname, SCRIPTS[source]);
   const args = [scriptPath];
   if (opts.max)   args.push('--max', String(parseInt(opts.max) || 100));
-  if (opts.terms) args.push('--terms', String(opts.terms));
+  // "terms" vira --terms no Extra (busca) e --cat na Tabela (categoria)
+  if (opts.terms) args.push(source === 'tabela' ? '--cat' : '--terms', String(opts.terms));
   if (opts.delay) args.push('--delay', String(parseInt(opts.delay) || 900));
 
   lastOpts  = opts;

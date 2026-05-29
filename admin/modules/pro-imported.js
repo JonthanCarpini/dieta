@@ -151,7 +151,14 @@ export function initProImported() {
     });
 
     // Controle do scraper
+    // Ajusta placeholder dos termos conforme a fonte
+    document.getElementById('scraper-source')?.addEventListener('change', e => {
+        const input = document.getElementById('scraper-terms');
+        if (input) input.placeholder = e.target.value === 'tabela' ? 'frutas (filtra categoria)' : 'arroz,feijao,leite';
+    });
+
     document.getElementById('scraper-start')?.addEventListener('click', async () => {
+        const source = document.getElementById('scraper-source')?.value || 'extra';
         const max   = document.getElementById('scraper-max')?.value;
         const terms = document.getElementById('scraper-terms')?.value.trim();
         const btn   = document.getElementById('scraper-start');
@@ -160,7 +167,7 @@ export function initProImported() {
             const res = await fetch(`${API_URL}/professional/imported-foods/scraper/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
-                body: JSON.stringify({ max, terms: terms || undefined })
+                body: JSON.stringify({ source, max, terms: terms || undefined })
             });
             const d = await res.json();
             if (!res.ok) throw new Error(d.error || 'Erro');

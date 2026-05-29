@@ -470,11 +470,18 @@
 
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;margin-bottom:14px;">
                             <div style="display:flex;flex-direction:column;gap:4px;">
+                                <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);">Fonte</label>
+                                <select id="scraper-source" style="padding:8px 10px;font-size:13px;background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);box-sizing:border-box;width:100%;">
+                                    <option value="extra">Extra Mercado</option>
+                                    <option value="tabela">Tabela de Alimentos</option>
+                                </select>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:4px;">
                                 <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);">Qtd. máxima</label>
                                 <input type="number" id="scraper-max" value="1000" min="1" step="50" style="padding:8px 10px;font-size:13px;background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);box-sizing:border-box;width:100%;">
                             </div>
                             <div style="display:flex;flex-direction:column;gap:4px;">
-                                <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);">Termos (opcional)</label>
+                                <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);" id="scraper-terms-label">Termos / Categoria (opcional)</label>
                                 <input type="text" id="scraper-terms" placeholder="arroz,feijao,leite" style="padding:8px 10px;font-size:13px;background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);box-sizing:border-box;width:100%;">
                             </div>
                             <div style="display:flex;gap:8px;">

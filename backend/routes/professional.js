@@ -623,7 +623,7 @@ router.get('/imported-foods', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 30, 100);
   const offset = (page - 1) * limit;
   try {
-    const where  = q ? `WHERE source='extra' AND name ILIKE $1` : `WHERE source='extra'`;
+    const where  = q ? `WHERE source IN ('extra','tabela') AND name ILIKE $1` : `WHERE source IN ('extra','tabela')`;
     const params = q ? [`%${q}%`] : [];
 
     const countRes = await db.query(`SELECT COUNT(*) FROM foods ${where}`, params);
@@ -652,7 +652,7 @@ router.get('/imported-foods', async (req, res) => {
 // DELETE /professional/imported-foods/:id — remove um alimento importado
 router.delete('/imported-foods/:id', async (req, res) => {
   try {
-    await db.query(`DELETE FROM foods WHERE id=$1 AND source='extra'`, [req.params.id]);
+    await db.query(`DELETE FROM foods WHERE id=$1 AND source IN ('extra','tabela')`, [req.params.id]);
     res.json({ message: 'Alimento removido.' });
   } catch (err) {
     console.error(err);
@@ -666,7 +666,7 @@ const scraper = require('../scripts/scraper-manager');
 // GET status + andamento (contagem no banco + log)
 router.get('/imported-foods/scraper/status', async (req, res) => {
   try {
-    const c = await db.query(`SELECT COUNT(*) FROM foods WHERE source='extra'`);
+    const c = await db.query(`SELECT COUNT(*) FROM foods WHERE source IN ('extra','tabela')`);
     res.json({ ...scraper.status(), totalInDb: parseInt(c.rows[0].count) });
   } catch (err) {
     res.json({ ...scraper.status(), totalInDb: null });
@@ -675,8 +675,8 @@ router.get('/imported-foods/scraper/status', async (req, res) => {
 
 // POST iniciar
 router.post('/imported-foods/scraper/start', (req, res) => {
-  const { max, terms, delay } = req.body || {};
-  const r = scraper.start({ max, terms, delay });
+  const { source, max, terms, delay } = req.body || {};
+  const r = scraper.start({ source, max, terms, delay });
   if (!r.ok) return res.status(409).json(r);
   res.json({ ok: true, message: 'Importação iniciada.' });
 });
