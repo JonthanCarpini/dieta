@@ -42,7 +42,7 @@ router.get('/profile', async (req, res) => {
   }
 });
 
-router.post('/profile', async (req, res) => {
+const saveProfileHandler = async (req, res) => {
   const {
     gender, age, weight, height, activity, goal,
     goal_weight, speed, target_calories, target_protein, target_carbs, target_fat
@@ -81,7 +81,10 @@ router.post('/profile', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Erro ao salvar perfil.' });
   }
-});
+};
+
+router.post('/profile', saveProfileHandler);
+router.put('/profile', saveProfileHandler);
 
 // ==========================================
 // 2. DIÁRIO DE REFEIÇÕES

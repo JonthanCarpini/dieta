@@ -98,7 +98,11 @@ export default function PerfilScreen() {
       qc.invalidateQueries({ queryKey: ['profile'] });
       setNewWeight('');
     },
-    onError: () => Alert.alert('Erro', 'Não foi possível registrar o peso.'),
+    onError: (err: any) => {
+      console.error('Erro ao registrar peso:', err);
+      const errMsg = err.response?.data?.error ?? err.message ?? 'Erro desconhecido';
+      Alert.alert('Erro', `Não foi possível registrar o peso: ${errMsg}`);
+    },
   });
 
   const pickAvatarMutation = useMutation({

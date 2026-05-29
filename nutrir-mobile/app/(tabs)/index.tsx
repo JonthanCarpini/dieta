@@ -207,7 +207,7 @@ export default function DiarioScreen() {
   const totalBurned = Math.round(stepsCalories + exercisesCalories);
   
   const netConsumedCal = Math.max(0, Math.round(consumedCal - totalBurned));
-  const calPct = goalCal > 0 ? netConsumedCal / goalCal : 0;
+  const calPct = goalCal > 0 ? consumedCal / goalCal : 0;
 
   // Lógica de Exclusão de Refeição Inteira
   const handleDeleteMeal = (mealId: string) => {
