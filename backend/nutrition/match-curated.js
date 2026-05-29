@@ -16,43 +16,62 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed_curated.json'
 
 const MICRO_OK = r => Number(r.ca) > 0 && Number(r.fe) > 0 && Number(r.na) > 0 && Number(r.k) > 0;
 
-function scoreRow(row, role) {
+// pratos preparados / formas indesejadas (penalidade forte)
+const PREPARED = /salada|sandu[ií]ch|\bsuco\b|\bdoce\b|em pó|\bbolo\b|receita|espeto|à grega|caramel|açúcar|rechead|\btorta\b|\bsopa\b|creme de|nugget|mingau|farofa|risoto|strogonoff|empad|pizza|lasanha|panqueca|pastel|coxinha|salgad/;
+
+function scoreRow(row, role, words) {
   const n = (row.nome || '').toLowerCase();
   let s = 0;
-  // grupo coerente com o papel
   const grps = gen.ROLE_GROUPS[role] || [];
-  if (grps.includes(row.grupo)) s += 20;
-  // micro-completude (exceto gordura)
+  if (grps.includes(row.grupo)) s += 25;
   if (role !== 'fat') s += MICRO_OK(row) ? 50 : -30;
-  // preferir preparo cozido/grelhado
-  if (/cozid|grelhad|assad|refogad/.test(n)) s += 12;
-  // penalizar formas indesejadas
-  if (/\bcru\b|\bcrua\b|frit|conserva|caramelizad|maionese|defumad|em calda|enlatad/.test(n)) s -= 25;
-  // ajuste por macro do papel
+
+  // palavra principal como token inteiro no nome → forte sinal de match correto
+  const first = words[0];
+  if (first && new RegExp(`(^|[ ,])${first.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}([ ,]|$)`).test(n)) s += 30;
+
+  // preparo
+  if (/cozid|grelhad|assad|refogad/.test(n)) s += 10;
+  if (/\bcru\b|\bcrua\b/.test(n)) s -= 45;
+  if (/frit|conserva|defumad|em calda|enlatad/.test(n)) s -= 30;
+  // prato preparado / composto
+  if (PREPARED.test(n)) s -= 45;
+  // "X com <comida>" (mistura) — permite "com sal/óleo/sem/casca/pele/leite"
+  if (/ com (?!sal|óleo|oleo|sem|casca|pele|leite|molho de tomate$)/.test(n)) s -= 22;
+  // óleo quando não é papel gordura/azeite
+  if (/óleo de|oleo de/.test(n) && !/óleo|oleo|azeite/.test(words.join(' '))) s -= 35;
+  // leite em pó para laticínio líquido
+  if (role === 'dairy' && /em pó|em po/.test(n)) s -= 35;
+
   const ptn = Number(row.ptn) || 0, cho = Number(row.cho) || 0, lip = Number(row.lip) || 0;
   if (role === 'protein') { if (ptn >= 12) s += 15; if (ptn < 8) s -= 15; }
   if (role === 'carb')    { if (cho >= 18) s += 10; }
   if (role === 'legume')  { if (cho >= 8)  s += 8; }
   if (role === 'fat')     { if (lip >= 40) s += 15; }
   if (role === 'vegetable') { if ((Number(row.kcal) || 0) < 80) s += 5; }
-  // preferir nomes simples (staples)
-  s -= Math.min(18, Math.floor(n.length / 7));
+
+  // preferir nomes simples (menos componentes)
+  const parts = n.split(/[ ,]+/).filter(Boolean).length;
+  s -= Math.min(28, parts * 3);
   return s;
 }
 
 async function findBest(entry) {
   const micros = gen.MICRO_KEYS.join(', ');
+  const words = entry.q.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+  const conds = words.map((_, i) => `nome ILIKE $${i + 1}`).join(' AND ');
+  const params = words.map(w => `%${w}%`);
   const res = await db.query(
     `SELECT id, nome, grupo, kcal, ptn, cho, lip, fibras, ${micros}
      FROM alimentos
-     WHERE (tipo IS NULL OR tipo='alimento') AND nome ILIKE $1 AND kcal > 0
-     LIMIT 120`,
-    [`%${entry.q}%`]
+     WHERE (tipo IS NULL OR tipo='alimento') AND ${conds} AND kcal > 0
+     LIMIT 150`,
+    params
   );
   if (!res.rows.length) return null;
   let best = null, bestScore = -1e9;
   for (const row of res.rows) {
-    const sc = scoreRow(row, entry.role);
+    const sc = scoreRow(row, entry.role, words);
     if (sc > bestScore) { bestScore = sc; best = row; }
   }
   return { row: best, score: bestScore };
