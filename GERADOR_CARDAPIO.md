@@ -17,8 +17,8 @@
 | 2026-05-29 | **Fase 3 ✅** | Criados `limits.js` (DRI/UL/piso/tiers) + `micros.js` (panorama, compensação iso-calórica com trava UL, relatório). Testado: Vit E 37%→105%, Cálcio 86%→95% reforçando dias específicos; Tier C sinalizado; UL não piorado. | 345d7c1 |
 | 2026-05-29 | **Fase 4 ✅** | UI no builder: botão "Gerar Automático" na aba Cardápio do paciente, modal de config, `loadGeneratedPlan` carrega rascunho no builder, `_renderGenReport` mostra banner + painel de adequação (chips coloridos por status). | 5d58f78 |
 
-**Fase atual:** Fase 5 (não iniciada / OPCIONAL) — Fases 0–4 concluídas. **MVP FUNCIONAL COMPLETO.**
-**Última sessão parou em:** Gerador end-to-end no ar — nutricionista abre paciente → aba Cardápio → "Gerar Automático" → config → rascunho carregado no builder com relatório de adequação → revisa e salva. Falta só testar pelo navegador com um paciente real. Fase 5 é refinamento opcional (IA p/ variedade, presets, regenerar refeição).
+**Fase atual:** Fase 6 (planejada) — Fases 0–4 concluídas (MVP funcional). Fase 5 opcional adiada.
+**Última sessão parou em:** Identificados 2 problemas reais no cardápio gerado: (1) **inadequação cultural** (arroz cozido no café é alucinação) e (2) **regionalidade/disponibilidade** (alimento exótico tipo bucho de bode). Decidido criar a **Fase 6 — Camada Culinária Curada** (banco curado sobre a TACO). Seed inicial de ~145 alimentos rascunhado na conversa; falta expandir (variedade por fonte — ex: frango = peito/coxa/moela/coração/fígado) e fazer o matching nome→TACO.
 
 ---
 
@@ -274,6 +274,50 @@ Fluxo completo: paciente → Cardápio → Gerar Automático → config → rasc
 
 ### Critério de aceite
 Recurso polido, com variedade e ajustes finos, mantendo precisão numérica.
+
+---
+
+## 📋 FASE 6 — Camada Culinária Curada (cultura + regionalidade)
+**Status:** ⬜ planejada (PRIORITÁRIA — sobrepõe a Fase 5)
+**Por quê:** a TACO é banco **nutricional**, não **culinário**. Gera "arroz no café" (cultura) e
+alimentos exóticos/indisponíveis (regionalidade). Solução: uma camada curada por cima da TACO.
+
+### Princípio central
+Tabela curada = **camada de anotação** que aponta para a TACO (FK `alimento_id`). **NÃO duplica
+nutrição** — macros/micros continuam vindo de `alimentos`. Só adiciona a dimensão cultural/prática.
+
+### Tabela `curated_foods` (proposta)
+```
+id | alimento_id (FK alimentos) | display_name (nome limpo) | role (proteina/carbo/leguminosa/
+vegetal/fruta/laticinio/gordura) | meals (array: cafe/lanche/almoco/jantar/ceia) |
+region (default 'nacional') | default_portion_g | active
+```
+
+### ⭐ Regra da VARIEDADE POR FONTE (apontada pelo usuário)
+Cada fonte precisa de MÚLTIPLAS formas/cortes, senão a rotação semanal repete:
+- **Frango:** peito, coxa, sobrecoxa, **moela**, **coração**, **fígado**, desfiado, caipira
+- **Boi:** patinho, acém, músculo, **moída de 2ª**, **fígado**, coração, costela
+- **Ovo:** cozido, mexido, omelete, pochê
+- **Carbo café:** pão, tapioca, cuscuz, aveia, crepioca (NUNCA arroz)
+- **Carbo almoço:** arroz, batata, mandioca, macarrão, inhame, polenta
+Miúdos = baratos, nacionais, proteicos → ótimos para variedade econômica.
+
+### Tarefas
+- [ ] **6.1** Criar tabela `curated_foods` (migration/CREATE IF NOT EXISTS).
+- [ ] **6.2** Seed: expandir a lista (~145 rascunhada na conversa de 2026-05-29) mirando **variedade por fonte** + cobertura nacional. Meta ~300-400. Guardar como `backend/nutrition/seed_curated.json` ou `.md`.
+- [ ] **6.3** Script de **matching nome→`alimentos.id`**: p/ cada item curado, buscar melhor candidato na TACO (preferir cozido/grelhado, não cru), gerar **planilha de revisão** (a parte que exige olho humano — escolher o id certo).
+- [ ] **6.4** Importar os matches revisados para `curated_foods`.
+- [ ] **6.5** Ajustar `generator.fetchFoodPool`: pool passa a vir de `curated_foods JOIN alimentos`, filtrado por **meal-tag + role** (pool por refeição). Templates/fillMeal/micros NÃO mudam. Exclusões clínicas continuam por cima. Fallback p/ TACO por grupo se pool curado vazio.
+- [ ] **6.6** `default_portion_g`: usar como âncora de porção (cardápio mais palatável que gramas puras).
+- [ ] **6.7** (Futuro) Campo `region` no `profiles` + whitelists regionais; preferências/aversões do paciente.
+
+### Caveat honesto
+O gargalo NÃO é gerar nomes — é o **matching nome→TACO** (nomes da TACO bagunçados/ambíguos:
+"Arroz, integral, cozido"). Exige uma rodada de revisão humana. É trabalho único.
+
+### Critério de aceite
+Cardápio gerado usa só alimentos comuns/nacionais, culturalmente coerentes por refeição
+(café ≠ arroz), com variedade entre os 7 dias (cortes/formas diferentes da mesma fonte).
 
 ---
 
