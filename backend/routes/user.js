@@ -1033,10 +1033,10 @@ ATENÇÃO E DIRETRIZES DE SEGURANÇA:
 - Enfatize de forma clara no início que são APENAS POSSIBILIDADES diagnósticas e hipóteses clínicas de apoio à decisão, e não um diagnóstico médico final.
 - Apresente o texto formatado em Markdown com as seguintes seções muito bem delimitadas:
   1. **RESUMO CLÍNICO DOS EXAMES**: um sumário conciso do quadro geral revelado pelos exames.
-  2. **ALERTAS E RESULTADOS CRÍTICOS**: identifique marcadores que estão alterados ou muito fora do padrão.
-  3. **POSSÍVEIS CAUSAS E ASSOCIAÇÕES**: correlação metabólica e nutricional de por que estes valores estão alterados.
-  4. **HIPÓTESES CLÍNICAS E DE INVESTIGAÇÃO**: sugestão de possíveis doenças, carências de micronutrientes ou distúrbios a investigar de forma aprofundada com exames complementares (apenas possibilidades/hipóteses).
-  5. **DIRETRIZES DE ORIENTAÇÃO PARA O NUTRICIONISTA**: como a dieta ou suplementação pode ser adaptada, ou se há necessidade de encaminhamento a um médico especialista.
+  2. **ALERTAS E RESULTADOS CRÍTICOS**: identifique marcadores que estão alterados (com status "low", "high" ou "abnormal").
+  3. **POSSÍVEIS CAUSAS E ASSOCIAÇÕES METABÓLICAS**: faça o cruzamento sistemático e a correlação metabólica/nutricional dos resultados alterados. Explique como eles se relacionam fisiologicamente entre si.
+  4. **HIPÓTESES CLÍNICAS E DE INVESTIGAÇÃO (QUADRO UNIFICADO)**: identifique e apresente possíveis patologias, síndromes, distúrbios sistêmicos ou deficiências de nutrientes que consigam englobar ou justificar a totalidade ou a grande maioria dos marcadores alterados de forma unificada (em vez de analisá-los apenas isoladamente). Proponha direcionamentos de investigação e possíveis exames adicionais para confirmar essas hipóteses (tudo estritamente como possibilidades e hipóteses de estudo).
+  5. **DIRETRIZES DE ORIENTAÇÃO PARA O NUTRICIONISTA**: diretrizes práticas de como adaptar a conduta dietoterápica ou suplementação com base no cruzamento desses marcadores, ou se há indicação clínica clara para encaminhamento a um médico especialista (ex: endocrinologista, hematologista, cardiologista, etc.).
 
 Resultados dos exames do paciente:
 ${markersListText}`;
