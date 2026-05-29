@@ -15,9 +15,10 @@
 | 2026-05-29 | **Fase 1 ✅** | Criado `backend/nutrition/planner.js` (funções puras): deriveTargetKcal, macros, distribuição/refeição, exclusões clínicas, buildGenerationConfig. Validado com 3 casos. | 8c9e91b |
 | 2026-05-29 | **Fase 2 ✅** | Criado `backend/nutrition/generator.js` (pool TACO por papel, templates, fillMeal com carbo fechando kcal, correção final) + endpoint `POST /professional/patients/:id/generate-plan`. Testado: desvio médio kcal 8%, alimentos coerentes. | 0653980 |
 | 2026-05-29 | **Fase 3 ✅** | Criados `limits.js` (DRI/UL/piso/tiers) + `micros.js` (panorama, compensação iso-calórica com trava UL, relatório). Testado: Vit E 37%→105%, Cálcio 86%→95% reforçando dias específicos; Tier C sinalizado; UL não piorado. | 345d7c1 |
+| 2026-05-29 | **Fase 4 ✅** | UI no builder: botão "Gerar Automático" na aba Cardápio do paciente, modal de config, `loadGeneratedPlan` carrega rascunho no builder, `_renderGenReport` mostra banner + painel de adequação (chips coloridos por status). | 5d58f78 |
 
-**Fase atual:** Fase 4 (não iniciada) — Fases 0, 1, 2, 3 concluídas
-**Última sessão parou em:** Backend completo (gera + compensa micros + relatório de adequação). Endpoint `generate-plan` devolve `{plan_data, summary, adequacy}`. Próximo: **Fase 4 (UI no builder)** — botão "Gerar automaticamente", modal de config, carregar rascunho no builder, painel de adequação. É a primeira fase só-frontend.
+**Fase atual:** Fase 5 (não iniciada / OPCIONAL) — Fases 0–4 concluídas. **MVP FUNCIONAL COMPLETO.**
+**Última sessão parou em:** Gerador end-to-end no ar — nutricionista abre paciente → aba Cardápio → "Gerar Automático" → config → rascunho carregado no builder com relatório de adequação → revisa e salva. Falta só testar pelo navegador com um paciente real. Fase 5 é refinamento opcional (IA p/ variedade, presets, regenerar refeição).
 
 ---
 
@@ -244,18 +245,19 @@ Micros melhorados na média semanal vs Fase 2, sem violar UL diário, relatório
 ---
 
 ## 📋 FASE 4 — Frontend: UI no builder
-**Status:** ⬜ não iniciada
-**Depende de:** Fase 2 (mínimo) / Fase 3 (completo).
+**Status:** ✅ CONCLUÍDA (2026-05-29) — `pro-meals.js` + `pro-patients.js` + `index.html`
+**Depende de:** Fase 2/3.
 
 ### Tarefas
-- [ ] **4.1** Botão **"Gerar automaticamente"** na aba Cardápio do paciente (`patient-tab-content-meal-plan`).
-- [ ] **4.2** Modal de configuração: objetivo (pré-preenchido do perfil), split de macros, distribuição por refeição, fonte de alimentos. Tudo com defaults sensatos.
-- [ ] **4.3** Chamar o endpoint → carregar o `plan_data` retornado **no builder existente** para revisão/edição.
-- [ ] **4.4** **Painel de adequação**: mostrar relatório (kcal/macros por dia + micros na média semanal, verde/amarelo/vermelho).
-- [ ] **4.5** Banner claro: "Rascunho gerado — revise e ajuste antes de salvar."
+- [x] **4.1** Botão **"Gerar Automático"** ao lado de "Novo Cardápio" na lista de cardápios do paciente (`_renderPatientPlansInTab`).
+- [x] **4.2** `openGenerateModal`: modal com objetivo (auto/lose/gain/maintain), meta kcal opcional, toggle "compensar micros". Macros/distribuição/exclusões vêm do perfil (backend).
+- [x] **4.3** `loadGeneratedPlan`: POST → carrega `plan_data` no builder existente (rascunho sem id), pré-seleciona paciente, renderiza.
+- [x] **4.4** `_renderGenReport`: painel de adequação — chips por micro coloridos (ok=verde, baixo=âmbar, muito_baixo/alto=vermelho, monitorar=cinza), dias reforçados (⤴), kcal/dia, alertas de piso.
+- [x] **4.5** Banner "Rascunho gerado por IA — revise e ajuste antes de salvar".
 
-### Critério de aceite
-Nutricionista clica, configura, recebe o cardápio no builder com relatório, edita e salva normalmente.
+### Critério de aceite ✅
+Fluxo completo: paciente → Cardápio → Gerar Automático → config → rascunho no builder com relatório → revisa e salva pelo fluxo normal.
+**Pendente de verificação:** teste manual pelo navegador com paciente real (recomendado antes de usar em produção).
 
 ---
 
