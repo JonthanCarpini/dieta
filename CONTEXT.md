@@ -36,24 +36,30 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 - **Meus Exames (`app/exams.tsx`):**
   - Rota corrigida de `/profile/exams` para a rota real `/user/exams`.
   - Mapeamento de upload unificado e tipos de dados de arquivos (PDF e imagens) suportados com sucesso.
+  - Correção aplicada para importar o módulo `expo-file-system/legacy`, eliminando a falha de upload nativa do SDK 56.
+  - Adicionada exibição em sanfona/accordion dos biomarcadores extraídos por IA diretamente no card do exame.
 
 ### 2. Painel Profissional & Frontend (`video-call.html`, `app.js`, `pro-patients.js`)
 - **Tratamento de Autoplay/Mute:** Aplicado no painel da nutricionista (`pro-patients.js`) e no portal geral (`app.js`). Se a reprodução remota de áudio for bloqueada pelo navegador, exibe-se um overlay interativo para que a profissional clique e ative o áudio do paciente.
+- **Visualização de Exames Extraídos (`admin/modules/pro-patients.js`):**
+  - Implementada exibição dos biomarcadores extraídos do PDF do exame de forma colorida e segmentada por status (verde para normal, vermelho para alto/abormal, azul para baixo) com exibição dos limites de referência.
 - **Deploy:** Deploy das modificações do frontend e backend efetuado com sucesso na VPS (https://nutrir.online).
 
 ### 3. Backend e Banco de Dados (`backend`)
 - **Rotas de Agenda:** `/api/user/appointments/available` ativa para filtragem inteligente de horários disponíveis dos nutricionistas em português.
 - **Rotas de Receitas:** Rotas para leitura de receitas individuais e plano semanal de IA ativas e persistidas no banco PostgreSQL.
-- **Rotas de Exames:**
+- **Rotas de Exames & Análise automática:**
   - Migração executada para adicionar colunas `category` (tipo do exame) e `size_kb` (tamanho) na tabela `patient_exams`.
-  - Endpoint `POST /api/user/exams` e `GET /api/user/exams` atualizados para receber as chaves enviadas pelo mobile (`name`, `base64`, `mime_type`, `category`, `size_kb`) e retornar a resposta formatada como a interface TypeScript `Exam`, garantindo também compatibilidade retrógrada com os payloads legados.
+  - Tabela `patient_exam_markers` criada para armazenar os biomarcadores extraídos com valor, unidade, limites e status de normalidade.
+  - Processo assíncrono em background integrado com a API do Gemini (`gemini_api_key`) para extrair os resultados e salvá-los automaticamente ao fazer upload de um arquivo PDF ou imagem.
+  - Endpoints `GET /exams/markers` e `GET /exams/:id/markers` adicionados para recuperação dos marcadores estruturados.
 
 ---
 
 ## 🚀 Próximos Passos (Pendências)
 
-*Nenhuma pendência crítica de alta prioridade ativa no momento. Aguardando novos feedbacks de teste do usuário no APK compilado com suporte nativo de áudio/vídeo.*
+*Nenhuma pendência crítica. Aguardando validação do usuário referente ao fluxo de upload e análise automática de PDF/Imagens de exames.*
 
 ---
 
-*Última atualização: 29 de Maio de 2026 às 13:55 (Gemini - Antigravity)*
+*Última atualização: 29 de Maio de 2026 às 12:45 (Gemini - Antigravity)*
