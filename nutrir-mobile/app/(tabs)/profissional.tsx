@@ -36,6 +36,7 @@ interface ProfessionalFeedback {
 }
 
 function AppointmentCard({ appt }: { appt: Appointment }) {
+  const router = useRouter();
   const statusColors: Record<string, string> = {
     agendada: colors.accentBlue,
     realizada: colors.accentGreen,
@@ -53,10 +54,11 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
       buttons.push({
         text: 'Iniciar Chamada',
         onPress: () => {
-          const url = `https://nutrir.online/video-call.html?room=${appt.channel_name}`;
-          Linking.openURL(url).catch((err) => {
-            Alert.alert('Erro', 'Não foi possível abrir o link da chamada de vídeo.');
-            console.error(err);
+          router.push({
+            pathname: '/video-call',
+            params: {
+              channelName: appt.channel_name!,
+            },
           });
         }
       });
@@ -97,10 +99,11 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
           style={styles.joinBtn}
           activeOpacity={0.8}
           onPress={() => {
-            const url = `https://nutrir.online/video-call.html?room=${appt.channel_name}`;
-            Linking.openURL(url).catch((err) => {
-              Alert.alert('Erro', 'Não foi possível abrir o link da chamada de vídeo.');
-              console.error(err);
+            router.push({
+              pathname: '/video-call',
+              params: {
+                channelName: appt.channel_name!,
+              },
             });
           }}
         >
