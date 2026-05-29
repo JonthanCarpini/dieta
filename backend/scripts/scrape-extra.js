@@ -33,7 +33,7 @@ const API   = 'https://api.vendas.gpa.digital/ex';
 const SITE   = 'https://www.extramercado.com.br';
 const UA     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const STORE  = parseInt(_flag('--store')) || 483;
-const DELAY  = parseInt(_flag('--delay')) || 900;
+const DELAY  = parseInt(_flag('--delay')) || 1300;
 const PAGE_SZ= 24;
 
 const MAX     = parseInt(_flag('--max')) || Infinity;
@@ -61,10 +61,32 @@ async function _fetchT(url, opts = {}, ms = FETCH_TIMEOUT) {
   try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
   finally { clearTimeout(t); }
 }
-async function _getText(url) {
-  const r = await _fetchT(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'pt-BR' } });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.text();
+// Retry com backoff em 403/429 (rate-limit do site recupera com espera)
+async function _getText(url, tries = 4) {
+  for (let i = 0; i < tries; i++) {
+    let r;
+    try {
+      r = await _fetchT(url, { headers: {
+        'User-Agent': UA,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+        'Referer': `${SITE}/`,
+        'Upgrade-Insecure-Requests': '1',
+      } });
+    } catch (e) {
+      if (i < tries - 1) { await sleep(4000 * (i + 1)); continue; }
+      throw e;
+    }
+    if (r.ok) return r.text();
+    if ((r.status === 403 || r.status === 429) && i < tries - 1) {
+      const wait = [6000, 20000, 45000][i] || 45000;
+      console.warn(`  ⏳ ${r.status} — aguardando ${wait/1000}s (rate-limit)`);
+      await sleep(wait);
+      continue;
+    }
+    throw new Error(`HTTP ${r.status}`);
+  }
+  throw new Error('falha após retries');
 }
 async function _search(terms, page) {
   const r = await _fetchT(`${API}/search/search`, {
@@ -210,6 +232,7 @@ async function main() {
 
   const terms = await _discoverTerms();
   const seen  = new Set();
+  let consecFail = 0;
 
   outer:
   for (const term of terms) {
@@ -238,14 +261,19 @@ async function main() {
 
         try {
           const food = await _fetchProduct(p.urlDetails, term);
-          if (!food || !food.name) { stats.failed++; }
+          if (!food || !food.name) { stats.noTable++; }
           else if (!_hasFullTable(food)) { stats.noTable++; }
           else {
             stats.valid++;
             const ok = await _insert(food);
             if (ok) console.log(`  ✓ ${food.name.slice(0, 48)} — ${food.energy_kcal}kcal P${food.protein_g} C${food.carbs_g} G${food.fat_g} [${food._basis}/${food._portion ?? '?'}g]`);
           }
-        } catch (e) { stats.failed++; if (stats.failed % 10 === 0) console.warn(`  ⚠ ${stats.failed} falhas (última: ${e.message})`); }
+          consecFail = 0; // sucesso (ou produto sem tabela) reseta o contador
+        } catch (e) {
+          stats.failed++; consecFail++;
+          if (stats.failed % 10 === 0) console.warn(`  ⚠ ${stats.failed} falhas (última: ${e.message})`);
+          if (consecFail >= 25) { console.error(`\n⛔ ${consecFail} falhas seguidas — provável bloqueio. Encerrando.`); break outer; }
+        }
 
         if (stats.products % 25 === 0) console.log(`  … ${stats.products} vistos | ${stats.inserted} novos | ${stats.skipped} já existiam | ${stats.noTable} sem tabela`);
         await sleep(DELAY);
