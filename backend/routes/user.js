@@ -978,10 +978,117 @@ Exemplo de formato esperado:
           marker.status || 'normal'
         ]);
       }
+
+      // Dispara a geração de orientação clínica consolidada
+      generateClinicalSummary(patientId).catch(e => {
+        console.error('[EXAM_SUMMARY] Falha ao gerar orientação clínica após importação:', e);
+      });
     }
 
   } catch (err) {
     console.error(`[EXAM_PARSER] Erro na análise do exame ${examId}:`, err);
+  }
+}
+
+async function generateClinicalSummary(patientId) {
+  try {
+    // 1. Busca chave de API do Gemini
+    const geminiKeyRes = await db.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const apiKey = geminiKeyRes.rows[0] ? geminiKeyRes.rows[0].value : null;
+
+    if (!apiKey) {
+      console.warn('[EXAM_SUMMARY] Chave gemini_api_key não configurada. Ignorando geração de orientação clínica.');
+      return;
+    }
+
+    // 2. Busca todos os biomarcadores do paciente
+    const markersRes = await db.query(
+      `SELECT m.marker_name, m.marker_value, m.unit, m.reference_range, m.status, e.file_name AS exam_name, e.created_at
+       FROM patient_exam_markers m
+       JOIN patient_exams e ON m.exam_id = e.id
+       WHERE m.patient_id = $1
+       ORDER BY e.created_at DESC, m.marker_name ASC`,
+      [patientId]
+    );
+
+    const markers = markersRes.rows;
+    if (markers.length === 0) {
+      console.log('[EXAM_SUMMARY] Nenhum marcador disponível para gerar orientação clínica.');
+      return;
+    }
+
+    // 3. Monta lista de marcadores em formato legível para a IA
+    let markersListText = '';
+    markers.forEach(m => {
+      const dateStr = new Date(m.created_at).toLocaleDateString('pt-BR');
+      markersListText += `- [${dateStr}] [Exame: ${m.exam_name}] Marcador: ${m.marker_name} | Valor: ${m.marker_value} ${m.unit || ''} | Referência: ${m.reference_range || 'Não informada'} | Status: ${m.status}\n`;
+    });
+
+    // 4. Prompt para a IA
+    const prompt = `Você é um assistente médico e de nutrição de nível sênior, atuando como consultor de suporte à decisão clínica para o nutricionista responsável pelo paciente.
+Com base nos resultados dos exames laboratoriais do paciente fornecidos abaixo, elabore um relatório clínico de orientação exclusivo para o profissional de saúde.
+
+ATENÇÃO E DIRETRIZES DE SEGURANÇA:
+- Escreva em tom puramente profissional, técnico e analítico.
+- Enfatize de forma clara no início que são APENAS POSSIBILIDADES diagnósticas e hipóteses clínicas de apoio à decisão, e não um diagnóstico médico final.
+- Apresente o texto formatado em Markdown com as seguintes seções muito bem delimitadas:
+  1. **RESUMO CLÍNICO DOS EXAMES**: um sumário conciso do quadro geral revelado pelos exames.
+  2. **ALERTAS E RESULTADOS CRÍTICOS**: identifique marcadores que estão alterados ou muito fora do padrão.
+  3. **POSSÍVEIS CAUSAS E ASSOCIAÇÕES**: correlação metabólica e nutricional de por que estes valores estão alterados.
+  4. **HIPÓTESES CLÍNICAS E DE INVESTIGAÇÃO**: sugestão de possíveis doenças, carências de micronutrientes ou distúrbios a investigar de forma aprofundada com exames complementares (apenas possibilidades/hipóteses).
+  5. **DIRETRIZES DE ORIENTAÇÃO PARA O NUTRICIONISTA**: como a dieta ou suplementação pode ser adaptada, ou se há necessidade de encaminhamento a um médico especialista.
+
+Resultados dos exames do paciente:
+${markersListText}`;
+
+    // 5. Executa chamada para o Gemini usando os candidatos de modelos
+    const candidates = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+    let rawText = '';
+    let lastErr = null;
+
+    for (const model of candidates) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }]
+      };
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          const resJson = await response.json();
+          rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            console.log(`[EXAM_SUMMARY] Orientação gerada com sucesso pelo modelo ${model}`);
+            break;
+          }
+        } else {
+          lastErr = `HTTP ${response.status} (${model}): ${await response.text()}`;
+        }
+      } catch (err) {
+        lastErr = err.message;
+      }
+    }
+
+    if (!rawText) {
+      throw new Error(lastErr || 'Falha ao chamar a IA para a orientação clínica.');
+    }
+
+    // 6. Insere ou atualiza o cache no banco de dados (UPSERT)
+    await db.query(`
+      INSERT INTO patient_exam_summaries (patient_id, summary_text, updated_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (patient_id) DO UPDATE SET
+        summary_text = EXCLUDED.summary_text,
+        updated_at = NOW()
+    `, [patientId, rawText]);
+
+  } catch (err) {
+    console.error(`[EXAM_SUMMARY] Erro ao gerar orientação clínica para o paciente ${patientId}:`, err);
   }
 }
 
@@ -1534,4 +1641,5 @@ router.delete('/activity/exercise/:index', async (req, res) => {
   }
 });
 
+router.generateClinicalSummary = generateClinicalSummary;
 module.exports = router;

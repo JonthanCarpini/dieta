@@ -289,7 +289,7 @@ export async function loadPatientExamsData(patientId) {
                                     <div style="background:${statusBg}; border:1px solid rgba(255,255,255,0.08); padding:8px 12px; border-radius:8px; display:flex; flex-direction:column; gap:2px;">
                                         <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
                                             <strong style="color:var(--text-1); font-size:12px;">${m.marker_name}</strong>
-                                            <span style="color:${statusColor}; font-weight:700; font-size:9px; text-transform:uppercase; background:${statusColor}18; padding:1px 6px; border-radius:4px; border:1px solid ${statusColor}30;">${m.status}</span>
+                                            <span style="color:${statusColor}; font-weight:700; font-size:9px; text-transform:uppercase; background:${statusColor}18; padding:1px 6px; border-radius:4px; border:1px solid ${statusColor}30;">${m.status === 'low' ? 'Baixo' : m.status === 'high' ? 'Alto' : m.status === 'abnormal' ? 'Alterado' : m.status === 'normal' ? 'Normal' : m.status}</span>
                                         </div>
                                         <div style="color:var(--text-1); font-size:14px; font-weight:700; margin-top:2px;">
                                             ${m.marker_value} <span style="font-size:11px; font-weight:500; color:var(--text-2);">${m.unit || ''}</span>
@@ -360,6 +360,7 @@ export async function loadPatientExamsData(patientId) {
         });
 
         if (window.lucide) window.lucide.createIcons();
+        loadPatientExamsSummary(patientId);
     } catch (err) {
         console.error('Erro ao carregar exames:', err);
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--color-danger);">Erro ao carregar exames.</td></tr>';
@@ -1935,3 +1936,169 @@ function _renderPatientPlansInTab(plans, patientId) {
 
     if (window.lucide) window.lucide.createIcons();
 }
+
+export async function loadPatientExamsSummary(patientId) {
+    const summaryCard = document.getElementById('pro-exams-summary-card');
+    const summaryContent = document.getElementById('pro-exams-summary-content');
+    const summaryTime = document.getElementById('pro-exams-summary-time');
+    const regenerateBtn = document.getElementById('pro-exams-summary-regenerate-btn');
+
+    if (!summaryContent) return;
+
+    summaryContent.innerHTML = '<div style="display:flex; align-items:center; gap:8px;"><i data-lucide="loader" class="animate-spin" style="width:16px; height:16px; color:var(--accent);"></i> Carregando orientações clínicas consolidando dados...</div>';
+    if (window.lucide) window.lucide.createIcons();
+
+    try {
+        const res = await fetch(`${API_URL}/professional/patients/${patientId}/exams/summary`, {
+            headers: { 'Authorization': `Bearer ${adminState.token}` }
+        });
+        if (!res.ok) throw new Error('Não foi possível carregar a orientação clínica.');
+        const data = await res.json();
+
+        if (!data.summary) {
+            summaryContent.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center; gap:10px;">
+                    <i data-lucide="sparkles" style="width:32px; height:32px; color:var(--text-3);"></i>
+                    <p style="color:var(--text-2); font-size:13px; max-width:400px; margin:0;">
+                        Nenhuma orientação clínica consolidada gerada ainda. Carregue exames laboratoriais do paciente para gerar a primeira análise automaticamente ou clique em regenerar abaixo.
+                    </p>
+                </div>
+            `;
+            if (summaryTime) summaryTime.textContent = 'Última atualização: --';
+            if (window.lucide) window.lucide.createIcons();
+            
+            // Vincular listener de regeneração mesmo se vazio
+            bindRegenerateListener(patientId, summaryContent, summaryTime, regenerateBtn);
+            return;
+        }
+
+        // Renderizar Markdown
+        summaryContent.innerHTML = renderMarkdownToHtml(data.summary);
+        
+        if (summaryTime && data.updated_at) {
+            const date = new Date(data.updated_at);
+            const dateStr = date.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            summaryTime.textContent = `Última atualização: ${dateStr}`;
+        }
+        if (window.lucide) window.lucide.createIcons();
+        
+        // Vincular listener de regeneração
+        bindRegenerateListener(patientId, summaryContent, summaryTime, regenerateBtn);
+    } catch (err) {
+        console.error('Erro ao carregar orientação clínica:', err);
+        summaryContent.innerHTML = `<span style="color:var(--color-danger);">Erro ao carregar orientação clínica consolidada: ${err.message}</span>`;
+    }
+}
+
+function bindRegenerateListener(patientId, summaryContent, summaryTime, regenerateBtn) {
+    if (!regenerateBtn) return;
+    
+    // Remover listeners anteriores usando cloneNode
+    const newBtn = regenerateBtn.cloneNode(true);
+    regenerateBtn.parentNode.replaceChild(newBtn, regenerateBtn);
+    
+    newBtn.addEventListener('click', async () => {
+        newBtn.disabled = true;
+        newBtn.innerHTML = '<i data-lucide="loader" class="animate-spin" style="width:12px; height:12px;"></i> Gerando...';
+        if (window.lucide) window.lucide.createIcons();
+        
+        try {
+            const res = await fetch(`${API_URL}/professional/patients/${patientId}/exams/summary/regenerate`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminState.token}`
+                }
+            });
+            if (!res.ok) throw new Error('Falha ao regenerar orientação clínica.');
+            const data = await res.json();
+            
+            if (data.summary) {
+                summaryContent.innerHTML = renderMarkdownToHtml(data.summary);
+                if (summaryTime && data.updated_at) {
+                    const date = new Date(data.updated_at);
+                    const dateStr = date.toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    summaryTime.textContent = `Última atualização: ${dateStr}`;
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        } finally {
+            newBtn.disabled = false;
+            newBtn.innerHTML = '<i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Regenerar Relatório';
+            if (window.lucide) window.lucide.createIcons();
+        }
+    });
+}
+
+function renderMarkdownToHtml(markdown) {
+    if (!markdown) return '';
+    
+    let html = markdown;
+    
+    // Escapar tags HTML para evitar XSS básico
+    html = html
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+        
+    // 1. Títulos
+    html = html.replace(/^### (.*?)$/gm, '<h4 style="font-size: 14px; font-weight: 700; color: var(--accent); margin: 16px 0 8px 0; border-bottom: 1px solid var(--border); padding-bottom: 4px;">$1</h4>');
+    html = html.replace(/^## (.*?)$/gm, '<h3 style="font-size: 16px; font-weight: 700; color: var(--text); margin: 20px 0 10px 0; display: flex; align-items: center; gap: 8px;">$1</h3>');
+    html = html.replace(/^# (.*?)$/gm, '<h2 style="font-size: 18px; font-weight: 700; color: var(--text); margin: 24px 0 12px 0;">$1</h2>');
+    
+    // 2. Negrito
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--accent); font-weight: 700;">$1</strong>');
+    html = html.replace(/\*(.*?)\*/g, '<em style="font-style: italic;">$1</em>');
+    
+    // 3. Listas
+    let inList = false;
+    const lines = html.split('\n');
+    const processedLines = lines.map(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            const content = trimmed.substring(2);
+            let result = '';
+            if (!inList) {
+                inList = true;
+                result += '<ul style="margin: 8px 0 12px 16px; padding-left: 0; list-style-type: disc; display: flex; flex-direction: column; gap: 6px;">';
+            }
+            result += `<li style="line-height:1.5; color: var(--text);">${content}</li>`;
+            return result;
+        } else {
+            let result = '';
+            if (inList) {
+                inList = false;
+                result += '</ul>';
+            }
+            return result + line;
+        }
+    });
+    if (inList) {
+        processedLines.push('</ul>');
+    }
+    html = processedLines.join('\n');
+    
+    // 4. Parágrafos / Quebras de linha
+    html = html.replace(/\n\n/g, '</div><div style="margin-bottom: 12px;">');
+    html = html.replace(/\n/g, '<br>');
+    
+    html = `<div style="margin-bottom: 12px;">${html}</div>`;
+    html = html.replace(/<div style="margin-bottom: 12px;"><\/div>/g, '');
+    
+    return html;
+}
+

@@ -464,6 +464,13 @@ async function runMigrations() {
   await db.query(`
     CREATE INDEX IF NOT EXISTS idx_exam_markers_patient ON patient_exam_markers(patient_id)
   `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS patient_exam_summaries (
+      patient_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      summary_text TEXT NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
   console.log('Migrações executadas com sucesso.');
 }
 

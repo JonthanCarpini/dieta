@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const userRoutes = require('./user');
 
 // Todos os endpoints aqui exigem login JWT e cargo de nutricionista ou personal trainer
 router.use(authenticateToken);
@@ -419,6 +420,49 @@ router.post('/exams/:examId/notes', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao salvar notes do exame.' });
+  }
+});
+
+router.get('/patients/:id/exams/summary', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  try {
+    const result = await db.query(
+      'SELECT summary_text, updated_at FROM patient_exam_summaries WHERE patient_id = $1',
+      [patientId]
+    );
+    if (result.rows.length === 0) {
+      return res.json({ summary: null });
+    }
+    res.json({
+      summary: result.rows[0].summary_text,
+      updated_at: result.rows[0].updated_at
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar orientação clínica do paciente.' });
+  }
+});
+
+router.post('/patients/:id/exams/summary/regenerate', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  try {
+    // Chama o helper importado do routes/user.js
+    await userRoutes.generateClinicalSummary(patientId);
+    
+    const result = await db.query(
+      'SELECT summary_text, updated_at FROM patient_exam_summaries WHERE patient_id = $1',
+      [patientId]
+    );
+    if (result.rows.length === 0) {
+      return res.json({ summary: null });
+    }
+    res.json({
+      summary: result.rows[0].summary_text,
+      updated_at: result.rows[0].updated_at
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao gerar orientação clínica.' });
   }
 });
 

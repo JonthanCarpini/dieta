@@ -123,7 +123,9 @@ function ExamCard({ exam, onDelete }: { exam: Exam; onDelete: () => void }) {
                   <View style={styles.markerRow}>
                     <Text style={styles.markerName}>{m.marker_name}</Text>
                     <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}30` }]}>
-                      <Text style={[styles.statusText, { color: statusColor }]}>{m.status}</Text>
+                      <Text style={[styles.statusText, { color: statusColor }]}>
+                        {m.status === 'low' ? 'Baixo' : m.status === 'high' ? 'Alto' : m.status === 'abnormal' ? 'Alterado' : m.status === 'normal' ? 'Normal' : m.status}
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.markerValueRow}>
