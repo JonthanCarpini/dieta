@@ -515,6 +515,113 @@ function _renderGenReport(summary, adequacy, config) {
     if (window.lucide) window.lucide.createIcons();
 }
 
+// ── Substituição de item por equivalente (banco curado + IA) ──────────────────
+export async function openSubstituteModal(dow, mealType, dayIdx, mealIdx, idx) {
+    const item = adminState._editingPlanData?.days?.[dayIdx]?.meals?.[mealIdx]?.items?.[idx];
+    if (!item) return;
+
+    document.getElementById('sub-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'sub-overlay';
+    ov.className = 'wd-dup-overlay';
+    ov.innerHTML = `
+        <div class="wd-dup-modal" style="max-width:520px;">
+            <div class="wd-dup-modal-header">
+                <div>
+                    <h3 style="margin:0 0 3px;font-size:16px;font-weight:700;">Substituir alimento</h3>
+                    <p style="margin:0;font-size:12px;color:var(--text-2);">Trocar <strong style="color:var(--text);">${item.name}</strong> (${Math.round(item.calories || 0)} kcal) por um equivalente.</p>
+                </div>
+                <button id="sub-close" style="background:none;border:none;font-size:22px;color:var(--text-2);cursor:pointer;line-height:1;padding:0 4px;">×</button>
+            </div>
+            <div id="sub-list" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+                <p style="font-size:12px;color:var(--text-2);text-align:center;padding:16px;">Buscando equivalentes…</p>
+            </div>
+            <div class="wd-dup-footer">
+                <button id="sub-ai" class="btn-secondary btn-sm"><i data-lucide="sparkles" style="width:13px;height:13px;display:inline;vertical-align:middle;margin-right:4px;"></i> Sugerir com IA</button>
+                <button id="sub-cancel" class="btn-secondary">Fechar</button>
+            </div>
+            <div id="sub-ai-box" style="display:none;margin-top:10px;font-size:12px;background:var(--accent-dim);border:1px solid rgba(245,193,77,.2);border-radius:8px;padding:10px 12px;color:var(--text);"></div>
+        </div>`;
+    document.body.appendChild(ov);
+    if (window.lucide) window.lucide.createIcons();
+
+    const close = () => ov.remove();
+    ov.querySelector('#sub-close').addEventListener('click', close);
+    ov.querySelector('#sub-cancel').addEventListener('click', close);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+
+    // Aplica a troca (iso-calórica) e re-renderiza
+    const applySwap = (sub) => {
+        const grams = sub.suggestedGrams || item.grams || 100;
+        const newItem = {
+            alimento_id: sub.alimento_id, name: sub.name,
+            medida_label: 'grama(s)', medida_grams: 1, quantidade: grams, grams,
+            available_measures: [], per100: sub.per100, role: item.role,
+            ...calcItemMacrosAndMicros(sub.per100, grams),
+        };
+        adminState._editingPlanData.days[dayIdx].meals[mealIdx].items[idx] = newItem;
+        recalcMealTotal(dayIdx, mealIdx);
+        _expandedMeal = { dow, type: mealType };
+        close();
+        renderPlanDayEditor(dow);
+    };
+
+    // Lista de equivalentes do banco curado
+    try {
+        const url = `${API_URL}/professional/curated-substitutes?role=${encodeURIComponent(item.role)}`
+            + `&kcalPer100=${item.per100?.calories || 0}&targetKcal=${item.calories || 0}`
+            + `&exclude=${item.alimento_id || ''}&meal=${mealType}`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${adminState.token}` } });
+        const subs = await res.json();
+        const list = ov.querySelector('#sub-list');
+        if (!Array.isArray(subs) || !subs.length) {
+            list.innerHTML = `<p style="font-size:12px;color:var(--text-2);text-align:center;padding:16px;">Nenhum equivalente no banco. Tente "Sugerir com IA".</p>`;
+        } else {
+            list.innerHTML = '';
+            subs.forEach(s => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;padding:8px 12px;';
+                row.innerHTML = `<div style="min-width:0;">
+                        <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
+                        <div style="font-size:11px;color:var(--text-2);">${s.suggestedGrams}g · ${Math.round((s.per100.calories||0)*s.suggestedGrams/100)} kcal · P${Math.round((s.per100.protein||0)*s.suggestedGrams/100)} C${Math.round((s.per100.carbs||0)*s.suggestedGrams/100)} G${Math.round((s.per100.fat||0)*s.suggestedGrams/100)}</div>
+                    </div>
+                    <button class="btn-primary btn-sm sub-use">Usar</button>`;
+                row.querySelector('.sub-use').addEventListener('click', () => applySwap(s));
+                list.appendChild(row);
+            });
+        }
+    } catch {
+        ov.querySelector('#sub-list').innerHTML = `<p style="font-size:12px;color:var(--color-danger);text-align:center;padding:16px;">Erro ao buscar equivalentes.</p>`;
+    }
+
+    // Sugestão via IA (texto)
+    ov.querySelector('#sub-ai').addEventListener('click', async () => {
+        const aiBtn = ov.querySelector('#sub-ai');
+        const aiBox = ov.querySelector('#sub-ai-box');
+        aiBtn.disabled = true; aiBtn.textContent = 'Consultando IA…';
+        aiBox.style.display = 'block'; aiBox.textContent = 'Gerando sugestões…';
+        try {
+            const res = await fetch(`${API_URL}/ai/substitute-food`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+                body: JSON.stringify({ food: item.name, meal: mealType, role: item.role, kcal: item.calories }),
+            });
+            const d = await res.json();
+            if (!res.ok) throw new Error(d.error || 'Erro');
+            const subs = Array.isArray(d.substitutes) ? d.substitutes : [];
+            aiBox.innerHTML = subs.length
+                ? '<strong style="color:var(--accent);">Sugestões da IA:</strong><ul style="margin:6px 0 0;padding-left:18px;line-height:1.6;">'
+                    + subs.map(s => `<li><strong>${s.name}</strong>${s.portion ? ' — ' + s.portion : ''}${s.why ? `<br><span style="color:var(--text-2);font-size:11px;">${s.why}</span>` : ''}</li>`).join('') + '</ul>'
+                : 'A IA não retornou sugestões.';
+        } catch (err) {
+            aiBox.style.color = 'var(--color-danger)'; aiBox.textContent = 'Erro: ' + err.message;
+        } finally {
+            aiBtn.disabled = false; aiBtn.innerHTML = '<i data-lucide="sparkles" style="width:13px;height:13px;display:inline;vertical-align:middle;margin-right:4px;"></i> Sugerir com IA';
+            if (window.lucide) window.lucide.createIcons();
+        }
+    });
+}
+
 // ==========================================
 // RENDERIZAÇÃO DO DIA
 // ==========================================
@@ -712,6 +819,9 @@ function renderFoodRow(dow, mealType, item, idx) {
         <td class="cho-col wd-food-cho">${rnd(item.carbs || 0)}g</td>
         <td class="kcal-col wd-food-kcal">${Math.round(item.calories || 0)} Kcal</td>
         <td class="wd-food-actions-cell">
+            ${item.role ? `<button class="wd-icon-btn btn-sub-wd-food" data-dow="${dow}" data-meal-type="${mealType}" data-idx="${idx}" title="Substituir por equivalente">
+                <i data-lucide="repeat" style="width:12px;height:12px;"></i>
+            </button>` : ''}
             <button class="wd-icon-btn danger btn-remove-wd-food" data-dow="${dow}" data-meal-type="${mealType}" data-idx="${idx}" title="Remover">
                 <i data-lucide="trash-2" style="width:12px;height:12px;"></i>
             </button>
@@ -916,6 +1026,13 @@ function bindMealDetailEvents(dow, mealType, dayIdx, mealIdx, container) {
             adminState._editingPlanData.days[dayIdx].meals[mealIdx].items.splice(idx, 1);
             recalcMealTotal(dayIdx, mealIdx);
             renderPlanDayEditor(dow);
+        });
+    });
+
+    // Substituir alimento por equivalente
+    container.querySelectorAll('.btn-sub-wd-food').forEach(btn => {
+        btn.addEventListener('click', () => {
+            openSubstituteModal(dow, mealType, dayIdx, mealIdx, parseInt(btn.dataset.idx));
         });
     });
 

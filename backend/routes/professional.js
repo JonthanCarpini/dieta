@@ -823,6 +823,48 @@ router.post('/patients/:id/generate-plan', verifyPatientAccess, async (req, res)
   }
 });
 
+// GET /professional/curated-substitutes — equivalentes do banco curado
+// params: role, kcalPer100, targetKcal, exclude (alimento_id), meal (tipo do builder)
+router.get('/curated-substitutes', async (req, res) => {
+  const { role, exclude } = req.query;
+  const kcalPer100 = parseFloat(req.query.kcalPer100) || 0;
+  const targetKcal = parseFloat(req.query.targetKcal) || 0;
+  if (!role) return res.status(400).json({ error: 'role obrigatório.' });
+
+  const MEAL_TAG = { cafe_da_manha: 'cafe', lanche_manha: 'lanche', lanche_tarde: 'lanche', almoco: 'almoco', jantar: 'jantar', ceia: 'ceia' };
+  const tag = MEAL_TAG[req.query.meal];
+
+  try {
+    const cols = generator.MICRO_KEYS.map(k => 'a.' + k).join(', ');
+    const params = [role];
+    let where = `c.role = $1 AND c.active = true AND a.kcal > 0`;
+    if (exclude) { params.push(parseInt(exclude)); where += ` AND a.id <> $${params.length}`; }
+    if (tag)     { params.push(JSON.stringify([tag])); where += ` AND c.meals @> $${params.length}::jsonb`; }
+
+    const r = await db.query(`
+      SELECT c.display_name, c.default_portion_g, a.id AS alimento_id, a.kcal, a.ptn, a.cho, a.lip, a.fibras, ${cols}
+      FROM curated_foods c JOIN alimentos a ON a.id = c.alimento_id
+      WHERE ${where}`, params);
+
+    const items = r.rows.map(row => {
+      const per100 = {
+        calories: Number(row.kcal) || 0, protein: Number(row.ptn) || 0,
+        carbs: Number(row.cho) || 0, fat: Number(row.lip) || 0, fiber: Number(row.fibras) || 0,
+      };
+      generator.MICRO_KEYS.forEach(k => { per100[k] = Number(row[k]) || 0; });
+      const perG = per100.calories / 100;
+      let grams = (targetKcal > 0 && perG > 0) ? targetKcal / perG : (Number(row.default_portion_g) || 100);
+      grams = Math.max(5, Math.round(grams / 5) * 5);
+      return { alimento_id: row.alimento_id, name: row.display_name, per100, suggestedGrams: grams, densityDiff: Math.abs(per100.calories - kcalPer100) };
+    });
+    items.sort((a, b) => a.densityDiff - b.densityDiff);
+    res.json(items.slice(0, 12));
+  } catch (err) {
+    console.error('curated-substitutes:', err);
+    res.status(500).json({ error: 'Erro ao buscar substitutos.' });
+  }
+});
+
 // ==========================================
 // ALIMENTOS IMPORTADOS (base global, source='extra')
 // ==========================================

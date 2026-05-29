@@ -638,6 +638,35 @@ function _extractPageContent(html, url) {
   return `URL: ${url}\n\nJSON-LD ESTRUTURADO:\n${jsonLdTexts.slice(0, 1500)}\n\nINÍCIO DA PÁGINA:\n${pageStart}\n\nSEÇÃO NUTRICIONAL:\n${nutritional}`.slice(0, 8000);
 }
 
+// POST /api/ai/substitute-food — sugere substitutos equivalentes para um alimento (Fase 5)
+router.post('/substitute-food', authenticateToken, async (req, res) => {
+  const t0 = Date.now();
+  try {
+    const { food, meal, role, kcal, restrictions } = req.body || {};
+    if (!food) return res.status(400).json({ error: 'Alimento obrigatório.' });
+
+    const prompt = `Você é nutricionista brasileiro. Sugira 5 substitutos COMUNS e de fácil acesso no Brasil para o alimento abaixo, equivalentes nutricionalmente (mesmo papel na refeição e calorias aproximadas) e culturalmente adequados à refeição indicada.
+
+Alimento atual: ${food}
+Refeição: ${meal || 'não informada'}
+Papel: ${role || 'não informado'}
+Calorias aproximadas da porção: ${kcal ? Math.round(kcal) + ' kcal' : 'não informada'}
+${restrictions ? 'Restrições do paciente (NÃO sugerir): ' + restrictions : ''}
+
+Retorne SOMENTE JSON válido (sem markdown):
+{"substitutes":[{"name":"nome do alimento","portion":"porção caseira sugerida (ex: 2 fatias, 1 concha)","why":"motivo curto da equivalência"}]}`;
+
+    const cfg = await getLLMConfig();
+    const { text, provider, model } = await callLLM(cfg, prompt);
+    const result = JSON.parse(extractJson(text));
+    result._meta = { provider, model, latency_ms: Date.now() - t0 };
+    res.json(result);
+  } catch (err) {
+    console.error('substitute-food:', err.message);
+    res.status(502).json({ error: 'Falha ao sugerir substitutos com IA.', detail: err.message });
+  }
+});
+
 router.getLLMConfig = getLLMConfig;
 router.callLLM = callLLM;
 
