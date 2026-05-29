@@ -21,6 +21,7 @@ export const GRID_DAYS = [
 
 let _selectedCells = new Set();
 let _dragState = null;
+let _bookedCells = new Map(); // key "dow|HH:MM" -> { appt, isStart, dateStr }
 
 export function timeToMinutes(t) {
     const [h, m] = t.split(':').map(Number);
@@ -84,16 +85,46 @@ export function selectedCellsToSlots(cells) {
 
 export async function loadScheduleData() {
     try {
-        const res = await fetch(`${API_URL}/admin/availability`, {
-            headers: { 'Authorization': `Bearer ${adminState.token}` }
-        });
-        if (!res.ok) throw new Error('Não foi possível carregar a agenda.');
-        const slots = await res.json();
+        const [availRes, apptRes] = await Promise.all([
+            fetch(`${API_URL}/admin/availability`, { headers: { 'Authorization': `Bearer ${adminState.token}` } }),
+            fetch(`${API_URL}/professional/appointments`, { headers: { 'Authorization': `Bearer ${adminState.token}` } }),
+        ]);
+        if (!availRes.ok) throw new Error('Não foi possível carregar a agenda.');
+        const slots = await availRes.json();
+        const appointments = apptRes.ok ? await apptRes.json() : [];
+        _buildBookedMap(appointments);
         renderScheduleGrid(slots);
     } catch (err) {
         console.error(err);
         alert(err.message);
     }
+}
+
+// Mapeia consultas futuras (não canceladas) para células da grade semanal
+function _buildBookedMap(appointments) {
+    _bookedCells = new Map();
+    const todayStr = new Date().toISOString().split('T')[0];
+    (appointments || []).forEach(a => {
+        if (a.status === 'cancelled') return;
+        const dateStr = String(a.appointment_date).split('T')[0];
+        if (dateStr < todayStr) return; // só futuras/hoje
+        const [y, mo, d] = dateStr.split('-').map(Number);
+        const dow = new Date(y, mo - 1, d).getDay();
+        const start = (a.start_time || '').substring(0, 5);
+        const end   = (a.end_time   || '').substring(0, 5);
+        const sM = timeToMinutes(start), eM = timeToMinutes(end);
+        SCHEDULE_TIMES.forEach(t => {
+            const tm = timeToMinutes(t);
+            if (tm >= sM && tm < eM) {
+                const key = `${dow}|${t}`;
+                // mantém o agendamento mais próximo se houver colisão de semanas
+                const cur = _bookedCells.get(key);
+                if (!cur || dateStr < cur.dateStr) {
+                    _bookedCells.set(key, { appt: a, isStart: t === start, dateStr });
+                }
+            }
+        });
+    });
 }
 
 export function renderScheduleGrid(existingSlots) {
@@ -118,6 +149,14 @@ export function renderScheduleGrid(existingSlots) {
         const tds = GRID_DAYS.map(d => {
             const key = `${d.dow}|${t}`;
             const sel = _selectedCells.has(key);
+            const booked = _bookedCells.get(key);
+            if (booked) {
+                const a = booked.appt;
+                const first = (a.patient_name || 'Paciente').split(' ')[0];
+                const dateBR = booked.dateStr.split('-').reverse().join('/');
+                const tip = `${a.patient_name || 'Paciente'} · ${dateBR} ${(a.start_time||'').substring(0,5)}–${(a.end_time||'').substring(0,5)}${a.patient_email ? '\n' + a.patient_email : ''}`;
+                return `<td class="sg-cell sg-booked${booked.isStart ? ' sg-booked-start' : ''}" data-key="${key}" data-dow="${d.dow}" data-time="${t}" data-appt-id="${a.id}" title="${tip.replace(/"/g, '&quot;')}">${booked.isStart ? `<span class="sg-booked-label"><i data-lucide="user" style="width:9px;height:9px;"></i>${first}</span>` : ''}</td>`;
+            }
             return `<td class="sg-cell${sel ? ' sg-selected' : ''}" data-key="${key}" data-dow="${d.dow}" data-time="${t}"></td>`;
         }).join('');
         return `<tr class="sg-row${isHour ? ' sg-hour-mark' : ''}">
@@ -141,6 +180,7 @@ export function renderScheduleGrid(existingSlots) {
         <div class="sg-legend">
             <span class="sg-legend-item sg-legend-free">Disponível (1 consulta)</span>
             <span class="sg-legend-item sg-legend-blocked">Bloqueado</span>
+            <span class="sg-legend-item sg-legend-booked">Ocupado (agendado)</span>
             <span class="sg-legend-hint">Cada linha = 1 consulta de 30 min · Clique ou arraste para alternar</span>
         </div>
         <div class="sg-scroll-wrap">
@@ -200,7 +240,7 @@ export function bindGridEvents(container) {
         btn.addEventListener('click', e => {
             e.preventDefault();
             const dow = btn.dataset.dow;
-            const dayCells = [...container.querySelectorAll(`.sg-cell[data-dow="${dow}"]`)];
+            const dayCells = [...container.querySelectorAll(`.sg-cell[data-dow="${dow}"]:not(.sg-booked)`)];
             const anySelected = dayCells.some(c => _selectedCells.has(c.dataset.key));
             dayCells.forEach(c => {
                 if (anySelected) { _selectedCells.delete(c.dataset.key); c.classList.remove('sg-selected'); }
@@ -217,6 +257,8 @@ export function bindGridEvents(container) {
         const cell = e.target.closest('.sg-cell');
         if (!cell) return;
         e.preventDefault();
+        // Células ocupadas mostram detalhes do paciente e não alteram disponibilidade
+        if (cell.classList.contains('sg-booked')) { _showBookedDetails(cell.dataset.key); return; }
         _dragState = { willSelect: !_selectedCells.has(cell.dataset.key) };
         toggleCellState(cell, cell.dataset.key, _dragState.willSelect);
         updateSchedInfo();
@@ -225,10 +267,26 @@ export function bindGridEvents(container) {
     table.addEventListener('mouseover', e => {
         if (!_dragState) return;
         const cell = e.target.closest('.sg-cell');
-        if (!cell) return;
+        if (!cell || cell.classList.contains('sg-booked')) return;
         toggleCellState(cell, cell.dataset.key, _dragState.willSelect);
         updateSchedInfo();
     });
+}
+
+function _showBookedDetails(key) {
+    const b = _bookedCells.get(key);
+    if (!b) return;
+    const a = b.appt;
+    const dateBR = b.dateStr.split('-').reverse().join('/');
+    const goalMap = { lose: 'Emagrecer', gain: 'Ganhar Massa', maintain: 'Manutenção' };
+    alert(
+        `Consulta agendada\n\n` +
+        `Paciente: ${a.patient_name || '—'}\n` +
+        `E-mail: ${a.patient_email || '—'}\n` +
+        `Data: ${dateBR}\n` +
+        `Horário: ${(a.start_time||'').substring(0,5)} – ${(a.end_time||'').substring(0,5)}\n` +
+        `Status: ${a.status || 'agendado'}`
+    );
 }
 
 export function toggleCellState(cell, key, select) {
