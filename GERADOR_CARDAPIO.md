@@ -21,8 +21,8 @@
 
 | 2026-05-29 | **Fase 6 ✅** | `curated_foods` (94 alimentos comuns, FK→TACO) semeada via `seed_curated.json` + `match-curated.js` (matching por palavras-AND + penalidades). `fetchFoodPool` agora é POR REFEIÇÃO (curated, fallback TACO); compensação de micros meal-aware; porção caseira. Café deixou de ter arroz; só staples nacionais; variedade por fonte (incl. moela/coração/fígado). | (vários) |
 
-**Fase atual:** Concluídas 0–4 + 6 + Fase 5 (parcial: substituição de item curado+IA). Restam opcionais: presets, regenerar refeição, preferências, variedade/nomes por LLM.
-**Última sessão parou em:** **Camada culinária resolvida** — cardápio gerado é culturalmente coerente (café=pão/fruta/laticínio, nunca arroz), só alimentos comuns nacionais, com variedade entre dias. `curated_foods` populada. Próximo possível: expandir o seed (94→300+, mais cortes/miúdos), campo `region` no profile, ou Fase 5 (LLM p/ variedade).
+**Fase atual:** Fase 7 (PLANEJADA — registrada, não iniciada). Concluídas 0–4 + 6 + 5(parcial).
+**Última sessão parou em:** Decidido evoluir para **refeições idiomáticas** (combos brasileiros reais, ex: pão+ovos, arroz+feijão+salada, omelete+queijo). Diagnóstico: hoje escolhemos alimentos por papel ISOLADO; falta a camada de COMBOS. Fase 7 modelada no doc (abaixo). Próximo: executar 7.1 (tabela `meal_archetypes`). **Filosofia acordada: sistema complexo, multi-sessão, sem simplificar/pressa.**
 
 ---
 
@@ -323,6 +323,94 @@ O gargalo NÃO é gerar nomes — é o **matching nome→TACO** (nomes da TACO b
 ### Critério de aceite
 Cardápio gerado usa só alimentos comuns/nacionais, culturalmente coerentes por refeição
 (café ≠ arroz), com variedade entre os 7 dias (cortes/formas diferentes da mesma fonte).
+
+---
+
+## 📋 FASE 7 — Refeições Idiomáticas (arquétipos/combos + bebidas)
+**Status:** ⬜ PLANEJADA (registrada 2026-05-29) — a maior evolução conceitual do gerador.
+**Filosofia:** sistema complexo, infinitas variáveis. Atacar em várias sessões, sem simplificar.
+
+### Problema que resolve
+Hoje montamos a refeição escolhendo **1 alimento por papel, isoladamente** (carbo+proteína+vegetal…).
+Isso dá nutrição correta mas **não idiomatismo**. A mesa brasileira é feita de **COMBOS que andam
+juntos**: "pão **com** ovos", "arroz **e** feijão", "omelete **com** mussarela". Precisamos de uma
+camada de **arquétipos de refeição** (combos), análoga ao que `curated_foods` fez para alimentos.
+
+### Lacunas concretas (dos exemplos do nutricionista)
+1. **Café sem proteína** — template atual `[carbo,laticínio,fruta]` não tem ovo. Café real tem ovo/queijo.
+2. **Jantar proteico e leve** possível (omelete+queijo), não só arroz+proteína+vegetal.
+3. **Bebidas** não existem — refri zero, café, chá, água saborizada (~0 kcal).
+4. **Lanche pode ser laticínio** (1 fatia queijo minas), não só fruta. **Ceia pode ser fruta leve** (mamão) — reconcilia com "ceia leve/digestiva".
+
+### Modelo de dados — tabela `meal_archetypes`
+Camada de combos por cima de `curated_foods` (NÃO duplica alimentos/nutrição).
+```
+id | meal_type (cafe_da_manha|lanche_manha|almoco|lanche_tarde|jantar|ceia)
+   | name (ex: "Pão com ovos mexidos")
+   | slots (JSONB) | region (default 'nacional') | weight (frequência) | active
+```
+Cada **slot** (dentro de slots[]):
+```
+{ role: 'carb|protein|legume|vegetable|fruit|dairy|fat|bebida',
+  owns: 'protein'|'fat'|'kcal'|null,   // null = porção fixa; 'kcal' = fecha energia
+  required: true|false,                 // false = pode ser omitido (ex: bebida)
+  portion: number|null }                // override de porção caseira
+```
+> Regra: cada arquétipo deve ter **um slot `owns:'kcal'`** (o fechador de energia). Se não tiver
+> (ex: omelete+queijo+salada), a correção final de kcal escala o maior slot não-travado.
+
+### Novos papéis / dados
+- **`bebida`** (novo role em `curated_foods`): refri zero, café s/ açúcar, chá, água saborizada,
+  suco natural. Quase 0 kcal (suco tem kcal). Seed novo + tags de refeição.
+- **Proteína no café**: garantir ovo/queijo disponíveis nos arquétipos de café (já existem na curated).
+
+### Biblioteca inicial de arquétipos (seed — expandir via LLM offline + revisão)
+- **Café:** Pão+ovos · Pão+queijo+café · Tapioca+ovo · Cuscuz+ovo · Iogurte+granola+fruta · Mingau de aveia+fruta · Pão+ovos+fruta+café
+- **Lanche manhã/tarde:** 1 fruta · 1 fatia de queijo · Iogurte · Castanhas · Fruta+castanhas
+- **Almoço:** Arroz+feijão+carne+salada · Arroz+feijão+frango+legume · Arroz+lentilha+ovo+salada · Arroz+feijão+peixe+legume (+ bebida zero opcional)
+- **Jantar:** Omelete+queijo+salada · Sopa de legumes+frango · Arroz+frango+legume(leve) · Crepioca recheada · Wrap/tapioca+frango+salada
+- **Ceia:** 1 fruta leve (mamão/melancia) · Iogurte · Chá+castanhas · Iogurte+chia
+
+### Mudanças no motor (generator.js)
+- `generatePlan`: por refeição, **escolher um arquétipo** (rotacionando p/ variedade entre dias),
+  cujos slots `required` sejam todos preenchíveis com o pool atual (respeitando exclusões clínicas);
+  senão tenta outro arquétipo.
+- `fillMeal`: generalizar para usar `slot.owns` (em vez do mapa fixo `ROLE_OWNS`) — cada arquétipo
+  define seus próprios donos de macro/kcal.
+- Compensação de micros, UL, distribuição (Fase refino) **permanecem** — só muda a forma de escolher o combo.
+
+### Regras de afinidade (if/else) — onde o arquétipo não basta
+- arroz ⇒ preferir feijão no slot leguminosa (par clássico).
+- "ovos mexidos"/omelete ⇒ slot carbo do café tende a pão/tapioca.
+- Manter simples: a maior parte da afinidade já está embutida no próprio arquétipo.
+
+### Papel da LLM (honesto)
+- **Agora:** usar LLM **uma vez, offline**, para SEMEAR a biblioteca de arquétipos (few-shot,
+  ela conhece combos BR) → revisar → gravar. Depois roda **determinístico, grátis, offline**.
+- **Fine-tuning do Mistral:** lift grande (dataset, infra, custo) e retorno incerto vs few-shot +
+  arquétipos curados. **Horizonte distante, não próximo passo.**
+- **Por requisição:** refino opcional (variedade/nomes/regional) — o botão "Sugerir com IA" já é a semente.
+
+### Tarefas
+- [ ] **7.1** Tabela `meal_archetypes` (CREATE IF NOT EXISTS) + script de seed/match (espelhar `match-curated`).
+- [ ] **7.2** Novo role `bebida` em `curated_foods`: adicionar itens ao `seed_curated.json` (refri zero, café, chá, água saborizada, suco) + re-seed.
+- [ ] **7.3** Definir `seed_archetypes.json` (biblioteca acima, expandida via LLM offline + revisão).
+- [ ] **7.4** `generatePlan` por arquétipo (escolha + viabilidade de slots + rotação).
+- [ ] **7.5** `fillMeal` por `slot.owns` (generalizar; manter fechador de kcal + correção).
+- [ ] **7.6** Garantir proteína no café (arquétipos com ovo/queijo) e bebidas opcionais.
+- [ ] **7.7** Regras de afinidade (arroz↔feijão etc.) quando necessário.
+- [ ] **7.8** Validar: café com ovo, almoço arroz+feijão+proteína+salada, jantar omelete+queijo, lanches leves, ceia leve — batendo kcal/macros e mantendo micros.
+
+### Critério de aceite
+Cardápio gerado parece **comida brasileira de verdade** (combos idiomáticos por refeição),
+com proteína no café, bebidas quando fizer sentido, mantendo meta de kcal (±~5%), macros e
+adequação de micros. Variedade de combos entre os 7 dias.
+
+### Ressalvas / decisões
+- Arquétipos NÃO duplicam nutrição (apontam para `curated_foods` → TACO).
+- Cada arquétipo precisa de um fechador de kcal (ou a correção final cobre).
+- Bebidas ~0 kcal não devem desbalancear a meta (entram como slot opcional).
+- Reconciliação ceia: aceitar fruta leve (mamão) OU laticínio+oleaginosa — ambos "leves/digestivos".
 
 ---
 
