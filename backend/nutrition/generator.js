@@ -24,7 +24,7 @@ const ROLE_GROUPS = {
 // Filtro de sanidade macro por papel (por 100g): preferir alimentos MAGROS/LIMPOS
 // (proteína magra não despeja gordura; carbo limpo = grão, não doce frito)
 const ROLE_MACRO_FILTER = {
-  protein:   'ptn >= 12 AND lip <= 15',          // proteína magra
+  protein:   'ptn >= 15 AND lip <= 12',          // proteína magra e densa (menos gramas)
   legume:    'cho >= 10 AND lip <= 10',
   carb:      'cho >= 18 AND lip <= 8',            // grão/raiz, sem fritura
   vegetable: 'kcal < 80',
@@ -33,10 +33,10 @@ const ROLE_MACRO_FILTER = {
   fat:       'lip >= 40',
 };
 
-// Nomes a evitar (frituras, doces, crus, ultraprocessados)
-const NAME_BLACKLIST = /frit|milanes|à dor[ée]|caramelizad|maionese|nugget|empanad|parmegian|crist|em calda|torresmo|salgadinho|rechead|chips|bacon|defumad|enlatad|conserva|\bcru\b|\bcrua\b/i;
-// Papéis que NÃO aplicam a blacklist (gordura=óleos; vegetal/fruta podem ser crus)
-const BLACKLIST_SKIP = new Set(['fat', 'vegetable', 'fruit']);
+// Nomes a evitar: frituras, crus, embutidos, sobremesas, ultraprocessados
+const NAME_BLACKLIST = /frit|milanes|à dor[ée]|caramelizad|maionese|nugget|empanad|parmegian|crist|em calda|torresmo|salgadinho|rechead|chips|bacon|defumad|enlatad|conserva|\bcru\b|\bcrua\b|apresuntad|presunto|mortadela|salsich|lingui[cç]|salame|condensad|brigadeir|pudim|mousse|sorvete|achocolat|gelatina|\bbolo\b|\btorta\b/i;
+// Papéis isentos da blacklist (vegetal/fruta podem ser crus). Gordura agora APLICA (tira maionese).
+const BLACKLIST_SKIP = new Set(['vegetable', 'fruit']);
 const ENERGY_ROLES   = new Set(['carb', 'legume', 'dairy', 'fruit', 'vegetable']);
 
 // Composição de cada refeição (papéis)
