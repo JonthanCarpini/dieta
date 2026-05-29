@@ -267,12 +267,18 @@ function generatePlan(pool, config) {
       cursor[`${meal}|${role}`] = 0;
     }
   }
-  const nextFood = (meal, role) => {
+  const nextFood = (meal, role, only) => {
     let r = role;
     let list = shuffled[meal] ? shuffled[meal][r] : null;
     if ((!list || !list.length) && ROLE_FALLBACK[role]) { r = ROLE_FALLBACK[role]; list = r && shuffled[meal] ? shuffled[meal][r] : null; }
     if (!list || !list.length) return null;
-    const key = `${meal}|${r}`;
+    let key = `${meal}|${r}`;
+    // `only`: fixa os alimentos-âncora do arquétipo (filtra por palavra-chave no nome);
+    // se nada casar, cai para o pool completo do papel (nunca quebra).
+    if (Array.isArray(only) && only.length) {
+      const filtered = list.filter(f => { const n = (f.nome || '').toLowerCase(); return only.some(k => n.includes(k)); });
+      if (filtered.length) { list = filtered; key = `${meal}|${r}|${only.join(',')}`; }
+    }
     cursor[key] = cursor[key] || 0;
     const f = list[cursor[key] % list.length];
     cursor[key]++;
@@ -311,8 +317,8 @@ function generatePlan(pool, config) {
       const slots = arch ? arch.slots : (MEAL_TEMPLATES[mealType] || []).map(role => ({ role }));
       const picks = [];
       for (const slot of slots) {
-        const f = nextFood(mealType, slot.role);
-        if (f) picks.push({ role: slot.role, food: f, owns: slot.owns, _slotKcal: slot.owns === 'kcal' });
+        const f = nextFood(mealType, slot.role, slot.only);
+        if (f) picks.push({ role: slot.role, food: f, owns: slot.owns });
       }
       // garante um fechador de kcal: se nenhum pick ficou com owns:'kcal', promove o carbo ou o de maior caloria
       if (picks.length && !picks.some(p => p.owns === 'kcal')) {
