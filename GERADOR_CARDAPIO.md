@@ -17,8 +17,10 @@
 | 2026-05-29 | **Fase 3 ✅** | Criados `limits.js` (DRI/UL/piso/tiers) + `micros.js` (panorama, compensação iso-calórica com trava UL, relatório). Testado: Vit E 37%→105%, Cálcio 86%→95% reforçando dias específicos; Tier C sinalizado; UL não piorado. | 345d7c1 |
 | 2026-05-29 | **Fase 4 ✅** | UI no builder: botão "Gerar Automático" na aba Cardápio do paciente, modal de config, `loadGeneratedPlan` carrega rascunho no builder, `_renderGenReport` mostra banner + painel de adequação (chips coloridos por status). | 5d58f78 |
 
-**Fase atual:** Fase 6 (planejada) — Fases 0–4 concluídas (MVP funcional). Fase 5 opcional adiada.
-**Última sessão parou em:** Identificados 2 problemas reais no cardápio gerado: (1) **inadequação cultural** (arroz cozido no café é alucinação) e (2) **regionalidade/disponibilidade** (alimento exótico tipo bucho de bode). Decidido criar a **Fase 6 — Camada Culinária Curada** (banco curado sobre a TACO). Seed inicial de ~145 alimentos rascunhado na conversa; falta expandir (variedade por fonte — ex: frango = peito/coxa/moela/coração/fígado) e fazer o matching nome→TACO.
+| 2026-05-29 | **Fase 6 ✅** | `curated_foods` (94 alimentos comuns, FK→TACO) semeada via `seed_curated.json` + `match-curated.js` (matching por palavras-AND + penalidades). `fetchFoodPool` agora é POR REFEIÇÃO (curated, fallback TACO); compensação de micros meal-aware; porção caseira. Café deixou de ter arroz; só staples nacionais; variedade por fonte (incl. moela/coração/fígado). | (vários) |
+
+**Fase atual:** Concluídas 0–4 + 6. Fase 5 (IA/variedade/presets) opcional.
+**Última sessão parou em:** **Camada culinária resolvida** — cardápio gerado é culturalmente coerente (café=pão/fruta/laticínio, nunca arroz), só alimentos comuns nacionais, com variedade entre dias. `curated_foods` populada. Próximo possível: expandir o seed (94→300+, mais cortes/miúdos), campo `region` no profile, ou Fase 5 (LLM p/ variedade).
 
 ---
 
@@ -278,7 +280,8 @@ Recurso polido, com variedade e ajustes finos, mantendo precisão numérica.
 ---
 
 ## 📋 FASE 6 — Camada Culinária Curada (cultura + regionalidade)
-**Status:** ⬜ planejada (PRIORITÁRIA — sobrepõe a Fase 5)
+**Status:** ✅ CONCLUÍDA (2026-05-29) — `curated_foods` + `seed_curated.json` + `match-curated.js`; `fetchFoodPool`/`micros` meal-aware.
+**Resultado:** café sem arroz, só staples nacionais, variedade por fonte. Seed atual = 94 itens (expansível). Re-semear: `docker exec nutrir_backend node nutrition/match-curated.js`.
 **Por quê:** a TACO é banco **nutricional**, não **culinário**. Gera "arroz no café" (cultura) e
 alimentos exóticos/indisponíveis (regionalidade). Solução: uma camada curada por cima da TACO.
 
