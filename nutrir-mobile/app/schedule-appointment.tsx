@@ -38,6 +38,8 @@ LocaleConfig.locales['pt-br'] = {
   dayNamesShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
   today: 'Hoje'
 };
+LocaleConfig.locales['pt-BR'] = LocaleConfig.locales['pt-br'];
+LocaleConfig.locales['pt'] = LocaleConfig.locales['pt-br'];
 LocaleConfig.defaultLocale = 'pt-br';
 
 interface TimeSlot {
@@ -69,13 +71,14 @@ export default function ScheduleAppointmentScreen() {
   const [notes, setNotes] = useState('');
 
   // Busca profissionais vinculados ao usuário
-  const { data: professionals } = useQuery<any[]>({
+  const { data: professionals, isLoading: loadingProfessionals } = useQuery<any[]>({
     queryKey: ['linked-professionals'],
     queryFn: () => api.get('/user/linked-professionals').then((r) => r.data),
   });
 
-  const nutritionist = professionals?.find((p) => p.role === 'nutritionist');
+  const nutritionist = professionals?.find((p) => p.type === 'nutritionist' || p.role === 'nutritionist');
   const professionalId = nutritionist?.id;
+  const hasNoNutritionist = professionals && !nutritionist;
 
   // Busca horários livres para o nutricionista na data selecionada
   const { data: slotsData, isLoading: loadingSlots } = useQuery<SlotsResponse>({
@@ -152,14 +155,24 @@ export default function ScheduleAppointmentScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Calendar */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Selecione a data</Text>
-          <View style={styles.calendarWrapper}>
-            <Calendar
-              current={today}
-              minDate={today}
-              maxDate={maxDate}
+        {loadingProfessionals ? (
+          <ActivityIndicator color={colors.accentGreen} style={{ marginTop: spacing.xxl }} />
+        ) : hasNoNutritionist ? (
+          <View style={styles.warningCard}>
+            <Text style={styles.warningText}>
+              Você não possui um nutricionista vinculado. Para agendar uma consulta, vincule um nutricionista na aba "Profissional".
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Calendar */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Selecione a data</Text>
+              <View style={styles.calendarWrapper}>
+                <Calendar
+                  current={today}
+                  minDate={today}
+                  maxDate={maxDate}
               onDayPress={(day) => {
                 setSelectedDate(day.dateString);
                 setSelectedTime('');
@@ -304,6 +317,8 @@ export default function ScheduleAppointmentScreen() {
             </TouchableOpacity>
           </View>
         )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -410,4 +425,20 @@ const styles = StyleSheet.create({
   },
   confirmBtnDisabled: { opacity: 0.6 },
   confirmBtnText: { fontSize: 15, fontWeight: '700', color: '#000' },
+
+  warningCard: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  warningText: {
+    ...typography.body,
+    color: colors.accentRed,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });

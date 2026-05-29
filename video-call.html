@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutrir - Consulta por Vídeo</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-secondary: #111827;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --text-primary: #ffffff;
+            --text-secondary: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .video-container {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #remote-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #local-video {
+            position: absolute;
+            bottom: 100px;
+            right: 16px;
+            width: 110px;
+            height: 150px;
+            border-radius: 12px;
+            border: 2px solid var(--accent-green);
+            background-color: #1f2937;
+            object-fit: cover;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        .header-bar {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 16px;
+            border-radius: 30px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .btn-close {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .title {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 20px;
+            right: 16px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 20;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .controls-bar {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            gap: 16px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 12px 24px;
+            border-radius: 40px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .btn-control {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #fff;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-control.active {
+            background-color: var(--accent-green);
+        }
+
+        .btn-control.muted {
+            background-color: var(--accent-red);
+        }
+
+        .btn-control.hangup {
+            background-color: var(--accent-red);
+            width: 54px;
+            height: 54px;
+        }
+
+        .btn-control.hangup:hover {
+            transform: scale(1.05);
+        }
+
+        /* Screen for call ended */
+        .ended-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-primary);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            z-index: 100;
+        }
+
+        .ended-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 32px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ended-icon {
+            color: var(--accent-green);
+            margin-bottom: 8px;
+        }
+
+        .ended-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .ended-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .btn-return {
+            background-color: var(--accent-green);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+
+        .btn-return:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="video-container" id="video-area">
+        <div class="header-bar">
+            <button class="btn-close" id="btn-header-close">
+                <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+            </button>
+            <span class="title">Consulta por Vídeo</span>
+        </div>
+
+        <div class="status-badge" id="call-status">Acessando câmera...</div>
+
+        <!-- Streams -->
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+
+        <!-- Controls -->
+        <div class="controls-bar">
+            <button class="btn-control active" id="btn-mic" title="Mutar/Desmutar Microfone">
+                <i data-lucide="mic" style="width: 20px; height: 20px;"></i>
+            </button>
+            <button class="btn-control active" id="btn-cam" title="Ativar/Desativar Câmera">
+                <i data-lucide="video" style="width: 20px; height: 20px;"></i>
+            </button>
+            <button class="btn-control hangup" id="btn-hangup" title="Desconectar">
+                <i data-lucide="phone-off" style="width: 22px; height: 22px;"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Ended Screen -->
+    <div class="ended-screen" id="ended-screen">
+        <div class="ended-card">
+            <div class="ended-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle-2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <h3 class="ended-title">Consulta Finalizada</h3>
+            <p class="ended-desc">Sua conferência foi encerrada com sucesso. Você já pode fechar esta página.</p>
+            <button class="btn-return" onclick="window.close()">Fechar Guia</button>
+        </div>
+    </div>
+
+    <script>
+        // Inicializar ícones
+        lucide.createIcons();
+
+        // Parâmetros da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomName = urlParams.get('room') || 'nutrir-room';
+
+        let localStream = null;
+        let peerConnection = null;
+        let wsSignal = null;
+        let isMicMuted = false;
+        let isCamOff = false;
+        let remoteCandidatesQueue = [];
+
+        const statusEl = document.getElementById('call-status');
+        const endedScreen = document.getElementById('ended-screen');
+        const videoArea = document.getElementById('video-area');
+
+        // Inicializar chamada
+        async function startCall() {
+            try {
+                // 1. Obter fluxo de mídia
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const localVideo = document.getElementById('local-video');
+                if (localVideo) localVideo.srcObject = localStream;
+
+                // 2. Criar RTCPeerConnection
+                peerConnection = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                });
+
+                // 3. Adicionar faixas locais
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                // 4. Lidar com faixas remotas
+                peerConnection.ontrack = (event) => {
+                    const remoteVideo = document.getElementById('remote-video');
+                    if (remoteVideo) {
+                        remoteVideo.srcObject = event.streams[0];
+                        remoteVideo.play().catch(err => {
+                            console.warn("Autoplay bloqueado no vídeo remoto:", err);
+                            remoteVideo.muted = true;
+                            remoteVideo.play().catch(e => console.error("Erro fatal ao reproduzir vídeo:", e));
+                        });
+                    }
+                    statusEl.textContent = 'Em chamada';
+                };
+
+                // 5. Enviar ICE candidates locais
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate && wsSignal && wsSignal.readyState === WebSocket.OPEN) {
+                        wsSignal.send(JSON.stringify({
+                            type: 'candidate',
+                            candidate: event.candidate,
+                            room: roomName
+                        }));
+                    }
+                };
+
+                // 6. Conectar ao WebSocket de Sinalização
+                const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+                const wsUrl = `${protocol}${window.location.host}/api/signal`;
+                statusEl.textContent = 'Conectando ao servidor...';
+
+                wsSignal = new WebSocket(wsUrl);
+
+                wsSignal.onopen = () => {
+                    console.log('Conectado ao servidor de sinalização');
+                    statusEl.textContent = 'Aguardando nutricionista...';
+                    
+                    wsSignal.send(JSON.stringify({
+                        type: 'join',
+                        room: roomName,
+                        userId: 'paciente-' + Date.now()
+                    }));
+                };
+
+                const processPendingCandidates = async () => {
+                    if (remoteCandidatesQueue.length > 0) {
+                        for (const candidate of remoteCandidatesQueue) {
+                            try {
+                                await peerConnection.addIceCandidate(candidate);
+                            } catch (e) {
+                                console.error("Erro ao aplicar candidato ICE:", e);
+                            }
+                        }
+                        remoteCandidatesQueue = [];
+                    }
+                };
+
+                wsSignal.onmessage = async (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        switch (data.type) {
+                            case 'new-peer':
+                                statusEl.textContent = 'Iniciando conexão...';
+                                const offer = await peerConnection.createOffer();
+                                await peerConnection.setLocalDescription(offer);
+                                wsSignal.send(JSON.stringify({
+                                    type: 'offer',
+                                    offer: offer,
+                                    room: roomName
+                                }));
+                                break;
+
+                            case 'offer':
+                                statusEl.textContent = 'Conectando...';
+                                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                                const answer = await peerConnection.createAnswer();
+                                await peerConnection.setLocalDescription(answer);
+                                wsSignal.send(JSON.stringify({
+                                    type: 'answer',
+                                    answer: answer,
+                                    room: roomName
+                                }));
+                                await processPendingCandidates();
+                                break;
+
+                            case 'answer':
+                                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                                await processPendingCandidates();
+                                break;
+
+                            case 'candidate':
+                                if (data.candidate) {
+                                    const candidate = new RTCIceCandidate(data.candidate);
+                                    if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                                        await peerConnection.addIceCandidate(candidate);
+                                    } else {
+                                        remoteCandidatesQueue.push(candidate);
+                                    }
+                                }
+                                break;
+
+                            case 'peer-left':
+                                statusEl.textContent = 'Profissional encerrou a chamada.';
+                                setTimeout(closeCall, 1500);
+                                break;
+
+                            case 'error':
+                                alert(data.message);
+                                closeCall();
+                                break;
+                        }
+                    } catch (err) {
+                        console.error("Erro ao processar mensagem de sinalização:", err);
+                    }
+                };
+
+                peerConnection.onconnectionstatechange = () => {
+                    if (peerConnection) {
+                        const state = peerConnection.connectionState;
+                        console.log('WebRTC Connection State:', state);
+                        if (state === 'connected') {
+                            statusEl.textContent = 'Em chamada';
+                        } else if (state === 'failed' || state === 'disconnected') {
+                            statusEl.textContent = 'Reconectando...';
+                        }
+                    }
+                };
+
+            } catch (err) {
+                console.error("Erro ao acessar câmera/microfone:", err);
+                alert("Não foi possível acessar a câmera e microfone. Por favor, conceda as permissões necessárias.");
+                closeCall();
+            }
+        }
+
+        // Encerrar chamada
+        function closeCall() {
+            if (wsSignal && wsSignal.readyState === WebSocket.OPEN) {
+                try {
+                    wsSignal.send(JSON.stringify({ type: 'leave' }));
+                } catch(e) {}
+                wsSignal.close();
+            }
+            wsSignal = null;
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+
+            const localVideo = document.getElementById('local-video');
+            const remoteVideo = document.getElementById('remote-video');
+            if (localVideo) localVideo.srcObject = null;
+            if (remoteVideo) remoteVideo.srcObject = null;
+
+            remoteCandidatesQueue = [];
+
+            // Exibir tela de encerramento
+            videoArea.style.display = 'none';
+            endedScreen.style.display = 'flex';
+        }
+
+        // Toggles
+        document.getElementById('btn-mic').addEventListener('click', () => {
+            if (!localStream) return;
+            isMicMuted = !isMicMuted;
+            localStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
+            
+            const btn = document.getElementById('btn-mic');
+            if (isMicMuted) {
+                btn.className = 'btn-control muted';
+                btn.innerHTML = '<i data-lucide="mic-off" style="width: 20px; height: 20px;"></i>';
+            } else {
+                btn.className = 'btn-control active';
+                btn.innerHTML = '<i data-lucide="mic" style="width: 20px; height: 20px;"></i>';
+            }
+            lucide.createIcons();
+        });
+
+        document.getElementById('btn-cam').addEventListener('click', () => {
+            if (!localStream) return;
+            isCamOff = !isCamOff;
+            localStream.getVideoTracks().forEach(track => track.enabled = !isCamOff);
+            
+            const btn = document.getElementById('btn-cam');
+            const localVideo = document.getElementById('local-video');
+            if (isCamOff) {
+                btn.className = 'btn-control muted';
+                btn.innerHTML = '<i data-lucide="video-off" style="width: 20px; height: 20px;"></i>';
+                if (localVideo) localVideo.style.opacity = '0';
+            } else {
+                btn.className = 'btn-control active';
+                btn.innerHTML = '<i data-lucide="video" style="width: 20px; height: 20px;"></i>';
+                if (localVideo) localVideo.style.opacity = '1';
+            }
+            lucide.createIcons();
+        });
+
+        document.getElementById('btn-hangup').addEventListener('click', () => {
+            if (confirm('Deseja realmente encerrar a chamada?')) {
+                closeCall();
+            }
+        });
+
+        document.getElementById('btn-header-close').addEventListener('click', () => {
+            if (confirm('Deseja sair da sala de vídeo?')) {
+                closeCall();
+            }
+        });
+
+        // Iniciar
+        startCall();
+    </script>
+</body>
+</html>

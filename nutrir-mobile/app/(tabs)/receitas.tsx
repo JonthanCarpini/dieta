@@ -31,6 +31,11 @@ const DAYS = [
   { key: 'domingo', label: 'Dom' },
 ];
 
+const getTodayKey = () => {
+  const days = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+  return days[new Date().getDay()];
+};
+
 const PRO_MEAL_EMOJIS: Record<string, string> = {
   cafe_da_manha: '☀️',
   lanche_manha: '🍎',
@@ -42,7 +47,8 @@ const PRO_MEAL_EMOJIS: Record<string, string> = {
 
 // ─── Tab: Receitas do Nutricionista ────────────────────────────────────────────
 function NutriRecipes() {
-  const [selectedDay, setSelectedDay] = useState('segunda');
+  const todayKey = getTodayKey();
+  const [selectedDay, setSelectedDay] = useState(todayKey);
   const router = useRouter();
 
   const { data: plan, isLoading, refetch, isRefetching } = useQuery<any>({
@@ -65,11 +71,6 @@ function NutriRecipes() {
   const planData = plan?.plan_data;
   const parsedPlanData = typeof planData === 'string' ? JSON.parse(planData) : planData;
   const dayData = parsedPlanData?.days?.find((d: any) => d.dow === selectedDow);
-
-  const todayKey = (() => {
-    const days = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-    return days[new Date().getDay()];
-  })();
 
   return (
     <View style={styles.tabContent}>
@@ -346,7 +347,8 @@ interface WeeklyPlan {
 }
 
 function WeeklyPlanTab() {
-  const [selectedDay, setSelectedDay] = useState('segunda');
+  const todayKey = getTodayKey();
+  const [selectedDay, setSelectedDay] = useState(todayKey);
   const router = useRouter();
 
   const { data: plan, isLoading, refetch } = useQuery<WeeklyPlan>({
@@ -361,11 +363,6 @@ function WeeklyPlanTab() {
   });
 
   const currentDay = plan?.days.find((d) => d.day === selectedDay);
-
-  const todayKey = (() => {
-    const days = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-    return days[new Date().getDay()];
-  })();
 
   return (
     <View style={styles.tabContent}>
