@@ -21,7 +21,9 @@
 
 | 2026-05-29 | **Fase 6 ✅** | `curated_foods` (94 alimentos comuns, FK→TACO) semeada via `seed_curated.json` + `match-curated.js` (matching por palavras-AND + penalidades). `fetchFoodPool` agora é POR REFEIÇÃO (curated, fallback TACO); compensação de micros meal-aware; porção caseira. Café deixou de ter arroz; só staples nacionais; variedade por fonte (incl. moela/coração/fígado). | (vários) |
 
-**Fase atual:** Fase 7 (PLANEJADA — registrada, não iniciada). Concluídas 0–4 + 6 + 5(parcial).
+**Fase atual:** Fase 7 (NÚCLEO ✅ — combos idiomáticos funcionando; refinos pendentes). Concluídas 0–4 + 6 + 5(parcial).
+**Fase 7 — feito:** `archetypes.js` (combos por refeição), gerador POR ARQUÉTIPO, `fillMeal` por `slot.owns`, role `bebida` (refri zero/café/chá/suco/água de coco), proteína no café (ovo/queijo), muçarela liberada p/ almoço/jantar. Resultado: café com ovo, almoço arroz+feijão+proteína+salada, jantar idiomático, lanches leves, ceia leve; kcal ~±5%.
+**Fase 7 — refinos pendentes (próximas camadas):** (1) nome do arquétipo às vezes não bate com o alimento sorteado do slot (ex: arquétipo "Cuscuz com ovo" sai com flocos de milho) — cosmético/interno, não exibido no builder; avaliar slots com alimento específico. (2) 1-2 dias ficam ~10% abaixo da meta quando o arquétipo é leve (ex: lanche só "Castanhas" com clamp de gordura). (3) match ruim de `semente de abóbora` (kcal baixo demais) — revisar no seed. (4) 7.7 regras de afinidade (arroz↔feijão) ainda não implementadas.
 **Última sessão parou em:** Decidido evoluir para **refeições idiomáticas** (combos brasileiros reais, ex: pão+ovos, arroz+feijão+salada, omelete+queijo). Diagnóstico: hoje escolhemos alimentos por papel ISOLADO; falta a camada de COMBOS. Fase 7 modelada no doc (abaixo). Próximo: executar 7.1 (tabela `meal_archetypes`). **Filosofia acordada: sistema complexo, multi-sessão, sem simplificar/pressa.**
 
 ---
@@ -392,14 +394,14 @@ Cada **slot** (dentro de slots[]):
 - **Por requisição:** refino opcional (variedade/nomes/regional) — o botão "Sugerir com IA" já é a semente.
 
 ### Tarefas
-- [ ] **7.1** Tabela `meal_archetypes` (CREATE IF NOT EXISTS) + script de seed/match (espelhar `match-curated`).
-- [ ] **7.2** Novo role `bebida` em `curated_foods`: adicionar itens ao `seed_curated.json` (refri zero, café, chá, água saborizada, suco) + re-seed.
-- [ ] **7.3** Definir `seed_archetypes.json` (biblioteca acima, expandida via LLM offline + revisão).
-- [ ] **7.4** `generatePlan` por arquétipo (escolha + viabilidade de slots + rotação).
-- [ ] **7.5** `fillMeal` por `slot.owns` (generalizar; manter fechador de kcal + correção).
-- [ ] **7.6** Garantir proteína no café (arquétipos com ovo/queijo) e bebidas opcionais.
-- [ ] **7.7** Regras de afinidade (arroz↔feijão etc.) quando necessário.
-- [ ] **7.8** Validar: café com ovo, almoço arroz+feijão+proteína+salada, jantar omelete+queijo, lanches leves, ceia leve — batendo kcal/macros e mantendo micros.
+- [x] **7.1** Arquétipos como `archetypes.js` (const JS, não tabela — config estática, sem FK; decisão pragmática vs o plano original de tabela).
+- [x] **7.2** Role `bebida` em `curated_foods` (café, chá, refrigerante, suco de laranja, água de coco) + re-seed.
+- [x] **7.3** Biblioteca de arquétipos por refeição em `archetypes.js` (slots role/owns/required).
+- [x] **7.4** `generatePlan` por arquétipo (escolhe combo viável, rotaciona p/ variedade).
+- [x] **7.5** `fillMeal` por `slot.owns` (correção trava macro-donos, escala o resto).
+- [x] **7.6** Proteína no café (arquétipos com ovo/queijo) + bebidas opcionais.
+- [ ] **7.7** Regras de afinidade (arroz↔feijão etc.) — PENDENTE.
+- [~] **7.8** Validado parcialmente (combos idiomáticos OK, ~±5% kcal). Refinos pendentes no topo do doc.
 
 ### Critério de aceite
 Cardápio gerado parece **comida brasileira de verdade** (combos idiomáticos por refeição),
