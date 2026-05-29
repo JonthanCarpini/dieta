@@ -1,296 +1,249 @@
 /**
- * scrape-extra.js — Importador em massa de alimentos do Extra Mercado (VTEX)
+ * scrape-extra.js — Importador em massa de alimentos do Extra Mercado
  *
- * Descobre produtos navegando pelas categorias via API pública de catálogo VTEX,
- * extrai a tabela nutricional direto da página (JSON-LD / regex), com fallback
- * opcional para o LLM, e insere na tabela global `foods` (source='extra').
+ * Plataforma: site Next.js + API GPA (api.vendas.gpa.digital).
+ *
+ * Fluxo:
+ *   1. Descobre termos a partir da árvore de categorias (público) ou --terms.
+ *   2. Para cada termo, pagina a busca pública (POST /ex/search/search) e coleta
+ *      as URLs dos produtos (dedup por id).
+ *   3. Abre cada produto e lê a tabela nutricional estruturada de
+ *      __NEXT_DATA__.product.nutritionalMap.
+ *   4. NORMALIZA para 100g: a base (por porção ou por 100g) varia por produto;
+ *      detectamos pelo %VD (sempre calculado sobre a porção) cruzado com a porção
+ *      do header. Validado contra produtos reais.
+ *   5. Importa só produtos com TABELA NUTRICIONAL COMPLETA (energia + 3 macros)
+ *      para a tabela global `foods` (source='extra'), com dedup por nome.
  *
  * USO:
- *   node backend/scripts/scrape-extra.js                 # tudo, parser direto
- *   node backend/scripts/scrape-extra.js --max 100       # limita a 100 produtos
- *   node backend/scripts/scrape-extra.js --llm           # usa LLM no fallback
- *   node backend/scripts/scrape-extra.js --dry           # não grava no banco
- *   node backend/scripts/scrape-extra.js --cat alimentos # filtra categoria raiz
+ *   node backend/scripts/scrape-extra.js --dry --max 20         # teste sem gravar
+ *   node backend/scripts/scrape-extra.js --max 500              # importa até 500
+ *   node backend/scripts/scrape-extra.js --terms "arroz,feijao" # termos próprios
  *
- * É educado: respeita delay entre requisições e User-Agent real.
+ * Educado: delay entre requisições + User-Agent real.
  */
 
 const db = require('../db');
 
-// ── Configuração ──────────────────────────────────────────────────────────────
-const BASE         = 'https://www.extramercado.com.br';
-const DELAY_MS     = 1200;          // intervalo entre requisições (respeitoso)
-const PAGE_SIZE    = 50;            // produtos por página VTEX (máx 50)
-const UA           = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+// ── Config ────────────────────────────────────────────────────────────────────
+const args    = process.argv.slice(2);
+function _flag(f) { const i = args.indexOf(f); return i !== -1 && args[i + 1] ? args[i + 1] : null; }
 
-// Flags de linha de comando
-const args      = process.argv.slice(2);
-const MAX       = parseInt(_flagVal('--max')) || Infinity;
-const USE_LLM   = args.includes('--llm');
-const DRY_RUN   = args.includes('--dry');
-const CAT_FILTER= (_flagVal('--cat') || '').toLowerCase();
+const API   = 'https://api.vendas.gpa.digital/ex';
+const SITE   = 'https://www.extramercado.com.br';
+const UA     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const STORE  = parseInt(_flag('--store')) || 483;
+const DELAY  = parseInt(_flag('--delay')) || 900;
+const PAGE_SZ= 24;
 
-function _flagVal(flag) {
-  const i = args.indexOf(flag);
-  return i !== -1 && args[i + 1] ? args[i + 1] : null;
-}
-
+const MAX     = parseInt(_flag('--max')) || Infinity;
+const DRY     = args.includes('--dry');
+const TERMS_CLI = (_flag('--terms') || '').split(',').map(s => s.trim()).filter(Boolean);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const num   = v => { const m = String(v ?? '').match(/-?\d+(?:[.,]\d+)?/); return m ? parseFloat(m[0].replace(',', '.')) : null; };
 
-// Estatísticas
-const stats = { discovered: 0, parsed: 0, inserted: 0, skipped: 0, failed: 0 };
+const stats = { terms: 0, found: 0, products: 0, valid: 0, inserted: 0, skipped: 0, noTable: 0, failed: 0 };
 
-// ── HTTP helper ───────────────────────────────────────────────────────────────
-async function _get(url, asJson = false) {
-  const r = await fetch(url, {
-    headers: {
-      'User-Agent': UA,
-      'Accept': asJson ? 'application/json' : 'text/html,application/xhtml+xml',
-      'Accept-Language': 'pt-BR,pt;q=0.9',
-    },
-    redirect: 'follow',
+// Mapa código GPA → campo. Referência ANVISA p/ %VD (porção).
+const FIELDS = [
+  { code: 'infnutricValorEnergetico', key: 'energy_kcal', vdRef: 2000 },
+  { code: 'infnutricProteina',        key: 'protein_g',   vdRef: 50   },
+  { code: 'infnutricCarboidrato',     key: 'carbs_g',     vdRef: 300  },
+  { code: 'infnutricGordurasTotais',  key: 'fat_g',       vdRef: 55   },
+  { code: 'infnutricFibraAlim',       key: 'fiber_g',     vdRef: 25   },
+];
+
+// ── HTTP ──────────────────────────────────────────────────────────────────────
+async function _getText(url) {
+  const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'pt-BR' } });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.text();
+}
+async function _search(terms, page) {
+  const r = await fetch(`${API}/search/search`, {
+    method: 'POST',
+    headers: { 'User-Agent': UA, 'Content-Type': 'application/json', 'Accept': 'application/json', 'x-origin': 'CATALOG' },
+    body: JSON.stringify({
+      terms, page, sortBy: 'relevance', resultsPerPage: PAGE_SZ,
+      allowRedirect: true, storeId: STORE, customerPlus: true,
+      department: 'ecom', partner: 'fallback',
+    }),
   });
-  if (!r.ok) throw new Error(`HTTP ${r.status} em ${url}`);
-  return asJson ? r.json() : r.text();
+  if (!r.ok) throw new Error(`search HTTP ${r.status}`);
+  return r.json();
 }
 
-// ── 1. Descoberta de categorias (VTEX category tree) ──────────────────────────
-async function discoverCategories() {
+// ── Descoberta de termos (árvore de categorias) ───────────────────────────────
+async function _discoverTerms() {
+  if (TERMS_CLI.length) { console.log(`🔎 ${TERMS_CLI.length} termos via --terms`); return TERMS_CLI; }
   try {
-    const tree = await _get(`${BASE}/api/catalog_system/pub/category/tree/3`, true);
-    const cats = [];
+    const r = await fetch(`${API}/v3/products/categories/ecom?storeId=${STORE}&split=&showSub=true`,
+      { headers: { 'User-Agent': UA, 'Accept': 'application/json', 'x-origin': 'CATALOG' } });
+    const j = await r.json();
+    const roots = j.content || [];
+    // Departamentos de alimentos/bebidas
+    const foodRoots = roots.filter(c => /aliment|bebida|merc|padaria|hortifr|congelad|doce|snack/i.test(c.name));
+    const terms = new Set();
     const walk = (nodes) => {
       for (const n of nodes) {
-        cats.push({ id: n.id, name: n.name, url: n.url });
-        if (n.children?.length) walk(n.children);
+        if (n.name && n.name.length > 2) terms.add(n.name);
+        if (n.subCategory?.length) walk(n.subCategory);
       }
     };
-    walk(tree);
-    const filtered = CAT_FILTER
-      ? cats.filter(c => c.name.toLowerCase().includes(CAT_FILTER))
-      : cats;
-    console.log(`📂 ${filtered.length} categorias encontradas${CAT_FILTER ? ` (filtro: "${CAT_FILTER}")` : ''}.`);
-    return filtered;
+    walk(foodRoots.length ? foodRoots : roots);
+    console.log(`🔎 ${terms.size} termos extraídos de ${foodRoots.length || roots.length} departamentos`);
+    return [...terms];
   } catch (err) {
-    console.error('Falha ao obter árvore de categorias VTEX:', err.message);
-    return [];
+    console.warn('Falha ao obter categorias, usando termos padrão:', err.message);
+    return ['arroz','feijao','leite','pao','biscoito','carne','frango','queijo','iogurte','cafe','acucar','farinha','oleo','macarrao','molho','suco','refrigerante','fruta','legume','cereal'];
   }
 }
 
-// ── 2. Listagem de produtos por categoria (VTEX search) ───────────────────────
-async function* productsInCategory(catId) {
-  let from = 0;
-  while (true) {
-    const to  = from + PAGE_SIZE - 1;
-    const url = `${BASE}/api/catalog_system/pub/products/search?fq=C:${catId}&_from=${from}&_to=${to}`;
-    let batch;
-    try {
-      batch = await _get(url, true);
-    } catch (err) {
-      // VTEX retorna 206 (partial) ok; outros erros encerram a categoria
-      if (String(err.message).includes('416')) break; // out of range
-      console.warn(`  ⚠ erro listando categoria ${catId} (${from}): ${err.message}`);
+// ── Parse + normalização da tabela nutricional ────────────────────────────────
+function _parseNutrition(prod) {
+  const nm = prod.nutritionalMap;
+  if (!nm || !Array.isArray(nm.attributes) || !nm.attributes.length) return null;
+
+  const portion = num((nm.header || '').match(/porç[ãa]o\s*de\s*([\d.,]+)\s*g/i)?.[1]) || null;
+
+  // Coleta valores brutos + vd
+  const raw = {};
+  for (const f of FIELDS) {
+    const a = nm.attributes.find(x => x.code === f.code);
+    raw[f.key] = a ? { val: num(a.val ?? a.value), vd: num(a.vd) } : { val: null, vd: null };
+  }
+
+  // Detecta a base (por porção × por 100g) usando o %VD como discriminador.
+  // %VD é sempre calculado sobre a PORÇÃO. Se `value` ~ vd/100*ref → é por porção;
+  // se `value` ~ (vd/100*ref)*(100/porção) → é por 100g.
+  let basis = null; // 'portion' | 'per100'
+  if (portion && portion !== 100) {
+    for (const f of FIELDS) {
+      const { val, vd } = raw[f.key];
+      if (val == null || vd == null || vd <= 0) continue;
+      const perPortionFromVd = (vd / 100) * f.vdRef;
+      if (perPortionFromVd <= 0) continue;
+      const errPortion = Math.abs(val / perPortionFromVd - 1);
+      const err100     = Math.abs(val / (perPortionFromVd * 100 / portion) - 1);
+      basis = errPortion <= err100 ? 'portion' : 'per100';
       break;
     }
-    if (!Array.isArray(batch) || batch.length === 0) break;
-    for (const p of batch) yield p;
-    if (batch.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-    await sleep(DELAY_MS);
-  }
-}
-
-// ── 3. Parser direto de nutrição ──────────────────────────────────────────────
-
-// Tenta extrair a tabela nutricional de um produto VTEX usando, em ordem:
-//   a) specifications/properties do próprio JSON do produto
-//   b) descrição (description) com regex
-//   c) HTML da página do produto (JSON-LD + regex)
-async function parseNutrition(product) {
-  const name = _cleanName(product.productName || product.productTitle || '');
-  const brand = product.brand && !name.toLowerCase().includes(product.brand.toLowerCase())
-    ? ` ${product.brand}` : '';
-  const fullName = (name + brand).trim();
-  const category = (product.categories?.[0] || '').split('/').filter(Boolean).pop() || 'Industrializados';
-
-  // a) + b) — texto disponível no JSON do produto
-  let blob = '';
-  (product.items || []).forEach(it => { /* sku-level data, raramente tem nutrição */ });
-  if (product.description) blob += ' ' + product.description;
-  (product.allSpecifications || []).forEach(spec => {
-    const vals = product[spec];
-    if (Array.isArray(vals)) blob += ` ${spec}: ${vals.join(' ')} `;
-  });
-
-  let nut = _parseNutritionText(blob);
-
-  // c) fallback — página do produto
-  if (!_hasMacros(nut) && product.link) {
-    try {
-      const pageUrl = product.link.startsWith('http') ? product.link : `${BASE}/${product.linkText}/p`;
-      const html = await _get(pageUrl);
-      nut = _parseNutritionText(_htmlToText(html)) || nut;
-    } catch { /* ignora */ }
+    // Fallback sem %VD: assume por porção se o resultado em 100g for plausível
+    if (!basis) {
+      const e = raw.energy_kcal.val;
+      basis = (e != null && (e / portion * 100) <= 900) ? 'portion' : 'per100';
+    }
+  } else {
+    basis = 'per100';
   }
 
-  return { name: fullName, category, ...nut };
-}
-
-// Regex robusto para tabelas nutricionais brasileiras (por porção ou 100g)
-function _parseNutritionText(text) {
-  if (!text) return {};
-  const t = text.replace(/\s+/g, ' ');
-  const num = (re) => {
-    const m = t.match(re);
-    if (!m) return null;
-    return parseFloat(m[1].replace(',', '.'));
-  };
-
-  // Detecta a porção de referência
-  const portion = num(/por\s+(\d+(?:[.,]\d+)?)\s*g/i) || num(/porção[^0-9]*(\d+(?:[.,]\d+)?)\s*g/i) || 100;
-
-  const raw = {
-    energy_kcal: num(/(?:valor\s+energ[ée]tico|energia)[^0-9]*(\d+(?:[.,]\d+)?)\s*kcal/i),
-    protein_g:   num(/prote[íi]nas?[^0-9]*(\d+(?:[.,]\d+)?)\s*g/i),
-    carbs_g:     num(/carboidratos?[^0-9]*(\d+(?:[.,]\d+)?)\s*g/i),
-    fat_g:       num(/gorduras?\s+totais?[^0-9]*(\d+(?:[.,]\d+)?)\s*g/i),
-    fiber_g:     num(/fibra[s]?\s+alimentar[^0-9]*(\d+(?:[.,]\d+)?)\s*g/i),
-  };
-
-  // Normaliza para 100g se a porção não for 100
-  const factor = portion && portion !== 100 ? 100 / portion : 1;
-  const norm = {};
-  for (const [k, v] of Object.entries(raw)) {
-    norm[k] = v != null ? Math.round(v * factor * 10) / 10 : null;
+  const factor = basis === 'per100' || !portion ? 1 : 100 / portion;
+  const out = {};
+  for (const f of FIELDS) {
+    const v = raw[f.key].val;
+    out[f.key] = v != null ? Math.round(v * factor * 10) / 10 : null;
   }
-  norm._portion = portion;
-  return norm;
+  out._portion = portion;
+  out._basis   = basis;
+  return out;
 }
 
-function _hasMacros(n) {
-  return n && n.energy_kcal != null && (n.protein_g != null || n.carbs_g != null || n.fat_g != null);
+function _hasFullTable(n) {
+  return n && n.energy_kcal != null && n.energy_kcal > 0
+    && n.protein_g != null && n.carbs_g != null && n.fat_g != null;
 }
 
-function _htmlToText(html) {
-  // Extrai JSON-LD + corpo limpo
-  const ld = (html.match(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi) || [])
-    .map(m => m.replace(/<[^>]+>/g, ' ')).join(' ');
-  const body = html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ');
-  return (ld + ' ' + body).replace(/\s+/g, ' ');
-}
-
-function _cleanName(s) {
-  return s.replace(/\s+/g, ' ').trim();
-}
-
-// ── 4. Fallback LLM (opcional, --llm) ─────────────────────────────────────────
-let _llm = null;
-function _getLLM() {
-  if (!_llm) _llm = require('../routes/ai'); // expõe callLLM + getLLMConfig
-  return _llm;
-}
-
-async function llmFallback(product) {
-  try {
-    const ai  = _getLLM();
-    const cfg = await ai.getLLMConfig();
-    const ctx = `Produto: ${product.productName}\nMarca: ${product.brand || ''}\nDescrição: ${(product.description || '').slice(0, 1500)}`;
-    const prompt = `Extraia a tabela nutricional do produto abaixo. Retorne SOMENTE JSON:
-{"energy_kcal":num_por_100g,"protein_g":num,"carbs_g":num,"fat_g":num,"fiber_g":num_ou_null}
-Normalize para 100g. Use null se não houver dado.
-
-${ctx}`;
-    const { text } = await ai.callLLM(cfg, prompt);
-    const j = JSON.parse(text.replace(/```json?|```/g, '').trim());
-    return j;
-  } catch (err) {
-    return null;
-  }
-}
-
-// ── 5. Inserção no banco (foods global, dedup por nome) ────────────────────────
+// ── Banco ─────────────────────────────────────────────────────────────────────
 let _createdBy = null;
 async function _resolveCreatedBy() {
-  try {
-    const r = await db.query(`SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1`);
-    _createdBy = r.rows[0]?.id || null;
-  } catch { _createdBy = null; }
+  try { const r = await db.query(`SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1`); _createdBy = r.rows[0]?.id || null; }
+  catch { _createdBy = null; }
 }
-
-async function insertFood(food) {
-  // Dedup por nome (case-insensitive) — não duplica produto já importado
-  const exists = await db.query(`SELECT 1 FROM foods WHERE LOWER(name) = LOWER($1) LIMIT 1`, [food.name]);
-  if (exists.rows.length) { stats.skipped++; return false; }
-
-  if (DRY_RUN) { stats.inserted++; return true; }
-
+async function _insert(food) {
+  if (DRY) { stats.inserted++; return true; }
+  const ex = await db.query(`SELECT 1 FROM foods WHERE LOWER(name)=LOWER($1) LIMIT 1`, [food.name]);
+  if (ex.rows.length) { stats.skipped++; return false; }
   await db.query(
     `INSERT INTO foods (name, category, energy_kcal, protein_g, carbs_g, fat_g, fiber_g, source, created_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,'extra',$8)`,
-    [food.name, food.category,
-     food.energy_kcal ?? 0, food.protein_g ?? 0, food.carbs_g ?? 0,
-     food.fat_g ?? 0, food.fiber_g ?? null, _createdBy]
+    [food.name, food.category, food.energy_kcal, food.protein_g, food.carbs_g, food.fat_g, food.fiber_g ?? null, _createdBy]
   );
   stats.inserted++;
   return true;
 }
 
+// ── Produto: abre página e extrai nutrição ────────────────────────────────────
+function _titleCase(s) {
+  return s.replace(/\s+/g, ' ').trim().toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+}
+async function _fetchProduct(url, term) {
+  const html = await _getText(url);
+  const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!m) return null;
+  const prod = JSON.parse(m[1]).props?.pageProps?.product;
+  if (!prod) return null;
+  const nut = _parseNutrition(prod);
+  if (!nut) return null;
+  const name = (prod.name || '').replace(/\s+/g, ' ').trim();
+  const category = term ? _titleCase(term) : 'Industrializados';
+  return { name, category, ...nut };
+}
+
 // ── Orquestração ──────────────────────────────────────────────────────────────
 async function main() {
-  console.log(`\n🛒 Scraper Extra Mercado — ${DRY_RUN ? 'DRY-RUN' : 'GRAVANDO'} | LLM fallback: ${USE_LLM ? 'on' : 'off'} | max: ${MAX === Infinity ? '∞' : MAX}\n`);
+  console.log(`\n🛒 Scraper Extra — ${DRY ? 'DRY-RUN (não grava)' : 'GRAVANDO'} | store ${STORE} | max ${MAX === Infinity ? '∞' : MAX}\n`);
+  if (!DRY) await _resolveCreatedBy();
 
-  await _resolveCreatedBy();
-  const categories = await discoverCategories();
-  if (!categories.length) { console.error('Nenhuma categoria. Abortando.'); process.exit(1); }
-
-  const seenProducts = new Set();
+  const terms = await _discoverTerms();
+  const seen  = new Set();
 
   outer:
-  for (const cat of categories) {
-    console.log(`\n📁 ${cat.name} (id ${cat.id})`);
-    for await (const product of productsInCategory(cat.id)) {
-      if (stats.inserted + stats.skipped >= MAX) break outer;
-      if (seenProducts.has(product.productId)) continue;
-      seenProducts.add(product.productId);
-      stats.discovered++;
+  for (const term of terms) {
+    stats.terms++;
+    let page = 1, totalPages = 1;
+    do {
+      let res;
+      try { res = await _search(term, page); }
+      catch (e) { console.warn(`  busca "${term}" p${page}: ${e.message}`); break; }
+      totalPages = res.totalPages || 1;
+      const prods = res.products || [];
+      if (page === 1) console.log(`\n🔎 "${term}" — ${res.totalProducts || 0} produtos`);
 
-      try {
-        let food = await parseNutrition(product);
+      for (const p of prods) {
+        if (stats.inserted + stats.skipped + stats.noTable >= MAX) break outer;
+        if (!p.urlDetails || seen.has(p.id)) continue;
+        seen.add(p.id);
+        stats.products++;
 
-        if (!_hasMacros(food) && USE_LLM) {
-          const j = await llmFallback(product);
-          if (j) food = { ...food, ...j };
-        }
+        try {
+          const food = await _fetchProduct(p.urlDetails, term);
+          if (!food || !food.name) { stats.failed++; }
+          else if (!_hasFullTable(food)) { stats.noTable++; }
+          else {
+            stats.valid++;
+            const ok = await _insert(food);
+            if (ok) console.log(`  ✓ ${food.name.slice(0, 48)} — ${food.energy_kcal}kcal P${food.protein_g} C${food.carbs_g} G${food.fat_g} [${food._basis}/${food._portion ?? '?'}g]`);
+          }
+        } catch (e) { stats.failed++; }
 
-        if (!food.name || !_hasMacros(food)) { stats.failed++; continue; }
-
-        stats.parsed++;
-        const ok = await insertFood(food);
-        if (ok) {
-          console.log(`  ✓ ${food.name} — ${food.energy_kcal}kcal P${food.protein_g ?? '-'} C${food.carbs_g ?? '-'} G${food.fat_g ?? '-'}`);
-        }
-      } catch (err) {
-        stats.failed++;
-        console.warn(`  ✗ ${product.productName}: ${err.message}`);
+        await sleep(DELAY);
       }
-
-      await sleep(DELAY_MS);
-    }
+      page++;
+      if (page <= totalPages) await sleep(DELAY);
+    } while (page <= totalPages);
   }
 
   console.log(`\n──────────────────────────────`);
-  console.log(`Descobertos: ${stats.discovered}`);
-  console.log(`Parseados:   ${stats.parsed}`);
-  console.log(`Inseridos:   ${stats.inserted}`);
-  console.log(`Duplicados:  ${stats.skipped}`);
-  console.log(`Falhas:      ${stats.failed}`);
+  console.log(`Termos buscados:    ${stats.terms}`);
+  console.log(`Produtos vistos:    ${stats.products}`);
+  console.log(`Com tabela completa:${stats.valid}`);
+  console.log(`${DRY ? 'Seriam inseridos:  ' : 'Inseridos:         '} ${stats.inserted}`);
+  console.log(`Já existiam (dup):  ${stats.skipped}`);
+  console.log(`Sem tabela nutric.: ${stats.noTable}`);
+  console.log(`Falhas:             ${stats.failed}`);
   console.log(`──────────────────────────────\n`);
 
-  await db.pool.end();
+  try { await db.pool.end(); } catch {}
   process.exit(0);
 }
 
