@@ -11,6 +11,7 @@
 | Data | Fase | O que foi feito | Commit |
 |------|------|-----------------|--------|
 | 2026-05-29 | — | Documento criado | — |
+| 2026-05-29 | **Fase 5 (parcial) ✅** | Substituição de item por equivalente: GET /curated-substitutes (banco curado, mesmo papel+refeição, kcal similar, troca iso-calórica) + POST /ai/substitute-food (LLM). Builder: botão "trocar" por alimento → modal com equivalentes + "Sugerir com IA". | (vários) |
 | 2026-05-29 | **Fase 0 ✅** | Auditoria de micros na `alimentos`, DRI confirmada, UL + piso definidos, decisão **GO** (ver "Fase 0 — Resultados") | — (sem código) |
 | 2026-05-29 | **Fase 1 ✅** | Criado `backend/nutrition/planner.js` (funções puras): deriveTargetKcal, macros, distribuição/refeição, exclusões clínicas, buildGenerationConfig. Validado com 3 casos. | 8c9e91b |
 | 2026-05-29 | **Fase 2 ✅** | Criado `backend/nutrition/generator.js` (pool TACO por papel, templates, fillMeal com carbo fechando kcal, correção final) + endpoint `POST /professional/patients/:id/generate-plan`. Testado: desvio médio kcal 8%, alimentos coerentes. | 0653980 |
@@ -19,7 +20,7 @@
 
 | 2026-05-29 | **Fase 6 ✅** | `curated_foods` (94 alimentos comuns, FK→TACO) semeada via `seed_curated.json` + `match-curated.js` (matching por palavras-AND + penalidades). `fetchFoodPool` agora é POR REFEIÇÃO (curated, fallback TACO); compensação de micros meal-aware; porção caseira. Café deixou de ter arroz; só staples nacionais; variedade por fonte (incl. moela/coração/fígado). | (vários) |
 
-**Fase atual:** Concluídas 0–4 + 6. Fase 5 (IA/variedade/presets) opcional.
+**Fase atual:** Concluídas 0–4 + 6 + Fase 5 (parcial: substituição de item curado+IA). Restam opcionais: presets, regenerar refeição, preferências, variedade/nomes por LLM.
 **Última sessão parou em:** **Camada culinária resolvida** — cardápio gerado é culturalmente coerente (café=pão/fruta/laticínio, nunca arroz), só alimentos comuns nacionais, com variedade entre dias. `curated_foods` populada. Próximo possível: expandir o seed (94→300+, mais cortes/miúdos), campo `region` no profile, ou Fase 5 (LLM p/ variedade).
 
 ---
