@@ -11,6 +11,7 @@
 | Data | Fase | O que foi feito | Commit |
 |------|------|-----------------|--------|
 | 2026-05-29 | — | Documento criado | — |
+| 2026-05-29 | **Refino distribuição** | MEAL_DISTRIBUTION concentra ~84% nas 3 principais (café 25/almoço 32/jantar 27); lanches 5-6% só fruta; ceia 5% = laticínio magro + oleaginosa/semente (sem carbo, alta fibra). Fix clamp dairy (queijo 30g, não 120g). Itens gerados editáveis. Desvio kcal ~3%. | (vários) |
 | 2026-05-29 | **Fase 5 (parcial) ✅** | Substituição de item por equivalente: GET /curated-substitutes (banco curado, mesmo papel+refeição, kcal similar, troca iso-calórica) + POST /ai/substitute-food (LLM). Builder: botão "trocar" por alimento → modal com equivalentes + "Sugerir com IA". | (vários) |
 | 2026-05-29 | **Fase 0 ✅** | Auditoria de micros na `alimentos`, DRI confirmada, UL + piso definidos, decisão **GO** (ver "Fase 0 — Resultados") | — (sem código) |
 | 2026-05-29 | **Fase 1 ✅** | Criado `backend/nutrition/planner.js` (funções puras): deriveTargetKcal, macros, distribuição/refeição, exclusões clínicas, buildGenerationConfig. Validado com 3 casos. | 8c9e91b |
