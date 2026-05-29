@@ -495,28 +495,33 @@ router.post('/patients/:id/target-calories', verifyPatientAccess, async (req, re
 // BANCO DE ALIMENTOS DO NUTRICIONISTA
 // ==========================================
 
-const _ensureProFoodsTable = (db) => db.query(`
-  CREATE TABLE IF NOT EXISTS pro_foods (
-    id               SERIAL PRIMARY KEY,
-    professional_id  INTEGER NOT NULL,
-    name             VARCHAR(200) NOT NULL,
-    category         VARCHAR(100) DEFAULT 'Personalizado',
-    portion_grams    NUMERIC DEFAULT 100,
-    energy_kcal      NUMERIC,
-    protein_g        NUMERIC,
-    fat_g            NUMERIC,
-    carbs_g          NUMERIC,
-    fiber_g          NUMERIC,
-    sodium_mg        NUMERIC,
-    calcium_mg       NUMERIC,
-    iron_mg          NUMERIC,
-    saturated_fat_g  NUMERIC,
-    trans_fat_g      NUMERIC,
-    notes            TEXT,
-    created_at       TIMESTAMPTZ DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ DEFAULT NOW()
-  )
-`);
+async function _ensureProFoodsTable(db) {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS pro_foods (
+      id               SERIAL PRIMARY KEY,
+      professional_id  INTEGER NOT NULL,
+      name             VARCHAR(200) NOT NULL,
+      category         VARCHAR(100) DEFAULT 'Personalizado',
+      portion_grams    NUMERIC DEFAULT 100,
+      energy_kcal      NUMERIC,
+      protein_g        NUMERIC,
+      fat_g            NUMERIC,
+      carbs_g          NUMERIC,
+      fiber_g          NUMERIC,
+      sodium_mg        NUMERIC,
+      calcium_mg       NUMERIC,
+      iron_mg          NUMERIC,
+      saturated_fat_g  NUMERIC,
+      trans_fat_g      NUMERIC,
+      measures         JSONB DEFAULT '[]',
+      notes            TEXT,
+      created_at       TIMESTAMPTZ DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  // Adiciona coluna measures se tabela já existia sem ela
+  await db.query(`ALTER TABLE pro_foods ADD COLUMN IF NOT EXISTS measures JSONB DEFAULT '[]'`);
+}
 
 // GET /professional/foods — lista/busca alimentos do nutricionista
 router.get('/foods', async (req, res) => {
@@ -544,19 +549,21 @@ router.get('/foods', async (req, res) => {
 router.post('/foods', async (req, res) => {
   const proId = req.user.id;
   const { name, category, portion_grams, energy_kcal, protein_g, fat_g, carbs_g,
-          fiber_g, sodium_mg, calcium_mg, iron_mg, saturated_fat_g, trans_fat_g, notes } = req.body;
+          fiber_g, sodium_mg, calcium_mg, iron_mg, saturated_fat_g, trans_fat_g,
+          measures, notes } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Nome do alimento obrigatório.' });
   try {
     await _ensureProFoodsTable(db);
+    const measuresJson = JSON.stringify(Array.isArray(measures) ? measures : []);
     const result = await db.query(
       `INSERT INTO pro_foods (professional_id, name, category, portion_grams, energy_kcal,
          protein_g, fat_g, carbs_g, fiber_g, sodium_mg, calcium_mg, iron_mg,
-         saturated_fat_g, trans_fat_g, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+         saturated_fat_g, trans_fat_g, measures, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [proId, name.trim(), category || 'Personalizado', portion_grams || 100,
        energy_kcal||null, protein_g||null, fat_g||null, carbs_g||null, fiber_g||null,
        sodium_mg||null, calcium_mg||null, iron_mg||null, saturated_fat_g||null,
-       trans_fat_g||null, notes||null]
+       trans_fat_g||null, measuresJson, notes||null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -569,20 +576,22 @@ router.post('/foods', async (req, res) => {
 router.put('/foods/:id', async (req, res) => {
   const proId = req.user.id;
   const { name, category, portion_grams, energy_kcal, protein_g, fat_g, carbs_g,
-          fiber_g, sodium_mg, calcium_mg, iron_mg, saturated_fat_g, trans_fat_g, notes } = req.body;
+          fiber_g, sodium_mg, calcium_mg, iron_mg, saturated_fat_g, trans_fat_g,
+          measures, notes } = req.body;
   try {
     await _ensureProFoodsTable(db);
     const chk = await db.query('SELECT id FROM pro_foods WHERE id=$1 AND professional_id=$2', [req.params.id, proId]);
     if (!chk.rows.length) return res.status(404).json({ error: 'Alimento não encontrado.' });
+    const measuresJson = JSON.stringify(Array.isArray(measures) ? measures : []);
     const result = await db.query(
       `UPDATE pro_foods SET name=$1, category=$2, portion_grams=$3, energy_kcal=$4,
          protein_g=$5, fat_g=$6, carbs_g=$7, fiber_g=$8, sodium_mg=$9, calcium_mg=$10,
-         iron_mg=$11, saturated_fat_g=$12, trans_fat_g=$13, notes=$14, updated_at=NOW()
-       WHERE id=$15 RETURNING *`,
+         iron_mg=$11, saturated_fat_g=$12, trans_fat_g=$13, measures=$14, notes=$15, updated_at=NOW()
+       WHERE id=$16 RETURNING *`,
       [name, category||'Personalizado', portion_grams||100,
        energy_kcal||null, protein_g||null, fat_g||null, carbs_g||null, fiber_g||null,
        sodium_mg||null, calcium_mg||null, iron_mg||null, saturated_fat_g||null,
-       trans_fat_g||null, notes||null, req.params.id]
+       trans_fat_g||null, measuresJson, notes||null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) {

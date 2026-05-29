@@ -919,21 +919,26 @@ async function runFoodSearch() {
         const dataPro  = resPro.ok ? await resPro.json() : [];
 
         // Converte alimentos do nutricionista para o mesmo formato do banco principal
-        const proItems = (Array.isArray(dataPro) ? dataPro : []).map(f => ({
-            id:          `pro_${f.id}`,
-            name:        f.name,
-            category:    f.category || 'Meus Alimentos',
-            source:      'Meu Banco',
-            energy_kcal: f.energy_kcal ?? 0,
-            protein_g:   f.protein_g ?? 0,
-            fat_g:        f.fat_g ?? 0,
-            carbs_g:     f.carbs_g ?? 0,
-            fiber_g:     f.fiber_g ?? 0,
-            sodium_mg:   f.sodium_mg ?? 0,
-            measures:    [{ label: 'grama(s)', grams: 1 }],
-            _isPro: true,
-            _proId: f.id,
-        }));
+        const proItems = (Array.isArray(dataPro) ? dataPro : []).map(f => {
+            const customMeasures = Array.isArray(f.measures) && f.measures.length
+                ? f.measures
+                : [];
+            return {
+                id:          `pro_${f.id}`,
+                name:        f.name,
+                category:    f.category || 'Meus Alimentos',
+                source:      'Meu Banco',
+                energy_kcal: f.energy_kcal ?? 0,
+                protein_g:   f.protein_g ?? 0,
+                fat_g:       f.fat_g ?? 0,
+                carbs_g:     f.carbs_g ?? 0,
+                fiber_g:     f.fiber_g ?? 0,
+                sodium_mg:   f.sodium_mg ?? 0,
+                measures:    [...customMeasures, { label: 'grama(s)', grams: 1 }],
+                _isPro: true,
+                _proId: f.id,
+            };
+        });
 
         if (!resMain.ok) throw new Error(dataMain.error || 'Erro na busca');
         _currentFoodResults = [...proItems, ...(dataMain.items || [])];

@@ -1706,6 +1706,52 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     padding-top: 4px;
     border-top: 1px solid var(--border);
 }
+/* Pro-foods form sections */
+.pf-section {
+    background: var(--bg-surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+}
+.pf-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-2);
+    margin-bottom: 10px;
+}
+/* Linha de medida caseira */
+.pf-measure-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 32px;
+    gap: 6px;
+    align-items: center;
+}
+.pf-measure-row input {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 10px;
+    font-size: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.pf-measure-row input:focus { outline: none; border-color: var(--accent); }
+.pf-measure-del {
+    background: none;
+    border: none;
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color .15s;
+}
+.pf-measure-del:hover { color: var(--color-danger); }
+
 /* ícone duplicar na linha da refeição */
 .btn-dup-meal {
     color: var(--text-2);
