@@ -78,6 +78,64 @@ async function _deleteFood(id) {
     loadImportedFoods(_page);
 }
 
+// ── Controle do importador (scraper) ──────────────────────────────────────────
+let _pollTimer = null;
+
+async function _scraperStatus() {
+    const res = await fetch(`${API_URL}/professional/imported-foods/scraper/status`, {
+        headers: { 'Authorization': `Bearer ${adminState.token}` }
+    });
+    return res.json();
+}
+
+function _renderScraperStatus(st) {
+    const badge   = document.getElementById('scraper-state-badge');
+    const startBt = document.getElementById('scraper-start');
+    const stopBt  = document.getElementById('scraper-stop');
+    const total   = document.getElementById('scraper-total');
+    const elapsed = document.getElementById('scraper-elapsed');
+    const log     = document.getElementById('scraper-log');
+
+    const running = !!st.running;
+    if (badge) {
+        badge.textContent = running ? 'rodando' : 'parado';
+        badge.className   = `ps-badge ${running ? '' : 'trial'}`;
+    }
+    if (startBt) startBt.classList.toggle('hidden', running);
+    if (stopBt)  stopBt.classList.toggle('hidden', !running);
+    if (total)   total.textContent = st.totalInDb != null ? st.totalInDb : '—';
+    if (elapsed) elapsed.textContent = running && st.elapsedSec != null
+        ? `Em execução há ${Math.floor(st.elapsedSec/60)}m ${st.elapsedSec%60}s`
+        : (st.lastExit ? `Última execução encerrada (código ${st.lastExit.code})` : '');
+
+    if (log) {
+        if (st.lines && st.lines.length) {
+            log.style.display = 'block';
+            log.textContent = st.lines.join('\n');
+            log.scrollTop = log.scrollHeight;
+        }
+    }
+    return running;
+}
+
+export async function refreshScraperStatus() { return _refreshScraper(); }
+
+async function _refreshScraper() {
+    try {
+        const st = await _scraperStatus();
+        const running = _renderScraperStatus(st);
+        // Atualiza a tabela quando o total muda e estamos na 1ª página sem busca
+        if (running && _page === 1 && !_q) loadImportedFoods(1);
+        // Liga/desliga o polling conforme execução
+        if (running && !_pollTimer) {
+            _pollTimer = setInterval(_refreshScraper, 4000);
+        } else if (!running && _pollTimer) {
+            clearInterval(_pollTimer); _pollTimer = null;
+            if (_page === 1 && !_q) loadImportedFoods(1); // recarrega ao terminar
+        }
+    } catch { /* silencioso */ }
+}
+
 export function initProImported() {
     let _timer;
     document.getElementById('imp-search-input')?.addEventListener('input', e => {
@@ -90,5 +148,38 @@ export function initProImported() {
     });
     document.getElementById('imp-next')?.addEventListener('click', () => {
         if (_page < _totalPages) loadImportedFoods(_page + 1);
+    });
+
+    // Controle do scraper
+    document.getElementById('scraper-start')?.addEventListener('click', async () => {
+        const max   = document.getElementById('scraper-max')?.value;
+        const terms = document.getElementById('scraper-terms')?.value.trim();
+        const btn   = document.getElementById('scraper-start');
+        if (btn) { btn.disabled = true; btn.textContent = 'Iniciando...'; }
+        try {
+            const res = await fetch(`${API_URL}/professional/imported-foods/scraper/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+                body: JSON.stringify({ max, terms: terms || undefined })
+            });
+            const d = await res.json();
+            if (!res.ok) throw new Error(d.error || 'Erro');
+            _refreshScraper();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="play" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;"></i> Iniciar'; if (window.lucide) window.lucide.createIcons(); }
+        }
+    });
+
+    document.getElementById('scraper-stop')?.addEventListener('click', async () => {
+        if (!confirm('Interromper a importação em andamento?')) return;
+        try {
+            await fetch(`${API_URL}/professional/imported-foods/scraper/stop`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${adminState.token}` }
+            });
+            _refreshScraper();
+        } catch (err) { alert(err.message); }
     });
 }

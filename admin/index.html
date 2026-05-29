@@ -458,6 +458,45 @@
                         <p>Base global de produtos importados (Extra). Disponíveis na busca ao montar cardápios.</p>
                     </div>
 
+                    <!-- Painel de controle do importador -->
+                    <div class="dashboard-card" style="margin-bottom:20px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+                            <h3 style="margin:0;display:flex;align-items:center;gap:8px;">
+                                <i data-lucide="download-cloud" style="width:16px;height:16px;color:var(--accent);"></i>
+                                Importador de Alimentos
+                            </h3>
+                            <span id="scraper-state-badge" class="ps-badge trial">parado</span>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;margin-bottom:14px;">
+                            <div style="display:flex;flex-direction:column;gap:4px;">
+                                <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);">Qtd. máxima</label>
+                                <input type="number" id="scraper-max" value="1000" min="1" step="50" style="padding:8px 10px;font-size:13px;background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);box-sizing:border-box;width:100%;">
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:4px;">
+                                <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);">Termos (opcional)</label>
+                                <input type="text" id="scraper-terms" placeholder="arroz,feijao,leite" style="padding:8px 10px;font-size:13px;background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);box-sizing:border-box;width:100%;">
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <button class="btn-primary" id="scraper-start" style="flex:1;">
+                                    <i data-lucide="play" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;"></i> Iniciar
+                                </button>
+                                <button class="btn-danger hidden" id="scraper-stop" style="flex:1;">
+                                    <i data-lucide="square" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;"></i> Parar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Status / progresso -->
+                        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-2);margin-bottom:10px;">
+                            <span>Total na base: <strong id="scraper-total" style="color:var(--accent);">—</strong></span>
+                            <span id="scraper-elapsed"></span>
+                        </div>
+
+                        <!-- Console de log -->
+                        <pre id="scraper-log" style="display:none;background:#0a0b0f;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;line-height:1.5;color:#b8c0d0;max-height:240px;overflow-y:auto;white-space:pre-wrap;margin:0;font-family:var(--mono,monospace);"></pre>
+                    </div>
+
                     <div class="dashboard-card">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
                             <div class="search-box" style="flex:1;max-width:360px;">

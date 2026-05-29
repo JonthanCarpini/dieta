@@ -660,6 +660,34 @@ router.delete('/imported-foods/:id', async (req, res) => {
   }
 });
 
+// ── Controle do importador (scrape-extra) ─────────────────────────────────────
+const scraper = require('../scripts/scraper-manager');
+
+// GET status + andamento (contagem no banco + log)
+router.get('/imported-foods/scraper/status', async (req, res) => {
+  try {
+    const c = await db.query(`SELECT COUNT(*) FROM foods WHERE source='extra'`);
+    res.json({ ...scraper.status(), totalInDb: parseInt(c.rows[0].count) });
+  } catch (err) {
+    res.json({ ...scraper.status(), totalInDb: null });
+  }
+});
+
+// POST iniciar
+router.post('/imported-foods/scraper/start', (req, res) => {
+  const { max, terms, delay } = req.body || {};
+  const r = scraper.start({ max, terms, delay });
+  if (!r.ok) return res.status(409).json(r);
+  res.json({ ok: true, message: 'Importação iniciada.' });
+});
+
+// POST parar
+router.post('/imported-foods/scraper/stop', (req, res) => {
+  const r = scraper.stop();
+  if (!r.ok) return res.status(409).json(r);
+  res.json({ ok: true, message: 'Importação interrompida.' });
+});
+
 // ==========================================
 // HISTÓRICO DE CÁLCULO ENERGÉTICO
 // ==========================================
