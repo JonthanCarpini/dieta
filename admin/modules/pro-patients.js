@@ -368,6 +368,7 @@ export async function loadPatientExamsData(patientId) {
             tbody.appendChild(tr);
 
             const trMarkers = document.createElement('tr');
+            trMarkers.className = 'no-hover';
             trMarkers.innerHTML = `
                 <td colspan="4" style="padding-top: 0; padding-bottom: 24px; border-top: none;">
                     ${markersHtml}
