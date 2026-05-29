@@ -33,6 +33,9 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
   - Histórico diário de passos integrado com o `stepTrackerStore.ts` ativo em segundo plano.
 - **Perfil:**
   - Correção aplicada no fluxo de registro e atualização de peso.
+- **Meus Exames (`app/exams.tsx`):**
+  - Rota corrigida de `/profile/exams` para a rota real `/user/exams`.
+  - Mapeamento de upload unificado e tipos de dados de arquivos (PDF e imagens) suportados com sucesso.
 
 ### 2. Painel Profissional & Frontend (`video-call.html`, `app.js`, `pro-patients.js`)
 - **Tratamento de Autoplay/Mute:** Aplicado no painel da nutricionista (`pro-patients.js`) e no portal geral (`app.js`). Se a reprodução remota de áudio for bloqueada pelo navegador, exibe-se um overlay interativo para que a profissional clique e ative o áudio do paciente.
@@ -41,6 +44,9 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 ### 3. Backend e Banco de Dados (`backend`)
 - **Rotas de Agenda:** `/api/user/appointments/available` ativa para filtragem inteligente de horários disponíveis dos nutricionistas em português.
 - **Rotas de Receitas:** Rotas para leitura de receitas individuais e plano semanal de IA ativas e persistidas no banco PostgreSQL.
+- **Rotas de Exames:**
+  - Migração executada para adicionar colunas `category` (tipo do exame) e `size_kb` (tamanho) na tabela `patient_exams`.
+  - Endpoint `POST /api/user/exams` e `GET /api/user/exams` atualizados para receber as chaves enviadas pelo mobile (`name`, `base64`, `mime_type`, `category`, `size_kb`) e retornar a resposta formatada como a interface TypeScript `Exam`, garantindo também compatibilidade retrógrada com os payloads legados.
 
 ---
 
