@@ -466,6 +466,69 @@ router.post('/patients/:id/exams/summary/regenerate', verifyPatientAccess, async
   }
 });
 
+router.get('/patients/:id/exams/explain-marker', verifyPatientAccess, async (req, res) => {
+  const { name, value, status, range } = req.query;
+  if (!name) {
+    return res.status(400).json({ error: 'Nome do marcador é obrigatório.' });
+  }
+
+  try {
+    const geminiKeyRes = await db.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const apiKey = geminiKeyRes.rows[0] ? geminiKeyRes.rows[0].value : null;
+
+    if (!apiKey) {
+      return res.json({ description: `O marcador ${name} está classificado como ${status}. Valor do resultado: ${value}. Intervalo de referência normal: ${range || 'não especificado'}.` });
+    }
+
+    const prompt = `Você é um especialista clínico de suporte à decisão. Forneça uma explicação concisa e profissional (máximo 3 frases) em português para o nutricionista sobre o seguinte marcador de exame que apresentou alteração:
+Marcador: ${name}
+Valor do resultado: ${value}
+Status: ${status}
+Intervalo de referência normal: ${range || 'não especificado'}
+
+Explique o que este marcador indica, qual a relevância fisiológica ou nutricional desta alteração específica (baixa, alta ou alterada) no organismo e possíveis direcionamentos (apenas como hipóteses/possibilidades).`;
+
+    const candidates = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+    let description = '';
+
+    for (const model of candidates) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }]
+      };
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          const resJson = await response.json();
+          const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            description = rawText.trim();
+            break;
+          }
+        }
+      } catch (e) {
+        // ignorar e tentar o próximo
+      }
+    }
+
+    if (!description) {
+      description = `O marcador ${name} está classificado como ${status}. Valor do resultado: ${value}. Intervalo de referência normal: ${range || 'não especificado'}.`;
+    }
+
+    res.json({ description });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao gerar explicação do marcador.' });
+  }
+});
+
+
 // ==========================================
 // DADOS ANTROPOMÉTRICOS DO PACIENTE
 // ==========================================

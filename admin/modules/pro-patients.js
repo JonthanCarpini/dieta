@@ -268,9 +268,12 @@ export async function loadPatientExamsData(patientId) {
             let markersHtml = '';
             if (exam.markers && exam.markers.length > 0) {
                 markersHtml = `
-                    <div class="exam-markers-container" style="margin-top:10px; display:flex; flex-direction:column; gap:6px; font-size:11px; padding-left:24px;">
-                        <span style="font-weight:700; color:var(--text-1); font-size:10px; text-transform:uppercase; letter-spacing:0.5px;">Biomarcadores Extraídos:</span>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:8px; margin-top:4px;">
+                    <div class="exam-markers-container" style="margin-top:12px; display:flex; flex-direction:column; gap:8px; font-size:11px; padding: 0 16px;">
+                        <span style="font-weight:700; color:var(--text-2); font-size:10px; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
+                            <i data-lucide="activity" style="width:14px; height:14px; color:var(--accent);"></i>
+                            Biomarcadores Extraídos:
+                        </span>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:10px; margin-top:4px; width: 100%;">
                             ${exam.markers.map(m => {
                                 let statusColor = '#a8a8a8';
                                 let statusBg = 'rgba(255,255,255,0.05)';
@@ -284,12 +287,19 @@ export async function loadPatientExamsData(patientId) {
                                     statusColor = '#10b981';
                                     statusBg = 'rgba(16,185,129,0.12)';
                                 }
-                                const refStr = m.reference_range ? ` (Ref: ${m.reference_range})` : '';
+                                const statusPT = m.status === 'low' ? 'Baixo' : m.status === 'high' ? 'Alto' : m.status === 'abnormal' ? 'Alterado' : m.status === 'normal' ? 'Normal' : m.status;
+                                const isAltered = m.status === 'low' || m.status === 'high' || m.status === 'abnormal';
+                                const cardStyle = `background:${statusBg}; border:1px solid rgba(255,255,255,0.08); padding:10px 14px; border-radius:10px; display:flex; flex-direction:column; gap:2px; ${isAltered ? 'cursor:pointer;' : ''}`;
+                                const infoIcon = isAltered ? `<i data-lucide="help-circle" style="width:12px; height:12px; color:var(--text-2); margin-left:4px; opacity:0.6;"></i>` : '';
+
                                 return `
-                                    <div style="background:${statusBg}; border:1px solid rgba(255,255,255,0.08); padding:8px 12px; border-radius:8px; display:flex; flex-direction:column; gap:2px;">
+                                    <div class="exam-marker-card ${isAltered ? 'altered-marker-card' : ''}" style="${cardStyle}" ${isAltered ? `data-name="${m.marker_name}" data-value="${m.marker_value}" data-status="${statusPT}" data-status-raw="${m.status}" data-unit="${m.unit || ''}" data-range="${m.reference_range || ''}"` : ''}>
                                         <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                                            <strong style="color:var(--text-1); font-size:12px;">${m.marker_name}</strong>
-                                            <span style="color:${statusColor}; font-weight:700; font-size:9px; text-transform:uppercase; background:${statusColor}18; padding:1px 6px; border-radius:4px; border:1px solid ${statusColor}30;">${m.status === 'low' ? 'Baixo' : m.status === 'high' ? 'Alto' : m.status === 'abnormal' ? 'Alterado' : m.status === 'normal' ? 'Normal' : m.status}</span>
+                                            <strong style="color:var(--text-1); font-size:12px; display:flex; align-items:center;">
+                                                ${m.marker_name}
+                                                ${infoIcon}
+                                            </strong>
+                                            <span style="color:${statusColor}; font-weight:700; font-size:9px; text-transform:uppercase; background:${statusColor}18; padding:1px 6px; border-radius:4px; border:1px solid ${statusColor}30;">${statusPT}</span>
                                         </div>
                                         <div style="color:var(--text-1); font-size:14px; font-weight:700; margin-top:2px;">
                                             ${m.marker_value} <span style="font-size:11px; font-weight:500; color:var(--text-2);">${m.unit || ''}</span>
@@ -303,29 +313,28 @@ export async function loadPatientExamsData(patientId) {
                 `;
             } else {
                 markersHtml = `
-                    <div style="margin-top:6px; font-size:11px; color:var(--color-text-muted); padding-left:24px; font-style:italic;">
+                    <div style="margin-top:6px; font-size:11px; color:var(--color-text-muted); padding-left:16px; font-style:italic;">
                         Nenhum marcador extraído (ou processamento em andamento)...
                     </div>
                 `;
             }
 
             tr.innerHTML = `
-                <td style="vertical-align: top; padding-bottom:16px;">
+                <td style="vertical-align: top; padding-bottom:16px; border-bottom: none;">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <i data-lucide="file-text" style="color:var(--color-primary); width:18px; height:18px;"></i>
                         <strong style="font-size:14px; color:var(--text-1);">${exam.file_name}</strong>
                         ${exam.category ? `<span style="font-size:9px; background:rgba(74,222,128,0.15); color:var(--color-primary); padding:2px 8px; border-radius:12px; font-weight:700; text-transform:uppercase;">${exam.category}</span>` : ''}
                     </div>
-                    ${markersHtml}
                 </td>
-                <td style="vertical-align: top; padding-top:12px;">${dateStr}</td>
-                <td style="vertical-align: top; padding-top:12px;">
+                <td style="vertical-align: top; padding-top:12px; border-bottom: none;">${dateStr}</td>
+                <td style="vertical-align: top; padding-top:12px; border-bottom: none;">
                     <div style="display:flex; gap:8px; align-items:center;">
                         <input type="text" class="pro-exam-note-input" data-exam-id="${exam.id}" value="${exam.notes || ''}" placeholder="Adicionar notas..." style="flex:1; font-size:12px; padding:4px 8px; height:auto;">
                         <button class="btn-primary btn-save-exam-note" data-exam-id="${exam.id}" style="font-size:10px; padding:4px 8px;">Salvar</button>
                     </div>
                 </td>
-                <td style="vertical-align: top; padding-top:12px;">
+                <td style="vertical-align: top; padding-top:12px; border-bottom: none;">
                     <a href="${downloadUrl}" download="${exam.file_name}" class="btn-secondary" style="font-size:11px; padding:4px 8px; text-decoration:none; display:inline-block;">
                         <i data-lucide="download" style="width:12px; height:12px; vertical-align:middle; margin-right:4px;"></i> Baixar
                     </a>
@@ -357,6 +366,27 @@ export async function loadPatientExamsData(patientId) {
             });
 
             tbody.appendChild(tr);
+
+            const trMarkers = document.createElement('tr');
+            trMarkers.innerHTML = `
+                <td colspan="4" style="padding-top: 0; padding-bottom: 24px; border-top: none;">
+                    ${markersHtml}
+                </td>
+            `;
+
+            trMarkers.querySelectorAll('.altered-marker-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const name = card.dataset.name;
+                    const value = card.dataset.value;
+                    const status = card.dataset.status;
+                    const statusRaw = card.dataset.statusRaw;
+                    const unit = card.dataset.unit;
+                    const range = card.dataset.range;
+                    openMarkerExplanationModal(patientId, name, value, status, statusRaw, unit, range);
+                });
+            });
+
+            tbody.appendChild(trMarkers);
         });
 
         if (window.lucide) window.lucide.createIcons();
@@ -2101,4 +2131,103 @@ function renderMarkdownToHtml(markdown) {
     
     return html;
 }
+
+export function openMarkerExplanationModal(patientId, name, value, status, statusRaw, unit, range) {
+    let statusColor = '#a8a8a8';
+    if (statusRaw === 'high' || statusRaw === 'abnormal') {
+        statusColor = '#ef4444';
+    } else if (statusRaw === 'low') {
+        statusColor = '#3b82f6';
+    } else if (statusRaw === 'normal') {
+        statusColor = '#10b981';
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'wd-dup-overlay'; // Reutiliza as classes de modal existentes para consistência de design
+    overlay.style.zIndex = '9999';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.25s ease-in-out';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+
+    overlay.innerHTML = `
+        <div class="panel-card" style="width: 95%; max-width: 480px; background: var(--bg-surface); border: 1px solid var(--border-hi); border-radius: var(--r-lg); box-shadow: 0 12px 48px rgba(0,0,0,0.6); padding: 26px; position: relative; transform: scale(0.95); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); border-top: 4px solid ${statusColor};">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                <h3 style="margin:0; font-size:16px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="sparkles" style="color:${statusColor}; width:16px; height:16px;"></i>
+                    Entendimento Clínico
+                </h3>
+                <button class="modal-close-btn" style="background:none; border:none; color:var(--text-2); font-size:22px; cursor:pointer; line-height:1; padding:0 4px; transition: color 0.15s ease;">&times;</button>
+            </div>
+            
+            <div style="margin-bottom:18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-surface-alt); padding:12px 14px; border-radius:var(--r-md); border:1px solid var(--border); margin-bottom:14px; gap: 12px;">
+                    <div>
+                        <strong style="color:var(--text); font-size:14px; display:block; margin-bottom:2px;">${name}</strong>
+                        <span style="font-size:12px; color:var(--text-2); font-family:var(--mono);">Resultado: <strong>${value}</strong> ${unit}</span>
+                    </div>
+                    <span style="font-size:9.5px; color:${statusColor}; font-weight:700; text-transform:uppercase; background:${statusColor}18; padding:3px 8px; border-radius:4px; border:1px solid ${statusColor}30; white-space:nowrap;">${status}</span>
+                </div>
+                
+                <div class="modal-description-content" style="font-size:13.5px; color:var(--text-2); line-height:1.65; min-height:80px; text-align: justify; padding: 2px 4px;">
+                    <div style="display:flex; align-items:center; gap:8px; color:var(--text-2);">
+                        <i data-lucide="loader" class="animate-spin" style="width:14px; height:14px;"></i> Consultando inteligência clínica...
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                <button class="btn-secondary btn-sm modal-ok-btn" style="padding:6px 16px; border-radius:var(--r-sm);">Fechar</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    if (window.lucide) window.lucide.createIcons();
+
+    // Inicia animações de fade-in e scale
+    setTimeout(() => {
+        overlay.style.opacity = '1';
+        overlay.querySelector('.panel-card').style.transform = 'scale(1)';
+    }, 10);
+
+    const close = () => {
+        overlay.style.opacity = '0';
+        overlay.querySelector('.panel-card').style.transform = 'scale(0.95)';
+        setTimeout(() => overlay.remove(), 250);
+    };
+
+    overlay.querySelector('.modal-close-btn').addEventListener('click', close);
+    overlay.querySelector('.modal-ok-btn').addEventListener('click', close);
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) close();
+    });
+
+    // Requisição dinâmica para explicar o biomarcador alterado
+    const queryParams = `name=${encodeURIComponent(name)}&value=${encodeURIComponent(value)}&status=${encodeURIComponent(status)}&range=${encodeURIComponent(range)}`;
+    fetch(`${API_URL}/professional/patients/${patientId}/exams/explain-marker?${queryParams}`, {
+        headers: { 'Authorization': `Bearer ${adminState.token}` }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Não foi possível carregar a explicação.');
+        return res.json();
+    })
+    .then(data => {
+        const descContent = overlay.querySelector('.modal-description-content');
+        if (descContent) {
+            descContent.style.color = 'var(--text)';
+            descContent.textContent = data.description;
+        }
+    })
+    .catch(err => {
+        const descContent = overlay.querySelector('.modal-description-content');
+        if (descContent) {
+            descContent.style.color = 'var(--color-danger)';
+            descContent.textContent = 'Erro ao consultar inteligência clínica: ' + err.message;
+        }
+    });
+}
+
 

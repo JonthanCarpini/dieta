@@ -1841,3 +1841,18 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     .patient-sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); }
 }
 @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } }
+
+/* Efeito de hover nos cards de biomarcadores alterados */
+.altered-marker-card {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+.altered-marker-card:hover {
+    transform: translateY(-2px) scale(1.02);
+    border-color: var(--border-hi) !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+.altered-marker-card:active {
+    transform: translateY(0) scale(1.0);
+}
+
