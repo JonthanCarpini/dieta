@@ -1711,7 +1711,8 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     background: var(--bg-surface-alt);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 14px;
+    padding: 12px;
+    overflow: hidden;
 }
 .pf-section-label {
     font-size: 10px;
@@ -1721,22 +1722,63 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     color: var(--text-2);
     margin-bottom: 10px;
 }
+
+/* Compact inputs inside pf-section */
+.pf-section .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.pf-section .form-group label {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pf-section .form-group input {
+    padding: 6px 9px;
+    font-size: 12.5px;
+    height: auto;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: var(--font);
+    transition: border-color 0.15s;
+}
+.pf-section .form-group input:focus { outline: none; border-color: var(--accent); }
+.pf-section .form-group input::placeholder { color: var(--text-3); }
+
+/* Grid inside pf-section — força células a não vazar */
+.pf-section > div[style*="grid"] > * { min-width: 0; }
+
 /* Linha de medida caseira */
 .pf-measure-row {
     display: grid;
-    grid-template-columns: 1fr 80px 32px;
-    gap: 6px;
+    grid-template-columns: 1fr 68px 28px;
+    gap: 5px;
     align-items: center;
+    min-width: 0;
 }
 .pf-measure-row input {
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
-    padding: 6px 10px;
+    padding: 6px 8px;
     font-size: 12px;
     width: 100%;
     box-sizing: border-box;
+    min-width: 0;
+    font-family: var(--font);
 }
 .pf-measure-row input:focus { outline: none; border-color: var(--accent); }
 .pf-measure-del {
@@ -1744,9 +1786,9 @@ button, select, input, textarea { font-family: inherit; color: inherit; }
     border: none;
     color: var(--text-2);
     cursor: pointer;
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1;
-    padding: 4px;
+    padding: 2px 4px;
     border-radius: 4px;
     transition: color .15s;
 }
