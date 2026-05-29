@@ -1042,6 +1042,26 @@
                             </div>
                         </div>
 
+                        <!-- Comparativo de Biomarcadores (Evolução) -->
+                        <div class="panel-card" id="pro-exams-evolution-card" style="margin-bottom:20px; background:var(--bg-surface-alt); display:none;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:12px;">
+                                <div>
+                                    <h3 style="margin:0; display:flex; align-items:center; gap:8px;">
+                                        <i data-lucide="trending-up" style="color:var(--accent); width:18px; height:18px;"></i>
+                                        Evolução de Biomarcadores
+                                    </h3>
+                                    <p style="font-size:11.5px; color:var(--text-2); margin-top:2px;">Acompanhamento histórico dos exames laboratoriais do paciente</p>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <label for="pro-exams-compare-select" style="font-size:12px; color:var(--text-2); font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Marcador:</label>
+                                    <select id="pro-exams-compare-select" style="padding:6px 12px; font-size:13px; background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--r-md); color:var(--text); min-width:200px; outline:none; transition:var(--ease);"></select>
+                                </div>
+                            </div>
+                            <div class="weight-chart-wrap" style="height:220px; position:relative; width:100%;">
+                                <canvas id="pro-exams-compare-chart"></canvas>
+                            </div>
+                        </div>
+
                         <!-- Exames em cards — preenchido pelo JS (mantém tbody para compatibilidade) -->
                         <div class="pp-section" style="padding:0; overflow:hidden;">
                             <table class="data-table" style="margin:0;">

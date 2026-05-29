@@ -471,6 +471,15 @@ async function runMigrations() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS exam_marker_explanations (
+      marker_name VARCHAR(150) NOT NULL,
+      status VARCHAR(50) NOT NULL,
+      explanation_text TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (marker_name, status)
+    )
+  `);
   console.log('Migrações executadas com sucesso.');
 }
 

@@ -320,8 +320,9 @@ export async function loadPatientExamsData(patientId) {
             }
 
             tr.innerHTML = `
-                <td style="vertical-align: top; padding-bottom:16px; border-bottom: none;">
+                <td style="vertical-align: top; padding-bottom:16px; border-bottom: none; cursor: pointer;" class="exam-row-header">
                     <div style="display:flex; align-items:center; gap:8px;">
+                        <i data-lucide="chevron-right" class="exam-toggle-caret" style="width:16px; height:16px; color:var(--text-2); transition: transform 0.2s ease;"></i>
                         <i data-lucide="file-text" style="color:var(--color-primary); width:18px; height:18px;"></i>
                         <strong style="font-size:14px; color:var(--text-1);">${exam.file_name}</strong>
                         ${exam.category ? `<span style="font-size:9px; background:rgba(74,222,128,0.15); color:var(--color-primary); padding:2px 8px; border-radius:12px; font-weight:700; text-transform:uppercase;">${exam.category}</span>` : ''}
@@ -369,11 +370,25 @@ export async function loadPatientExamsData(patientId) {
 
             const trMarkers = document.createElement('tr');
             trMarkers.className = 'no-hover';
+            trMarkers.style.display = 'none'; // Escondido por padrão (Acordeão)
             trMarkers.innerHTML = `
                 <td colspan="4" style="padding-top: 0; padding-bottom: 24px; border-top: none;">
                     ${markersHtml}
                 </td>
             `;
+
+            // Clique na linha principal expande o acordeão de biomarcadores
+            const headerCell = tr.querySelector('.exam-row-header');
+            const caret = tr.querySelector('.exam-toggle-caret');
+            if (headerCell) {
+                headerCell.addEventListener('click', () => {
+                    const isCollapsed = trMarkers.style.display === 'none';
+                    trMarkers.style.display = isCollapsed ? 'table-row' : 'none';
+                    if (caret) {
+                        caret.style.transform = isCollapsed ? 'rotate(90deg)' : 'rotate(0deg)';
+                    }
+                });
+            }
 
             trMarkers.querySelectorAll('.altered-marker-card').forEach(card => {
                 card.addEventListener('click', () => {
@@ -392,6 +407,7 @@ export async function loadPatientExamsData(patientId) {
 
         if (window.lucide) window.lucide.createIcons();
         loadPatientExamsSummary(patientId);
+        initBiomarkerComparison(exams, patientId);
     } catch (err) {
         console.error('Erro ao carregar exames:', err);
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--color-danger);">Erro ao carregar exames.</td></tr>';
@@ -2230,5 +2246,169 @@ export function openMarkerExplanationModal(patientId, name, value, status, statu
         }
     });
 }
+
+export function initBiomarkerComparison(exams, patientId) {
+    const cardEl = document.getElementById('pro-exams-evolution-card');
+    const selectEl = document.getElementById('pro-exams-compare-select');
+    const canvas = document.getElementById('pro-exams-compare-chart');
+
+    if (!selectEl || !canvas) return;
+
+    // Destruir gráfico anterior se houver
+    if (adminState._patientBiomarkerChart) {
+        try { adminState._patientBiomarkerChart.destroy(); } catch (e) {}
+        adminState._patientBiomarkerChart = null;
+    }
+
+    if (!exams || exams.length === 0) {
+        if (cardEl) cardEl.style.display = 'none';
+        return;
+    }
+
+    // 1. Coletar e agrupar biomarcadores com valores numéricos
+    const markerMap = {};
+
+    // Ordena exames por data crescente para o gráfico
+    const sortedExams = [...exams].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    sortedExams.forEach(exam => {
+        const dateObj = new Date(exam.created_at);
+        const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        
+        if (exam.markers && exam.markers.length > 0) {
+            exam.markers.forEach(m => {
+                const val = parseFloat(m.numeric_value);
+                if (!isNaN(val) && m.numeric_value !== null) {
+                    const name = m.marker_name.trim();
+                    if (!markerMap[name]) {
+                        markerMap[name] = [];
+                    }
+                    markerMap[name].push({
+                        date: dateStr,
+                        timestamp: dateObj,
+                        value: val,
+                        unit: m.unit || '',
+                        range: m.reference_range || ''
+                    });
+                }
+            });
+        }
+    });
+
+    const markerNames = Object.keys(markerMap).sort();
+
+    if (markerNames.length === 0) {
+        if (cardEl) cardEl.style.display = 'none';
+        return;
+    }
+
+    // 2. Preencher o select dropdown
+    selectEl.innerHTML = '';
+    markerNames.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        selectEl.appendChild(opt);
+    });
+
+    // Exibir o card agora que temos marcadores numéricos comparáveis
+    if (cardEl) cardEl.style.display = 'block';
+
+    // 3. Renderizar gráfico para o primeiro marcador selecionado por padrão
+    const renderChartFor = (markerName) => {
+        const points = markerMap[markerName] || [];
+        if (points.length === 0) return;
+
+        // Ordena pontos pela data (timestamp)
+        points.sort((a, b) => a.timestamp - b.timestamp);
+
+        const labels = points.map(p => p.date);
+        const dataValues = points.map(p => p.value);
+        const unit = points[0].unit;
+        const refRange = points[0].range;
+
+        // Destruir anterior se existir
+        if (adminState._patientBiomarkerChart) {
+            try { adminState._patientBiomarkerChart.destroy(); } catch (e) {}
+        }
+
+        const ctx = canvas.getContext('2d');
+        adminState._patientBiomarkerChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `${markerName} (${unit})`,
+                    data: dataValues,
+                    borderColor: '#f5c14d', // Accent gold color
+                    backgroundColor: 'rgba(245, 193, 77, 0.12)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#f5c14d',
+                    pointBorderColor: '#161821', // Match var(--bg-surface)
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    tension: 0.15,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: '#edeae0', // --text
+                            font: { family: 'var(--font)', size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = `Valor: ${context.parsed.y} ${unit}`;
+                                if (refRange) {
+                                    label += ` (Ref: ${refRange})`;
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: '#1e2133', // --border
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#7e8099', // --text-2
+                            font: { family: 'var(--mono)', size: 10 }
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: '#1e2133', // --border
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#7e8099', // --text-2
+                            font: { family: 'var(--mono)', size: 10 }
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    // Renderizar gráfico inicial
+    renderChartFor(markerNames[0]);
+
+    // Vincular listener de mudança do dropdown
+    selectEl.onchange = (e) => {
+        renderChartFor(e.target.value);
+    };
+}
+
 
 

@@ -472,18 +472,33 @@ router.get('/patients/:id/exams/explain-marker', verifyPatientAccess, async (req
     return res.status(400).json({ error: 'Nome do marcador é obrigatório.' });
   }
 
+  const normalizedName = name.trim();
+  const normalizedStatus = (status || 'alterado').trim();
+
   try {
+    // 1. Verifica cache no banco de dados
+    const cacheRes = await db.query(
+      'SELECT explanation_text FROM exam_marker_explanations WHERE LOWER(marker_name) = LOWER($1) AND LOWER(status) = LOWER($2)',
+      [normalizedName, normalizedStatus]
+    );
+
+    if (cacheRes.rows.length > 0) {
+      console.log(`[MARKER_EXPLANATION] Cache hit para ${normalizedName} (${normalizedStatus})`);
+      return res.json({ description: cacheRes.rows[0].explanation_text });
+    }
+
+    // 2. Se não estiver no cache, consulta a IA
     const geminiKeyRes = await db.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
     const apiKey = geminiKeyRes.rows[0] ? geminiKeyRes.rows[0].value : null;
 
     if (!apiKey) {
-      return res.json({ description: `O marcador ${name} está classificado como ${status}. Valor do resultado: ${value}. Intervalo de referência normal: ${range || 'não especificado'}.` });
+      return res.json({ description: `O marcador ${normalizedName} está classificado como ${normalizedStatus}. Valor do resultado: ${value}. Intervalo de referência normal: ${range || 'não especificado'}.` });
     }
 
     const prompt = `Você é um especialista clínico de suporte à decisão. Forneça uma explicação concisa e profissional (máximo 3 frases) em português para o nutricionista sobre o seguinte marcador de exame que apresentou alteração:
-Marcador: ${name}
+Marcador: ${normalizedName}
 Valor do resultado: ${value}
-Status: ${status}
+Status: ${normalizedStatus}
 Intervalo de referência normal: ${range || 'não especificado'}
 
 Explique o que este marcador indica, qual a relevância fisiológica ou nutricional desta alteração específica (baixa, alta ou alterada) no organismo e possíveis direcionamentos (apenas como hipóteses/possibilidades).`;
@@ -518,7 +533,20 @@ Explique o que este marcador indica, qual a relevância fisiológica ou nutricio
     }
 
     if (!description) {
-      description = `O marcador ${name} está classificado como ${status}. Valor do resultado: ${value}. Intervalo de referência normal: ${range || 'não especificado'}.`;
+      description = `O marcador ${normalizedName} está classificado como ${normalizedStatus}. Valor do resultado: ${value}. Intervalo de referência normal: ${range || 'não especificado'}.`;
+    } else {
+      // 3. Salva no cache para futuras consultas (UPSERT)
+      try {
+        await db.query(`
+          INSERT INTO exam_marker_explanations (marker_name, status, explanation_text)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (marker_name, status) DO UPDATE SET
+            explanation_text = EXCLUDED.explanation_text
+        `, [normalizedName, normalizedStatus, description]);
+        console.log(`[MARKER_EXPLANATION] Cache salvo com sucesso para ${normalizedName} (${normalizedStatus})`);
+      } catch (dbErr) {
+        console.error('[MARKER_EXPLANATION] Erro ao salvar cache de explicação:', dbErr);
+      }
     }
 
     res.json({ description });
