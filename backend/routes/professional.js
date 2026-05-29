@@ -613,6 +613,47 @@ router.delete('/foods/:id', async (req, res) => {
 });
 
 // ==========================================
+// GERADOR DE CARDÁPIO (Fase 2 — kcal + macros)
+// ==========================================
+const planner   = require('../nutrition/planner');
+const generator = require('../nutrition/generator');
+
+// POST /professional/patients/:id/generate-plan — gera rascunho (NÃO salva)
+router.post('/patients/:id/generate-plan', verifyPatientAccess, async (req, res) => {
+  const patientId = parseInt(req.params.id);
+  try {
+    const profRes = await db.query('SELECT * FROM profiles WHERE user_id = $1', [patientId]);
+    const profile = profRes.rows[0] || {};
+
+    // Último GET salvo (tabela criada sob demanda — pode não existir)
+    let latestEnergyCalc = null;
+    try {
+      const ec = await db.query(
+        'SELECT get_value FROM energy_calculations WHERE patient_id = $1 ORDER BY calculated_at DESC LIMIT 1',
+        [patientId]
+      );
+      latestEnergyCalc = ec.rows[0] || null;
+    } catch (_) { /* tabela ainda não existe */ }
+
+    // clinical vive no próprio profiles (comorbidities, intolerances, dietary_restrictions, notes)
+    const config = planner.buildGenerationConfig({
+      profile, latestEnergyCalc, clinical: profile, overrides: req.body || {},
+    });
+
+    const pool = await generator.fetchFoodPool(db, config.exclusions);
+    const { plan_data, summary } = generator.generatePlan(pool, config);
+
+    res.json({
+      plan_data, config, summary,
+      poolSizes: Object.fromEntries(Object.entries(pool).map(([k, v]) => [k, v.length])),
+    });
+  } catch (err) {
+    console.error('generate-plan:', err);
+    res.status(500).json({ error: 'Erro ao gerar cardápio.' });
+  }
+});
+
+// ==========================================
 // ALIMENTOS IMPORTADOS (base global, source='extra')
 // ==========================================
 
