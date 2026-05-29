@@ -333,12 +333,15 @@
                         <!-- ── FORMULÁRIO ── -->
                         <div class="dashboard-card col-4" style="position:sticky;top:24px;">
 
-                            <!-- Scanner em destaque -->
-                            <button id="pf-btn-scan" class="btn-primary w-full" style="margin-bottom:16px;font-size:13px;padding:11px;">
-                                <i data-lucide="scan-line" style="width:15px;height:15px;display:inline;vertical-align:middle;margin-right:6px;"></i>
-                                Escanear Tabela Nutricional (IA)
-                            </button>
-                            <div id="pf-scan-status" style="display:none;font-size:11px;padding:10px 12px;background:var(--accent-dim);border:1px solid rgba(245,193,77,.2);border-radius:8px;color:var(--accent);margin-bottom:14px;line-height:1.6;"></div>
+                            <!-- Scanner — dois slots de imagem -->
+                            <div style="margin-bottom:14px;">
+                                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                                    <i data-lucide="sparkles" style="width:12px;height:12px;color:var(--accent);"></i>
+                                    Escanear com IA — até 2 fotos
+                                </div>
+                                <div id="pf-scan-wrap"></div>
+                                <div id="pf-scan-status" style="display:none;font-size:11px;padding:8px 12px;background:var(--accent-dim);border:1px solid rgba(245,193,77,.2);border-radius:8px;color:var(--accent);margin-top:8px;line-height:1.6;"></div>
+                            </div>
 
                             <h3 id="pf-form-title" style="margin:0 0 14px;">Cadastrar Alimento</h3>
 

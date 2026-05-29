@@ -41,7 +41,9 @@ function extractJson(text) {
 
 async function callGemini(apiKey, prompt, imageBase64 = null) {
   const parts = [{ text: prompt }];
-  if (imageBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
+  // Suporta string única ou array de imagens base64
+  const imgs = Array.isArray(imageBase64) ? imageBase64 : (imageBase64 ? [imageBase64] : []);
+  imgs.forEach(img => { if (img) parts.push({ inlineData: { mimeType: 'image/jpeg', data: img } }); });
 
   let lastErr;
   for (const { api, model, jsonMode } of GEMINI_CANDIDATES) {
@@ -130,7 +132,8 @@ async function callLLM(cfg, prompt, imageBase64 = null) {
         return { provider, ...result };
       }
       if (provider === 'mistral' && cfg.mistral_api_key) {
-        if (imageBase64) { lastErr = 'Mistral não suporta imagens'; continue; }
+        const hasImage = Array.isArray(imageBase64) ? imageBase64.some(Boolean) : !!imageBase64;
+        if (hasImage) { lastErr = 'Mistral não suporta imagens'; continue; }
         const result = await callMistral(cfg.mistral_api_key, prompt);
         if (provider !== active) console.warn(`Auto-fallback para Mistral após falha de ${active}`);
         return { provider, ...result };
@@ -468,18 +471,29 @@ router.post('/test', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/ai/scan-nutrition-label — lê tabela nutricional de uma foto
+// POST /api/ai/scan-nutrition-label — lê tabela nutricional de uma ou duas fotos
+// Aceita: { image: "base64" }  OU  { images: ["base64_frente", "base64_tabela"] }
 router.post('/scan-nutrition-label', authenticateToken, async (req, res) => {
   const t0 = Date.now();
   try {
-    const { image } = req.body;
-    if (!image) return res.status(400).json({ error: 'Imagem base64 obrigatória.' });
+    // Normaliza para array; suporta envio legado com campo "image"
+    let images = req.body.images || (req.body.image ? [req.body.image] : []);
+    images = images.filter(Boolean);
+    if (!images.length) return res.status(400).json({ error: 'Ao menos uma imagem base64 obrigatória.' });
+    const image = images; // repassa array para callLLM → callGemini
 
-    const prompt = `Você é um sistema de extração de dados nutricionais. Analise a imagem de um rótulo ou tabela nutricional e extraia as informações.
+    const nImgs  = images.length;
+    const imgCtx = nImgs > 1
+        ? 'Você receberá DUAS imagens: a primeira é a frente da embalagem (nome, marca, sabor, variante) e a segunda é o quadro de informações nutricionais.'
+        : 'Você receberá UMA imagem de um rótulo ou tabela nutricional.';
+
+    const prompt = `Você é um sistema de extração de dados nutricionais. ${imgCtx}
+
+Analise TODAS as imagens fornecidas e extraia as informações completas do produto.
 
 Retorne SOMENTE um JSON válido com a seguinte estrutura (sem markdown, sem explicações):
 {
-  "name": "nome do produto se visível na embalagem, senão null",
+  "name": "nome completo do produto incluindo marca, sabor e variante (ex: Requeijão Cremoso Light Vigor), se visível, senão null",
   "portion_grams": porção de referência em gramas (número),
   "energy_kcal_100g": kcal por 100g (número),
   "energy_kcal_portion": kcal por porção (número ou null),
