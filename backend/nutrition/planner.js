@@ -116,11 +116,18 @@ function buildGenerationConfig({ profile = {}, latestEnergyCalc = null, clinical
   const objetivo = overrides.objetivo || profile.goal || 'maintain';
   const kcal = Number(overrides.kcal) > 0 ? round(Number(overrides.kcal)) : deriveTargetKcal({ profile, latestEnergyCalc });
 
-  // Macros: se o perfil já tem metas explícitas (e sem override de split), usa-as. Senão, split por objetivo.
+  // Macros: usa metas explícitas do perfil SOMENTE se forem consistentes com a meta
+  // de kcal (±10%). Se os macros salvos somam kcal muito diferente do alvo, ignora-os
+  // e recalcula pelo split — a KCAL é a meta principal a respeitar.
   const hasExplicit = Number(profile.target_protein) > 0 && Number(profile.target_carbs) > 0 && Number(profile.target_fat) > 0;
+  let useExplicit = !overrides.macroSplit && hasExplicit;
+  if (useExplicit && kcal > 0) {
+    const ek = 4 * Number(profile.target_protein) + 4 * Number(profile.target_carbs) + 9 * Number(profile.target_fat);
+    if (Math.abs(ek - kcal) / kcal > 0.10) useExplicit = false; // macros inconsistentes com a meta
+  }
   let macroSplit = null;
   let macroTargets;
-  if (!overrides.macroSplit && hasExplicit) {
+  if (useExplicit) {
     macroTargets = {
       protein_g: round(Number(profile.target_protein)),
       carbs_g:   round(Number(profile.target_carbs)),
@@ -161,7 +168,7 @@ function buildGenerationConfig({ profile = {}, latestEnergyCalc = null, clinical
     perMeal,
     exclusions,
     meta: {
-      hasExplicitMacros: hasExplicit && !overrides.macroSplit,
+      hasExplicitMacros: useExplicit,
       kcalSource: (latestEnergyCalc && Number(latestEnergyCalc.get_value) > 0) ? 'energy_calc'
                  : (Number(profile.target_calories) > 0 ? 'profile_target' : 'fallback_mifflin'),
     },

@@ -404,6 +404,14 @@ export function openGenerateModal(patientId) {
     document.body.appendChild(ov);
     if (window.lucide) window.lucide.createIcons();
 
+    // Pré-popula objetivo e meta kcal a partir do perfil do paciente
+    const pat = adminState._currentPatient || {};
+    const prof = adminState._currentPatientProfile || {};
+    const goal = pat.goal || prof.goal;
+    const tcal = pat.target_calories || prof.target_calories;
+    if (goal) { const sel = ov.querySelector('#gen-objetivo'); if (sel) sel.value = goal; }
+    if (tcal) { const inp = ov.querySelector('#gen-kcal'); if (inp) inp.value = Math.round(tcal); }
+
     const close = () => ov.remove();
     ov.querySelector('#gen-close').addEventListener('click', close);
     ov.querySelector('#gen-cancel').addEventListener('click', close);
