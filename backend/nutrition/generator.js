@@ -33,8 +33,11 @@ const ROLE_MACRO_FILTER = {
   fat:       'lip >= 40',
 };
 
-// Nomes a evitar (frituras, doces, ultraprocessados) — aplicado a todos menos gordura
-const NAME_BLACKLIST = /frit|milanes|à dor[ée]|caramelizad|maionese|nugget|empanad|parmegian|crist|em calda|torresmo|salgadinho|salgad[ií]ssim|rechead|chips|bacon|defumad|enlatad/i;
+// Nomes a evitar (frituras, doces, crus, ultraprocessados)
+const NAME_BLACKLIST = /frit|milanes|à dor[ée]|caramelizad|maionese|nugget|empanad|parmegian|crist|em calda|torresmo|salgadinho|rechead|chips|bacon|defumad|enlatad|conserva|\bcru\b|\bcrua\b/i;
+// Papéis que NÃO aplicam a blacklist (gordura=óleos; vegetal/fruta podem ser crus)
+const BLACKLIST_SKIP = new Set(['fat', 'vegetable', 'fruit']);
+const ENERGY_ROLES   = new Set(['carb', 'legume', 'dairy', 'fruit', 'vegetable']);
 
 // Composição de cada refeição (papéis)
 const MEAL_TEMPLATES = {
@@ -79,7 +82,7 @@ async function fetchFoodPool(db, exclusions) {
     try { rows = (await db.query(sql, grupos)).rows; } catch (e) { rows = []; }
     pool[role] = rows
       .filter(r => !planner.isExcluded(r, exclusions))
-      .filter(r => role === 'fat' || !NAME_BLACKLIST.test(r.nome || ''))
+      .filter(r => BLACKLIST_SKIP.has(role) || !NAME_BLACKLIST.test(r.nome || ''))
       .map(toFood);
   }
   return pool;
@@ -130,11 +133,34 @@ function fillMeal(target, picks) {
     grams = Math.max(clamp[0], Math.min(clamp[1], grams));
     grams = Math.max(5, Math.round(grams / 5) * 5);             // múltiplos de 5g
     const item = scaleItem(food, grams);
+    item._role = role; item._food = food;
     items.push(item);
     remaining.protein -= item.protein;
     remaining.fat     -= item.fat;
     remaining.kcal    -= item.calories;
   }
+
+  // Correção final de KCAL: escala os itens de energia (não-proteína/não-gordura)
+  // para encaixar no alvo da refeição — resolve overshoot de lanches/ceia.
+  const lockedKcal = items.filter(it => it._role === 'protein' || it._role === 'fat')
+                          .reduce((s, it) => s + it.calories, 0);
+  const energyItems = items.filter(it => ENERGY_ROLES.has(it._role));
+  const energyKcal  = energyItems.reduce((s, it) => s + it.calories, 0);
+  const budget = Math.max(0, target.kcal - lockedKcal);
+  if (energyKcal > 0 && Math.abs(energyKcal - budget) / Math.max(1, budget) > 0.10) {
+    let factor = budget / energyKcal;
+    factor = Math.max(0.4, Math.min(1.8, factor));
+    energyItems.forEach(it => {
+      const cl = CLAMP[it._role] || [20, 300];
+      let g = Math.max(cl[0], Math.min(cl[1], it.grams * factor));
+      g = Math.max(5, Math.round(g / 5) * 5);
+      const scaled = scaleItem(it._food, g);
+      Object.assign(it, scaled);
+    });
+  }
+
+  // limpa campos internos
+  items.forEach(it => { delete it._role; delete it._food; });
   return items;
 }
 
