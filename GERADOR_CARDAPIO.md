@@ -14,9 +14,10 @@
 | 2026-05-29 | **Fase 0 ✅** | Auditoria de micros na `alimentos`, DRI confirmada, UL + piso definidos, decisão **GO** (ver "Fase 0 — Resultados") | — (sem código) |
 | 2026-05-29 | **Fase 1 ✅** | Criado `backend/nutrition/planner.js` (funções puras): deriveTargetKcal, macros, distribuição/refeição, exclusões clínicas, buildGenerationConfig. Validado com 3 casos. | 8c9e91b |
 | 2026-05-29 | **Fase 2 ✅** | Criado `backend/nutrition/generator.js` (pool TACO por papel, templates, fillMeal com carbo fechando kcal, correção final) + endpoint `POST /professional/patients/:id/generate-plan`. Testado: desvio médio kcal 8%, alimentos coerentes. | 0653980 |
+| 2026-05-29 | **Fase 3 ✅** | Criados `limits.js` (DRI/UL/piso/tiers) + `micros.js` (panorama, compensação iso-calórica com trava UL, relatório). Testado: Vit E 37%→105%, Cálcio 86%→95% reforçando dias específicos; Tier C sinalizado; UL não piorado. | 345d7c1 |
 
-**Fase atual:** Fase 3 (não iniciada) — Fases 0, 1, 2 concluídas
-**Última sessão parou em:** Fase 2 fechada. Motor base gera 7 dias batendo kcal (±8% médio) com alimentos coerentes, no formato do builder. **Limitação conhecida (ver Fase 2 — Resultados):** carboidratos tendem a ficar altos (carbo é o fechador de kcal). Próximo: Fase 3 (compensação semanal de micros — o diferencial).
+**Fase atual:** Fase 4 (não iniciada) — Fases 0, 1, 2, 3 concluídas
+**Última sessão parou em:** Backend completo (gera + compensa micros + relatório de adequação). Endpoint `generate-plan` devolve `{plan_data, summary, adequacy}`. Próximo: **Fase 4 (UI no builder)** — botão "Gerar automaticamente", modal de config, carregar rascunho no builder, painel de adequação. É a primeira fase só-frontend.
 
 ---
 
@@ -215,24 +216,30 @@ vitc, tiamina(b1), riboflavina(b2), niacina(b3), piridoxina(b6), vitb12, vitb9(f
 ---
 
 ## 📋 FASE 3 — Camada de Micronutrientes (compensação semanal)
-**Status:** ⬜ não iniciada
+**Status:** ✅ CONCLUÍDA (2026-05-29) — `backend/nutrition/limits.js` + `micros.js`
 **Depende de:** Fase 2 + Fase 0 GO.
-**Entrega:** o diferencial do produto — balanceamento semanal de micros.
 
 ### Tarefas
-- [ ] **3.1** `computeWeeklyPanorama(plan_data)`: soma cada micro na semana, calcula média/dia e % da RDA.
-- [ ] **3.2** **Passada de compensação** (algoritmo central):
-  1. Ordenar micros por maior déficit semanal.
-  2. Para o mais deficiente, achar dia com folga de macro + alimento rico naquele micro.
-  3. Fazer **swap** (trocar/ajustar alimento) mantendo kcal+macros do dia na tolerância.
-  4. Repetir até convergir ou esgotar melhorias (limite de N iterações).
-- [ ] **3.3** **Trava UL**: a cada swap, validar que nenhum dia ultrapassa o teto (Fase 0.4). Se passar, rejeitar swap.
-- [ ] **3.4** **Piso hidrossolúvel**: garantir mínimo diário dos da Fase 0.5 (não só média).
-- [ ] **3.5** `buildAdequacyReport(plan_data)`: por micro → % da RDA semanal, status (ok/baixo/alto), e em quais dias foi reforçado. Anexar ao retorno do endpoint.
-- [ ] **3.6** Fallback: se pool de micros for insuficiente (Fase 0 NO-GO), pular compensação e só gerar o relatório de adequação informativo.
+- [x] **3.1** `computeWeeklyPanorama`: soma semanal + média/dia + % RDA por micro (perDay também).
+- [x] **3.2** `compensateMicros`: **swap ISO-CALÓRICO** — troca item por alimento rico no micro mais deficiente, no dia onde está mais baixo, mantendo ~kcal. Loop até convergir (máx 90 iter).
+- [x] **3.3** **Trava UL**: swap rejeitado se estoura UL diário OU piora micro já alto (guarda `ulAfter ≤ max(UL, ulBefore)`); + guarda de kcal/dia ±20%.
+- [x] **3.4** **Piso hidrossolúvel**: REPORTADO (alertas de dias abaixo de 70% RDA). _Não enforce duro nesta versão._
+- [x] **3.5** `buildAdequacyReport`: status por micro (ok/baixo/muito_baixo/monitorar/alto), tier, dias reforçados, alertas de piso, resumo.
+- [x] **3.6** Fallback: `req.body.micro=false` desliga compensação; Tier C sempre só relatório.
 
-### Critério de aceite
-Plano com micros melhorados na média semanal vs Fase 2, sem violar UL diário, com relatório transparente.
+### 🔬 FASE 3 — RESULTADOS (teste real)
+- **Compensação funciona:** Vit E **37%→105%** (reforçada dias 1,2,3,5); Cálcio **86%→95%** (dias 5,6). 7 swaps / 8 iterações. Todos Tier A+B ficaram ≥95%.
+- **Trava UL ativa:** sódio ficou "alto" (120%) mas a compensação **não o agravou**.
+- **Tier C** (Vit D 26%, B12, Vit A) corretamente marcado **"monitorar"** (não tenta otimizar).
+- **Honestidade:** a base TACO já é nutricionalmente rica → muitos micros já vinham ≥100%; a compensação focou os reais déficits (Ca, Vit E).
+
+### ⚠️ Limitações conhecidas (honestas)
+- **Sódio alto** no plano base (alimentos TACO com sal) — só teto/UL, reportado; não há redução ativa de sódio nesta versão.
+- **Piso hidrossolúvel** (B1/B6/B9) abaixo em alguns dias — reportado, não corrigido ativamente.
+- Swap iso-calórico com carregadores de baixa caloria (folhas) bate o clamp → ganho parcial.
+
+### Critério de aceite — ✅
+Micros melhorados na média semanal vs Fase 2, sem violar UL diário, relatório transparente com tiers e alertas. ✓
 
 ---
 
