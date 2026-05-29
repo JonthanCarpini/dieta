@@ -341,7 +341,6 @@ router.post('/generate-recipe', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/ai/generate-weekly
 router.post('/generate-weekly', authenticateToken, async (req, res) => {
   const t0 = Date.now();
   try {
@@ -353,7 +352,78 @@ router.post('/generate-weekly', authenticateToken, async (req, res) => {
     const fat = Math.round(targetFat / 3);
     const { text, provider, model } = await callLLM(cfg, promptWeeklyPlan(mealType, cal, prot, carb, fat, profile));
     const plans = JSON.parse(text);
-    res.json({ plans, mealType, _meta: { provider, model, latency_ms: Date.now() - t0 } });
+
+    const dayNames = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
+    const mappedDays = [];
+
+    for (let i = 0; i < plans.length; i++) {
+      const p = plans[i];
+      const recipeId = Math.floor(100000 + Math.random() * 900000); // 6-digit random ID
+      
+      const mappedIngredients = (p.ingredients || []).map(ing => ({
+        name: ing.name,
+        quantity: `${ing.amount || ''} ${ing.unit || ''}`.trim()
+      }));
+
+      const mappedSteps = typeof p.directions === 'string'
+        ? p.directions.split('\n').map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean)
+        : (Array.isArray(p.directions) ? p.directions : [String(p.directions)]);
+
+      const recipeDetail = {
+        id: recipeId,
+        name: p.name || 'Receita Saudável',
+        description: `Receita para o dia ${p.day || (i + 1)} do cardápio semanal.`,
+        calories: parseInt(p.calories) || cal,
+        protein: parseInt(p.protein) || prot,
+        carbs: parseInt(p.carbs) || carb,
+        fats: parseInt(p.fat || p.fats) || fat,
+        prep_time: parseInt(p.time_min) || 20,
+        servings: 1,
+        difficulty: 'Fácil',
+        ingredients: mappedIngredients,
+        steps: mappedSteps
+      };
+
+      // Save to ai_recipes
+      await db.query(
+        `INSERT INTO ai_recipes (id, user_id, type, name, data)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [recipeId, req.user.id, mealType, recipeDetail.name, JSON.stringify(recipeDetail)]
+      );
+
+      // Create Day entry
+      const dayName = dayNames[i] || dayNames[p.day - 1] || 'segunda';
+      mappedDays.push({
+        day: dayName,
+        total_calories: recipeDetail.calories,
+        meals: [
+          {
+            type: MEAL_LABELS[mealType] || 'Refeição principal',
+            name: recipeDetail.name,
+            calories: recipeDetail.calories,
+            protein: recipeDetail.protein,
+            carbs: recipeDetail.carbs,
+            fats: recipeDetail.fats,
+            recipe_id: recipeId
+          }
+        ]
+      });
+    }
+
+    // Save weekly plan to database
+    await db.query(
+      `UPDATE weekly_plans SET is_active = FALSE 
+       WHERE patient_id = $1 AND professional_id IS NULL`,
+      [req.user.id]
+    );
+
+    await db.query(
+      `INSERT INTO weekly_plans (professional_id, patient_id, name, plan_data, is_active)
+       VALUES (NULL, $1, $2, $3, TRUE)`,
+      [req.user.id, 'Cardápio Semanal IA', JSON.stringify({ days: mappedDays })]
+    );
+
+    res.json({ plans: { days: mappedDays }, mealType, _meta: { provider, model, latency_ms: Date.now() - t0 } });
   } catch (err) {
     console.error('Erro generate-weekly:', err.message);
     res.status(502).json({ error: 'Falha ao gerar plano semanal com IA.', detail: err.message });

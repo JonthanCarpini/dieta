@@ -236,6 +236,47 @@ router.get('/recipes', async (req, res) => {
   }
 });
 
+// Buscar detalhes de uma receita por ID
+router.get('/recipes/:id', async (req, res) => {
+  try {
+    const recipeId = parseInt(req.params.id);
+    const result = await db.query('SELECT * FROM ai_recipes WHERE id = $1', [recipeId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Receita não encontrada.' });
+    }
+    const row = result.rows[0];
+    const recipeData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+    res.json({
+      id: row.id,
+      name: row.name,
+      ...recipeData
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar receita.' });
+  }
+});
+
+// Buscar plano semanal de IA do paciente
+router.get('/meal-plan/weekly', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT * FROM weekly_plans 
+       WHERE patient_id = $1 AND professional_id IS NULL AND is_active = TRUE
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      [req.user.id]
+    );
+    if (result.rows.length === 0) return res.json(null);
+    const row = result.rows[0];
+    const planData = typeof row.plan_data === 'string' ? JSON.parse(row.plan_data) : row.plan_data;
+    res.json(planData);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar cardápio semanal da IA.' });
+  }
+});
+
 router.post('/recipes', async (req, res) => {
   const { id, type, name, data } = req.body;
 
@@ -413,6 +454,105 @@ router.get('/professionals/:id/busy-slots', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar horários ocupados do profissional.' });
+  }
+});
+
+// Obter horários disponíveis de um profissional em uma data específica
+router.get('/appointments/available', async (req, res) => {
+  if (req.user.isPlanExpired) {
+    return res.status(403).json({ error: 'Sua assinatura expirou.' });
+  }
+
+  let professionalId = req.query.professional_id;
+  const { date } = req.query; // YYYY-MM-DD
+
+  if (!date) {
+    return res.status(400).json({ error: 'Data é obrigatória.' });
+  }
+
+  try {
+    if (!professionalId) {
+      // Busca nutricionista vinculado ao usuário
+      const linkRes = await db.query(
+        "SELECT professional_id FROM professional_links WHERE user_id = $1 AND type = 'nutritionist'",
+        [req.user.id]
+      );
+      if (linkRes.rows.length === 0) {
+        // Fallback para qualquer profissional vinculado
+        const fallbackRes = await db.query(
+          "SELECT professional_id FROM professional_links WHERE user_id = $1 LIMIT 1",
+          [req.user.id]
+        );
+        if (fallbackRes.rows.length === 0) {
+          return res.json({ date, slots: [] });
+        }
+        professionalId = fallbackRes.rows[0].professional_id;
+      } else {
+        professionalId = linkRes.rows[0].professional_id;
+      }
+    }
+
+    // Calcula dia da semana
+    const dateParts = date.split('-');
+    const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+    const dayOfWeek = dateObj.getDay();
+
+    // Busca disponibilidade cadastrada pelo profissional
+    const availabilityRes = await db.query(
+      `SELECT start_time, end_time FROM professional_availability
+       WHERE professional_id = $1 AND day_of_week = $2 AND active = true
+       ORDER BY start_time`,
+      [professionalId, dayOfWeek]
+    );
+
+    // Busca agendamentos de consulta já agendados
+    const appointmentsRes = await db.query(
+      `SELECT start_time, end_time FROM appointments
+       WHERE professional_id = $1 AND appointment_date = $2 AND status = 'scheduled'`,
+      [professionalId, date]
+    );
+
+    const normalizeTime = t => (t || '').substring(0, 5);
+
+    // Validação de horário no passado baseado em América/Sao_Paulo (Horário de Brasília)
+    const nowSaoPaulo = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    const year = nowSaoPaulo.getFullYear();
+    const month = String(nowSaoPaulo.getMonth() + 1).padStart(2, '0');
+    const day = String(nowSaoPaulo.getDate()).padStart(2, '0');
+    const currentDateSP = `${year}-${month}-${day}`;
+    
+    const hours = String(nowSaoPaulo.getHours()).padStart(2, '0');
+    const minutes = String(nowSaoPaulo.getMinutes()).padStart(2, '0');
+    const currentTimeSP = `${hours}:${minutes}`;
+
+    const slots = availabilityRes.rows.map(slot => {
+      const startTime = normalizeTime(slot.start_time);
+      const endTime = normalizeTime(slot.end_time);
+
+      let isPast = false;
+      if (date < currentDateSP) {
+        isPast = true;
+      } else if (date === currentDateSP && startTime <= currentTimeSP) {
+        isPast = true;
+      }
+
+      const isBooked = appointmentsRes.rows.some(appt => {
+        const apptStart = normalizeTime(appt.start_time);
+        const apptEnd = normalizeTime(appt.end_time);
+        return startTime < apptEnd && endTime > apptStart;
+      });
+
+      return {
+        time: startTime,
+        endTime: endTime,
+        available: !isBooked && !isPast
+      };
+    });
+
+    res.json({ date, slots });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar horários disponíveis.' });
   }
 });
 

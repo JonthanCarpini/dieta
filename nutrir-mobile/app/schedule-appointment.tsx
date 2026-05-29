@@ -12,13 +12,37 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calendar } from 'react-native-calendars';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { ChevronLeft, Video, MapPin, Clock, Check } from 'lucide-react-native';
 import api from '../src/api/client';
 import { colors, spacing, radius, typography } from '../src/constants/theme';
 
+// Configura tradução do calendário
+LocaleConfig.locales['pt-br'] = {
+  monthNames: [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro'
+  ],
+  monthNamesShort: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+  dayNames: ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
+  dayNamesShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+  today: 'Hoje'
+};
+LocaleConfig.defaultLocale = 'pt-br';
+
 interface TimeSlot {
   time: string;        // "09:00"
+  endTime?: string;
   available: boolean;
 }
 
@@ -44,21 +68,51 @@ export default function ScheduleAppointmentScreen() {
   const [appointmentType, setAppointmentType] = useState('video');
   const [notes, setNotes] = useState('');
 
-  const { data: slotsData, isLoading: loadingSlots } = useQuery<SlotsResponse>({
-    queryKey: ['available-slots', selectedDate],
-    queryFn: () =>
-      api.get('/appointments/available', { params: { date: selectedDate } }).then((r) => r.data),
-    enabled: !!selectedDate,
+  // Busca profissionais vinculados ao usuário
+  const { data: professionals } = useQuery<any[]>({
+    queryKey: ['linked-professionals'],
+    queryFn: () => api.get('/user/linked-professionals').then((r) => r.data),
   });
 
+  const nutritionist = professionals?.find((p) => p.role === 'nutritionist');
+  const professionalId = nutritionist?.id;
+
+  // Busca horários livres para o nutricionista na data selecionada
+  const { data: slotsData, isLoading: loadingSlots } = useQuery<SlotsResponse>({
+    queryKey: ['available-slots', selectedDate, professionalId],
+    queryFn: () =>
+      api.get('/user/appointments/available', {
+        params: {
+          date: selectedDate,
+          professional_id: professionalId
+        }
+      }).then((r) => r.data),
+    enabled: !!selectedDate && !!professionalId,
+  });
+
+  const calculateEndTime = (timeStr: string) => {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':').map(Number);
+    let endMins = h * 60 + m + 30; // slot padrão de 30 minutos
+    const endH = Math.floor(endMins / 60);
+    const endM = endMins % 60;
+    return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+  };
+
   const bookMutation = useMutation({
-    mutationFn: () =>
-      api.post('/appointments', {
-        date: selectedDate,
-        time: selectedTime,
+    mutationFn: () => {
+      const selectedSlot = slotsData?.slots.find(s => s.time === selectedTime);
+      const endTime = selectedSlot?.endTime || calculateEndTime(selectedTime);
+
+      return api.post('/user/appointments', {
+        professional_id: professionalId,
+        appointment_date: selectedDate,
+        start_time: selectedTime,
+        end_time: endTime,
         type: appointmentType,
         notes,
-      }),
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointments'] });
       Alert.alert(
@@ -67,7 +121,10 @@ export default function ScheduleAppointmentScreen() {
         [{ text: 'OK', onPress: () => router.back() }]
       );
     },
-    onError: () => Alert.alert('Erro', 'Não foi possível agendar a consulta. Tente novamente.'),
+    onError: (err: any) => {
+      const errMsg = err.response?.data?.error || 'Não foi possível agendar a consulta. Tente novamente.';
+      Alert.alert('Erro', errMsg);
+    },
   });
 
   const formatDate = (dateStr: string) => {
@@ -77,7 +134,7 @@ export default function ScheduleAppointmentScreen() {
     return `${d} de ${months[parseInt(m) - 1]}`;
   };
 
-  const canBook = selectedDate && selectedTime && appointmentType;
+  const canBook = selectedDate && selectedTime && appointmentType && professionalId;
 
   const markedDates: Record<string, object> = {};
   if (selectedDate) {

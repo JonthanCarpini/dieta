@@ -21,62 +21,143 @@ import { colors, spacing, radius, typography } from '../../src/constants/theme';
 
 type Tab = 'nutri' | 'ia' | 'cardapio';
 
+const DAYS = [
+  { key: 'segunda', label: 'Seg' },
+  { key: 'terca', label: 'Ter' },
+  { key: 'quarta', label: 'Qua' },
+  { key: 'quinta', label: 'Qui' },
+  { key: 'sexta', label: 'Sex' },
+  { key: 'sabado', label: 'Sáb' },
+  { key: 'domingo', label: 'Dom' },
+];
+
+const PRO_MEAL_EMOJIS: Record<string, string> = {
+  cafe_da_manha: '☀️',
+  lanche_manha: '🍎',
+  almoco: '🍽️',
+  lanche_tarde: '🍊',
+  jantar: '🌙',
+  ceia: '🌛'
+};
+
 // ─── Tab: Receitas do Nutricionista ────────────────────────────────────────────
 function NutriRecipes() {
-  const [search, setSearch] = useState('');
+  const [selectedDay, setSelectedDay] = useState('segunda');
   const router = useRouter();
 
-  const { data, isLoading, refetch, isRefetching } = useQuery<Recipe[]>({
+  const { data: plan, isLoading, refetch, isRefetching } = useQuery<any>({
     queryKey: ['recipes-nutri'],
-    queryFn: () => api.get('/recipes', { params: { source: 'nutricionista' } }).then((r) => r.data),
+    queryFn: () => api.get('/user/weekly-plan').then((r) => r.data),
   });
 
-  const filtered = (data ?? []).filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const dayOfWeekMap: Record<string, number> = {
+    segunda: 1,
+    terca: 2,
+    quarta: 3,
+    quinta: 4,
+    sexta: 5,
+    sabado: 6,
+    domingo: 0,
+  };
+
+  const selectedDow = dayOfWeekMap[selectedDay] ?? 1;
+
+  const planData = plan?.plan_data;
+  const parsedPlanData = typeof planData === 'string' ? JSON.parse(planData) : planData;
+  const dayData = parsedPlanData?.days?.find((d: any) => d.dow === selectedDow);
+
+  const todayKey = (() => {
+    const days = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+    return days[new Date().getDay()];
+  })();
 
   return (
     <View style={styles.tabContent}>
-      <View style={styles.searchBox}>
-        <Search size={15} color={colors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Buscar receita..."
-          placeholderTextColor={colors.textMuted}
-        />
-      </View>
+      {/* Day selector */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll} contentContainerStyle={styles.dayScrollContent}>
+        {DAYS.map((d) => (
+          <TouchableOpacity
+            key={d.key}
+            style={[
+              styles.dayChip,
+              selectedDay === d.key && styles.dayChipActive,
+              d.key === todayKey && styles.dayChipToday
+            ]}
+            onPress={() => setSelectedDay(d.key)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.dayChipText, selectedDay === d.key && styles.dayChipTextActive]}>{d.label}</Text>
+            {d.key === todayKey && <View style={styles.todayDot} />}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {isLoading ? (
         <ActivityIndicator color={colors.accentGreen} style={styles.loader} />
+      ) : !plan ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>Nenhum cardápio disponível</Text>
+          <Text style={styles.emptySubtext}>
+            Seu nutricionista ainda não cadastrou um cardápio semanal para você.
+          </Text>
+        </View>
       ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => (
-            <RecipeCard
-              recipe={item}
-              onPress={() => router.push({ pathname: '/recipe-detail', params: { id: item.id } })}
-            />
-          )}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          onRefresh={refetch}
-          refreshing={isRefetching}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>
-                {search ? `Nenhuma receita para "${search}"` : 'Nenhuma receita disponível'}
-              </Text>
-              {!search && (
-                <Text style={styles.emptySubtext}>
-                  Seu nutricionista ainda não cadastrou receitas para você.
-                </Text>
-              )}
+        <ScrollView contentContainerStyle={styles.planContent} showsVerticalScrollIndicator={false} onRefresh={refetch} refreshing={isRefetching}>
+          <View style={styles.dayTotalRow}>
+            <Text style={styles.dayTotalLabel}>Nutricionista</Text>
+            <Text style={styles.dayTotalValue}>{plan.name || 'Cardápio Semanal'}</Text>
+          </View>
+
+          {plan.notes && (
+            <View style={styles.notesCard}>
+              <Text style={styles.notesTitle}>Orientações Gerais</Text>
+              <Text style={styles.notesText}>{plan.notes}</Text>
             </View>
-          }
-        />
+          )}
+
+          <View style={styles.mealList}>
+            {(!dayData || !dayData.meals || dayData.meals.length === 0) && (
+              <Text style={styles.emptyText}>Nenhuma refeição prescrita para este dia.</Text>
+            )}
+            {(dayData?.meals ?? []).map((meal: any, i: number) => (
+              <View key={i} style={styles.proMealCardWrapper}>
+                <View style={styles.planMealCard}>
+                  <View style={styles.planMealLeft}>
+                    <Text style={styles.planMealType}>
+                      {PRO_MEAL_EMOJIS[meal.type] || '🍴'} {meal.label || meal.type}
+                    </Text>
+                    <Text style={styles.planMealTime}>{meal.time}</Text>
+
+                    {/* Food Items List */}
+                    <View style={styles.foodItemList}>
+                      {(meal.items ?? []).map((item: any, idx: number) => (
+                        <View key={idx} style={styles.foodItemRow}>
+                          <Text style={styles.foodItemName}>
+                            • {item.name} {item.qty ? `(${item.qty})` : ''}
+                          </Text>
+                          <Text style={styles.foodItemMacros}>
+                            {Math.round(item.calories || 0)} kcal · P: {Math.round(item.protein || 0)}g · C: {Math.round(item.carbs || 0)}g · G: {Math.round(item.fat || 0)}g
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                  <View style={styles.planMealRight}>
+                    <Text style={styles.planMealCal}>{Math.round(meal.total?.calories || 0)}</Text>
+                    <Text style={styles.planMealCalUnit}>kcal</Text>
+                  </View>
+                </View>
+                {meal.instructions && (
+                  <View style={styles.mealInstructionsCard}>
+                    <Text style={styles.instructionsText}>
+                      💡 {meal.instructions}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -242,15 +323,6 @@ function AIGenerator() {
 }
 
 // ─── Tab: Cardápio Semanal ──────────────────────────────────────────────────────
-const DAYS = [
-  { key: 'segunda', label: 'Seg' },
-  { key: 'terca', label: 'Ter' },
-  { key: 'quarta', label: 'Qua' },
-  { key: 'quinta', label: 'Qui' },
-  { key: 'sexta', label: 'Sex' },
-  { key: 'sabado', label: 'Sáb' },
-  { key: 'domingo', label: 'Dom' },
-];
 
 interface MealPlanMeal {
   type: string;
@@ -279,7 +351,7 @@ function WeeklyPlanTab() {
 
   const { data: plan, isLoading, refetch } = useQuery<WeeklyPlan>({
     queryKey: ['weekly-plan'],
-    queryFn: () => api.get('/meal-plan/weekly').then((r) => r.data),
+    queryFn: () => api.get('/user/meal-plan/weekly').then((r) => r.data),
   });
 
   const generateMutation = useMutation({
@@ -628,4 +700,37 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(139,92,246,0.25)',
   },
   regenWeekText: { fontSize: 14, fontWeight: '600', color: colors.accentPurple },
+
+  notesCard: {
+    backgroundColor: 'rgba(59,130,246,0.08)',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.2)',
+    marginBottom: spacing.xs,
+  },
+  notesTitle: { ...typography.label, color: colors.accentBlue, fontWeight: '700', marginBottom: 4 },
+  notesText: { ...typography.bodySmall, color: colors.textSecondary, lineHeight: 18 },
+
+  proMealCardWrapper: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    marginBottom: spacing.xs,
+  },
+  planMealTime: { ...typography.caption, color: colors.textMuted, marginTop: 2, marginBottom: 8 },
+  foodItemList: { gap: 6, marginTop: 8 },
+  foodItemRow: { paddingLeft: 4 },
+  foodItemName: { ...typography.bodySmall, color: colors.textPrimary, fontWeight: '600' },
+  foodItemMacros: { fontSize: 11, color: colors.textMuted, marginLeft: 10, marginTop: 2 },
+  mealInstructionsCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSubtle,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  instructionsText: { ...typography.bodySmall, color: colors.textSecondary, fontStyle: 'italic' },
 });
