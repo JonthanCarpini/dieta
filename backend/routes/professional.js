@@ -613,6 +613,54 @@ router.delete('/foods/:id', async (req, res) => {
 });
 
 // ==========================================
+// ALIMENTOS IMPORTADOS (base global, source='extra')
+// ==========================================
+
+// GET /professional/imported-foods?q=&page=&limit=
+router.get('/imported-foods', async (req, res) => {
+  const q     = (req.query.q || '').trim();
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(parseInt(req.query.limit) || 30, 100);
+  const offset = (page - 1) * limit;
+  try {
+    const where  = q ? `WHERE source='extra' AND name ILIKE $1` : `WHERE source='extra'`;
+    const params = q ? [`%${q}%`] : [];
+
+    const countRes = await db.query(`SELECT COUNT(*) FROM foods ${where}`, params);
+    const total = parseInt(countRes.rows[0].count);
+
+    const listRes = await db.query(
+      `SELECT id, name, category, energy_kcal, protein_g, carbs_g, fat_g, fiber_g
+       FROM foods ${where}
+       ORDER BY name ASC
+       LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+
+    res.json({
+      items: listRes.rows,
+      total,
+      page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao listar alimentos importados.' });
+  }
+});
+
+// DELETE /professional/imported-foods/:id — remove um alimento importado
+router.delete('/imported-foods/:id', async (req, res) => {
+  try {
+    await db.query(`DELETE FROM foods WHERE id=$1 AND source='extra'`, [req.params.id]);
+    res.json({ message: 'Alimento removido.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remover alimento.' });
+  }
+});
+
+// ==========================================
 // HISTÓRICO DE CÁLCULO ENERGÉTICO
 // ==========================================
 

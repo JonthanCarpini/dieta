@@ -77,6 +77,9 @@
                 <button class="nav-btn" data-tab="foods" id="nav-foods">
                     <i data-lucide="database"></i> Meus Alimentos
                 </button>
+                <button class="nav-btn" data-tab="imported" id="nav-imported">
+                    <i data-lucide="download-cloud"></i> Importados
+                </button>
                 <button class="nav-btn" data-tab="settings" id="nav-settings">
                     <i data-lucide="key-round"></i> Credenciais
                 </button>
@@ -445,6 +448,51 @@
                             </div>
                         </div>
 
+                    </div>
+                </section>
+
+                <!-- ABA: ALIMENTOS IMPORTADOS -->
+                <section id="tab-imported" class="tab-content">
+                    <div class="header-section">
+                        <h1>Alimentos Importados</h1>
+                        <p>Base global de produtos importados (Extra). Disponíveis na busca ao montar cardápios.</p>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+                            <div class="search-box" style="flex:1;max-width:360px;">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="imp-search-input" placeholder="Buscar por nome...">
+                            </div>
+                            <span id="imp-count-label" class="patients-count-label"></span>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Categoria</th>
+                                        <th style="text-align:right;">Kcal/100g</th>
+                                        <th style="text-align:right;">Ptn</th>
+                                        <th style="text-align:right;">Lip</th>
+                                        <th style="text-align:right;">Carb</th>
+                                        <th style="text-align:right;">Fibra</th>
+                                        <th style="text-align:right;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="imp-table-body">
+                                    <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-2);">Carregando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Paginação -->
+                        <div id="imp-pagination" style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:18px;">
+                            <button class="btn-secondary btn-sm" id="imp-prev" disabled>← Anterior</button>
+                            <span id="imp-page-label" style="font-size:13px;color:var(--text-2);">Página 1</span>
+                            <button class="btn-secondary btn-sm" id="imp-next" disabled>Próxima →</button>
+                        </div>
                     </div>
                 </section>
 
