@@ -21,34 +21,41 @@ const ROLE_GROUPS = {
   fat:       ['Gorduras e azeites', 'Gorduras e óleos'],
 };
 
-// Filtro de sanidade macro por papel (por 100g) para pegar representantes coerentes
+// Filtro de sanidade macro por papel (por 100g): preferir alimentos MAGROS/LIMPOS
+// (proteína magra não despeja gordura; carbo limpo = grão, não doce frito)
 const ROLE_MACRO_FILTER = {
-  protein:   'ptn >= 12',
-  legume:    'cho >= 10',
-  carb:      'cho >= 18',
-  vegetable: 'kcal < 120',
-  fruit:     'cho >= 5 AND kcal < 200',
-  dairy:     '(ptn >= 2 OR cho >= 3)',
+  protein:   'ptn >= 12 AND lip <= 15',          // proteína magra
+  legume:    'cho >= 10 AND lip <= 10',
+  carb:      'cho >= 18 AND lip <= 8',            // grão/raiz, sem fritura
+  vegetable: 'kcal < 80',
+  fruit:     'cho >= 5 AND kcal < 150',
+  dairy:     '(ptn >= 2 OR cho >= 3) AND lip <= 12',
   fat:       'lip >= 40',
 };
+
+// Nomes a evitar (frituras, doces, ultraprocessados) — aplicado a todos menos gordura
+const NAME_BLACKLIST = /frit|milanes|à dor[ée]|caramelizad|maionese|nugget|empanad|parmegian|crist|em calda|torresmo|salgadinho|salgad[ií]ssim|rechead|chips|bacon|defumad|enlatad/i;
 
 // Composição de cada refeição (papéis)
 const MEAL_TEMPLATES = {
   cafe_da_manha: ['carb', 'dairy', 'fruit'],
   lanche_manha:  ['fruit', 'dairy'],
-  almoco:        ['protein', 'carb', 'legume', 'vegetable', 'fat'],
+  almoco:        ['protein', 'legume', 'vegetable', 'fat', 'carb'],
   lanche_tarde:  ['fruit', 'carb'],
-  jantar:        ['protein', 'carb', 'vegetable'],
+  jantar:        ['protein', 'vegetable', 'carb'],
   ceia:          ['dairy', 'fruit'],
 };
 
-// Papel → macro "dono" (per100 key); null = porção fixa
-const ROLE_OWNS = { protein: 'protein', legume: 'carbs', carb: 'carbs', dairy: 'protein', fat: 'fat', vegetable: null, fruit: null };
-// Fallback quando o pool do papel está vazio (ex: vegano sem carnes → leguminosa vira proteína)
+// Comportamento por papel:
+//  - 'fixed': porção fixa (veg/fruta/leguminosa/laticínio)
+//  - owns 'protein' | 'fat': resolve esse macro
+//  - owns 'kcal': CARBO fecha a energia restante (lever de calorias)
+const ROLE_OWNS = { protein: 'protein', fat: 'fat', carb: 'kcal', legume: null, dairy: null, vegetable: null, fruit: null };
 const ROLE_FALLBACK = { protein: 'legume', dairy: null };
-const FIXED_PORTION = { vegetable: 90, fruit: 130 };
-const CLAMP = { protein: [40, 250], carb: [30, 320], legume: [30, 200], dairy: [120, 250], fat: [3, 15], fruit: [80, 200], vegetable: [50, 150] };
-const ROLE_ORDER = ['vegetable', 'fruit', 'protein', 'legume', 'carb', 'dairy', 'fat'];
+const FIXED_PORTION = { vegetable: 90, fruit: 130, legume: 80, dairy: 200 };
+const CLAMP = { protein: [40, 220], carb: [30, 400], legume: [40, 150], dairy: [120, 250], fat: [3, 15], fruit: [80, 200], vegetable: [50, 150] };
+// fixos primeiro, depois proteína, gordura, e CARBO por último (fecha kcal)
+const ROLE_ORDER = ['vegetable', 'fruit', 'legume', 'dairy', 'protein', 'fat', 'carb'];
 
 const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const round1 = n => Math.round(n * 10) / 10;
@@ -70,7 +77,10 @@ async function fetchFoodPool(db, exclusions) {
       LIMIT 200`;
     let rows = [];
     try { rows = (await db.query(sql, grupos)).rows; } catch (e) { rows = []; }
-    pool[role] = rows.filter(r => !planner.isExcluded(r, exclusions)).map(toFood);
+    pool[role] = rows
+      .filter(r => !planner.isExcluded(r, exclusions))
+      .filter(r => role === 'fat' || !NAME_BLACKLIST.test(r.nome || ''))
+      .map(toFood);
   }
   return pool;
 }
@@ -98,26 +108,32 @@ function scaleItem(food, grams) {
   return item;
 }
 
-// Preenche uma refeição: porção fixa p/ veg/fruta; demais resolvem o macro "dono"
+// Preenche uma refeição: fixos (veg/fruta/leguminosa/laticínio) → proteína (alvo P)
+// → gordura (alvo G restante) → carbo (fecha a KCAL restante).
 function fillMeal(target, picks) {
   const ordered = [...picks].sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
-  const remaining = { protein: target.protein_g, carbs: target.carbs_g, fat: target.fat_g };
+  const remaining = { protein: target.protein_g, fat: target.fat_g, kcal: target.kcal };
   const items = [];
   for (const { role, food } of ordered) {
     const owns = ROLE_OWNS[role];
     let grams;
     if (!owns) {
-      grams = FIXED_PORTION[role] || 100;
+      grams = FIXED_PORTION[role] || 100;                       // porção fixa
+    } else if (owns === 'kcal') {
+      const perG = (food.per100.calories || 0) / 100;           // carbo fecha energia
+      grams = perG > 0 ? remaining.kcal / perG : (CLAMP[role][0]);
     } else {
-      const perG = (food.per100[owns] || 0) / 100;
+      const perG = (food.per100[owns] || 0) / 100;              // proteína / gordura
       grams = perG > 0 ? remaining[owns] / perG : (CLAMP[role] ? CLAMP[role][0] : 50);
     }
     const clamp = CLAMP[role] || [20, 300];
     grams = Math.max(clamp[0], Math.min(clamp[1], grams));
-    grams = Math.max(5, Math.round(grams / 5) * 5); // múltiplos de 5g
+    grams = Math.max(5, Math.round(grams / 5) * 5);             // múltiplos de 5g
     const item = scaleItem(food, grams);
     items.push(item);
-    remaining.protein -= item.protein; remaining.carbs -= item.carbs; remaining.fat -= item.fat;
+    remaining.protein -= item.protein;
+    remaining.fat     -= item.fat;
+    remaining.kcal    -= item.calories;
   }
   return items;
 }
