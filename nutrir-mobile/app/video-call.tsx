@@ -80,8 +80,19 @@ export default function VideoCallScreen() {
         originWhitelist={['*']}
         geolocationEnabled={false}
         androidHardwareAccelerationDisabled={false}
+        mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
         onPermissionRequest={(event) => {
           event.grant(event.resources);
+        }}
+        onMessage={(event) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === 'close') {
+              router.back();
+            }
+          } catch (e) {
+            console.error('Erro ao processar mensagem do WebView:', e);
+          }
         }}
       />
     </SafeAreaView>

@@ -279,11 +279,19 @@
             </div>
             <h3 class="ended-title">Consulta Finalizada</h3>
             <p class="ended-desc">Sua conferência foi encerrada com sucesso. Você já pode fechar esta página.</p>
-            <button class="btn-return" onclick="window.close()">Fechar Guia</button>
+            <button class="btn-return" onclick="closeGui()">Fechar Guia</button>
         </div>
     </div>
 
     <script>
+        function closeGui() {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'close' }));
+            } else {
+                window.close();
+            }
+        }
+
         // Inicializar ícones
         lucide.createIcons();
 
@@ -328,10 +336,36 @@
                     const remoteVideo = document.getElementById('remote-video');
                     if (remoteVideo) {
                         remoteVideo.srcObject = event.streams[0];
-                        remoteVideo.play().catch(err => {
-                            console.warn("Autoplay bloqueado no vídeo remoto:", err);
+                        remoteVideo.play().then(() => {
+                            console.log("Stream remoto reproduzido com áudio com sucesso.");
+                        }).catch(err => {
+                            console.warn("Autoplay bloqueado no vídeo remoto. Tentando mutado...", err);
                             remoteVideo.muted = true;
-                            remoteVideo.play().catch(e => console.error("Erro fatal ao reproduzir vídeo:", e));
+                            remoteVideo.play().then(() => {
+                                // Adicionar overlay temporário ou escutar clique global para desmutar
+                                const unmuteOverlay = document.createElement('div');
+                                unmuteOverlay.id = 'unmute-overlay';
+                                unmuteOverlay.style = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.75); z-index: 99; cursor: pointer;';
+                                unmuteOverlay.innerHTML = `
+                                    <div style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); padding: 20px 30px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); text-align: center; max-width: 80%;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-volume-x"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>
+                                        <span style="font-size: 15px; font-weight: 600; color: #fff;">Toque na tela para ativar o áudio</span>
+                                        <span style="font-size: 12px; color: #9ca3af;">O navegador bloqueou a reprodução automática de som.</span>
+                                    </div>
+                                `;
+                                
+                                const container = remoteVideo.parentElement;
+                                if (container) {
+                                    container.appendChild(unmuteOverlay);
+                                    const removeOverlayAndUnmute = () => {
+                                        remoteVideo.muted = false;
+                                        unmuteOverlay.remove();
+                                        console.log("Áudio ativado pelo clique do usuário");
+                                    };
+                                    unmuteOverlay.addEventListener('click', removeOverlayAndUnmute);
+                                    document.body.addEventListener('click', removeOverlayAndUnmute, { once: true });
+                                }
+                            }).catch(e => console.error("Erro fatal ao reproduzir vídeo:", e));
                         });
                     }
                     statusEl.textContent = 'Em chamada';
