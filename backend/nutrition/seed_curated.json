@@ -25,7 +25,7 @@
   { "name": "Coxa de frango assada",      "q": "frango coxa",          "role": "protein",   "meals": ["almoco","jantar"],      "portion": 100 },
   { "name": "Sobrecoxa de frango",        "q": "frango sobrecoxa",     "role": "protein",   "meals": ["almoco","jantar"],      "portion": 100 },
   { "name": "Moela de frango",            "q": "moela",                "role": "protein",   "meals": ["almoco","jantar"],      "portion": 100 },
-  { "name": "Coração de frango",          "q": "coração de galinha",   "role": "protein",   "meals": ["almoco","jantar"],      "portion": 80 },
+  { "name": "Coração de frango",          "q": "coração",              "role": "protein",   "meals": ["almoco","jantar"],      "portion": 80 },
   { "name": "Fígado de frango",           "q": "fígado de galinha",    "role": "protein",   "meals": ["almoco","jantar"],      "portion": 100 },
   { "name": "Patinho moído",              "q": "patinho",              "role": "protein",   "meals": ["almoco","jantar"],      "portion": 100 },
   { "name": "Acém cozido",                "q": "acém",                 "role": "protein",   "meals": ["almoco","jantar"],      "portion": 100 },

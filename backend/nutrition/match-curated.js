@@ -17,7 +17,7 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed_curated.json'
 const MICRO_OK = r => Number(r.ca) > 0 && Number(r.fe) > 0 && Number(r.na) > 0 && Number(r.k) > 0;
 
 // pratos preparados / formas indesejadas (penalidade forte)
-const PREPARED = /salada|sandu[ií]ch|\bsuco\b|\bdoce\b|em pó|\bbolo\b|receita|espeto|à grega|caramel|açúcar|rechead|\btorta\b|\bsopa\b|creme de|nugget|mingau|farofa|risoto|strogonoff|empad|pizza|lasanha|panqueca|pastel|coxinha|salgad/;
+const PREPARED = /salada|sandu[ií]ch|\bsuco\b|\bdoce\b|em pó|\bbolo\b|receita|espeto|à grega|caramel|açúcar|rechead|\btorta\b|\bsopa\b|creme de|nugget|mingau|farofa|risoto|strogonoff|empad|pizza|lasanha|panqueca|pastel|coxinha|salgad|\bbarra\b|cereal/;
 
 function scoreRow(row, role, words) {
   const n = (row.nome || '').toLowerCase();
@@ -29,6 +29,8 @@ function scoreRow(row, role, words) {
   // palavra principal como token inteiro no nome → forte sinal de match correto
   const first = words[0];
   if (first && new RegExp(`(^|[ ,])${first.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}([ ,]|$)`).test(n)) s += 30;
+  // nome COMEÇA com a palavra principal → forte sinal de que é o alimento puro (não ingrediente)
+  if (first && n.startsWith(first)) s += 40;
 
   // preparo
   if (/cozid|grelhad|assad|refogad/.test(n)) s += 10;
@@ -37,7 +39,7 @@ function scoreRow(row, role, words) {
   // prato preparado / composto
   if (PREPARED.test(n)) s -= 45;
   // "X com <comida>" (mistura) — permite "com sal/óleo/sem/casca/pele/leite"
-  if (/ com (?!sal|óleo|oleo|sem|casca|pele|leite|molho de tomate$)/.test(n)) s -= 22;
+  if (/ com (?!sal|óleo|oleo|sem|casca|pele|leite)/.test(n)) s -= 22;
   // óleo quando não é papel gordura/azeite
   if (/óleo de|oleo de/.test(n) && !/óleo|oleo|azeite/.test(words.join(' '))) s -= 35;
   // leite em pó para laticínio líquido
