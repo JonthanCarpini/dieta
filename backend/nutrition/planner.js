@@ -13,12 +13,13 @@ const MACRO_SPLITS = {
 };
 
 // ── 1.3 Distribuição de kcal por refeição (soma = 1.0) ────────────────────────
+// Bulk nas 3 principais (café/almoço/jantar = ~84%); lanches leves; ceia mínima.
 const MEAL_DISTRIBUTION = {
-  cafe_da_manha: 0.20,
-  lanche_manha:  0.10,
-  almoco:        0.30,
-  lanche_tarde:  0.10,
-  jantar:        0.25,
+  cafe_da_manha: 0.25,
+  lanche_manha:  0.05,
+  almoco:        0.32,
+  lanche_tarde:  0.06,
+  jantar:        0.27,
   ceia:          0.05,
 };
 const MEAL_LABELS = {

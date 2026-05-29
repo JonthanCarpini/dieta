@@ -39,14 +39,18 @@ const NAME_BLACKLIST = /frit|milanes|à dor[ée]|caramelizad|maionese|nugget|emp
 const BLACKLIST_SKIP = new Set(['vegetable', 'fruit']);
 const ENERGY_ROLES   = new Set(['carb', 'legume', 'dairy', 'fruit', 'vegetable']);
 
-// Composição de cada refeição (papéis)
+// Composição de cada refeição (papéis) — rotina/fisiologia do brasileiro:
+//  - 3 principais (café/almoço/jantar) concentram as calorias
+//  - lanches: leves, fruta
+//  - ceia: SEM carboidrato (horário tardio); laticínio magro + oleaginosa/semente
+//    rica em fibra (saciedade + esvaziamento gástrico mais lento)
 const MEAL_TEMPLATES = {
   cafe_da_manha: ['carb', 'dairy', 'fruit'],
-  lanche_manha:  ['fruit', 'dairy'],
+  lanche_manha:  ['fruit'],
   almoco:        ['protein', 'legume', 'vegetable', 'fat', 'carb'],
-  lanche_tarde:  ['fruit', 'carb'],
+  lanche_tarde:  ['fruit'],
   jantar:        ['protein', 'vegetable', 'carb'],
-  ceia:          ['dairy', 'fruit'],
+  ceia:          ['dairy', 'fat'],
 };
 
 // Comportamento por papel:
