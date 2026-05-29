@@ -133,7 +133,7 @@ function fillMeal(target, picks) {
     grams = Math.max(clamp[0], Math.min(clamp[1], grams));
     grams = Math.max(5, Math.round(grams / 5) * 5);             // múltiplos de 5g
     const item = scaleItem(food, grams);
-    item._role = role; item._food = food;
+    item.role = role; item._food = food;
     items.push(item);
     remaining.protein -= item.protein;
     remaining.fat     -= item.fat;
@@ -142,25 +142,26 @@ function fillMeal(target, picks) {
 
   // Correção final de KCAL: escala os itens de energia (não-proteína/não-gordura)
   // para encaixar no alvo da refeição — resolve overshoot de lanches/ceia.
-  const lockedKcal = items.filter(it => it._role === 'protein' || it._role === 'fat')
+  const lockedKcal = items.filter(it => it.role === 'protein' || it.role === 'fat')
                           .reduce((s, it) => s + it.calories, 0);
-  const energyItems = items.filter(it => ENERGY_ROLES.has(it._role));
+  const energyItems = items.filter(it => ENERGY_ROLES.has(it.role));
   const energyKcal  = energyItems.reduce((s, it) => s + it.calories, 0);
   const budget = Math.max(0, target.kcal - lockedKcal);
   if (energyKcal > 0 && Math.abs(energyKcal - budget) / Math.max(1, budget) > 0.10) {
     let factor = budget / energyKcal;
     factor = Math.max(0.4, Math.min(1.8, factor));
     energyItems.forEach(it => {
-      const cl = CLAMP[it._role] || [20, 300];
+      const cl = CLAMP[it.role] || [20, 300];
       let g = Math.max(cl[0], Math.min(cl[1], it.grams * factor));
       g = Math.max(5, Math.round(g / 5) * 5);
       const scaled = scaleItem(it._food, g);
+      scaled.role = it.role; scaled._food = it._food;
       Object.assign(it, scaled);
     });
   }
 
-  // limpa campos internos
-  items.forEach(it => { delete it._role; delete it._food; });
+  // limpa só o campo interno _food (mantém role para a Fase 3)
+  items.forEach(it => { delete it._food; });
   return items;
 }
 
@@ -230,4 +231,4 @@ function generatePlan(pool, config) {
   return { plan_data: { days }, summary };
 }
 
-module.exports = { fetchFoodPool, generatePlan, MEAL_TEMPLATES, ROLE_GROUPS, MICRO_KEYS };
+module.exports = { fetchFoodPool, generatePlan, MEAL_TEMPLATES, ROLE_GROUPS, MICRO_KEYS, scaleItem, sumTotals, CLAMP };

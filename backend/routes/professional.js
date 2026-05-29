@@ -617,6 +617,8 @@ router.delete('/foods/:id', async (req, res) => {
 // ==========================================
 const planner   = require('../nutrition/planner');
 const generator = require('../nutrition/generator');
+const limits    = require('../nutrition/limits');
+const micros    = require('../nutrition/micros');
 
 // POST /professional/patients/:id/generate-plan — gera rascunho (NÃO salva)
 router.post('/patients/:id/generate-plan', verifyPatientAccess, async (req, res) => {
@@ -643,8 +645,26 @@ router.post('/patients/:id/generate-plan', verifyPatientAccess, async (req, res)
     const pool = await generator.fetchFoodPool(db, config.exclusions);
     const { plan_data, summary } = generator.generatePlan(pool, config);
 
+    // Fase 3 — compensação semanal de micronutrientes (pode desligar com micro=false)
+    const dri = limits.getDRI(profile.age, profile.gender);
+    let adequacy = null, swapLog = [];
+    if (req.body?.micro !== false) {
+      const r = micros.compensateMicros(plan_data, pool, config, dri);
+      swapLog = r.swapLog;
+      // recomputa o resumo de kcal/dia após os swaps
+      plan_data.days.forEach((d, i) => {
+        const t = generator.sumTotals(d.meals.flatMap(m => m.items));
+        if (summary[i]) {
+          summary[i].kcal = Math.round(t.calories); summary[i].protein = Math.round(t.protein);
+          summary[i].carbs = Math.round(t.carbs); summary[i].fat = Math.round(t.fat);
+          summary[i].devKcalPct = config.kcal ? Math.round((t.calories - config.kcal) / config.kcal * 100) : 0;
+        }
+      });
+    }
+    adequacy = micros.buildAdequacyReport(plan_data, dri, swapLog);
+
     res.json({
-      plan_data, config, summary,
+      plan_data, config, summary, adequacy,
       poolSizes: Object.fromEntries(Object.entries(pool).map(([k, v]) => [k, v.length])),
     });
   } catch (err) {
