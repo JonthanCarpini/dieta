@@ -479,7 +479,7 @@ router.post('/scan-nutrition-label', authenticateToken, async (req, res) => {
 
 Retorne SOMENTE um JSON válido com a seguinte estrutura (sem markdown, sem explicações):
 {
-  "name": "nome do produto se visível, senão null",
+  "name": "nome do produto se visível na embalagem, senão null",
   "portion_grams": porção de referência em gramas (número),
   "energy_kcal_100g": kcal por 100g (número),
   "energy_kcal_portion": kcal por porção (número ou null),
@@ -491,10 +491,16 @@ Retorne SOMENTE um JSON válido com a seguinte estrutura (sem markdown, sem expl
   "fiber_g": fibra alimentar por 100g (número ou null),
   "sodium_mg": sódio em mg por 100g (número ou null),
   "calcium_mg": cálcio em mg por 100g (número ou null),
-  "iron_mg": ferro em mg por 100g (número ou null)
+  "iron_mg": ferro em mg por 100g (número ou null),
+  "measures": [
+    { "label": "descrição da medida caseira (ex: 1 colher de sopa, 1 xícara, 1 unidade, 1 fatia, 1 porção)", "grams": equivalência em gramas (número) }
+  ]
 }
 
-IMPORTANTE: Normalize todos os valores para 100g (se a tabela mostrar valores por porção, converta usando a porção em gramas). Se um campo não estiver visível ou legível, use null.`;
+IMPORTANTE:
+- Normalize TODOS os valores nutricionais para por 100g. Se o rótulo mostrar valores por porção, converta usando: valor_100g = (valor_porção / portion_grams) * 100
+- Para "measures": extraia TODAS as medidas caseiras visíveis no rótulo (ex: "Porção: 1 colher de sopa (30g)" → { label: "1 colher de sopa", grams: 30 }). Sempre inclua também a porção principal. Se não houver medidas caseiras, retorne array vazio [].
+- Se um campo nutricional não estiver visível, use null.`;
 
     const cfg = await getLLMConfig();
     const { text, provider, model } = await callLLM(cfg, prompt, image);

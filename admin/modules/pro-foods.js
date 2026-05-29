@@ -159,14 +159,20 @@ async function _openScanner() {
             if (d.calcium_mg)          _setField('pf-calcium',       parseFloat(d.calcium_mg).toFixed(0));
             if (d.iron_mg)             _setField('pf-iron',          parseFloat(d.iron_mg).toFixed(2));
 
-            // Sugere medida padrão pela porção detectada
-            if (d.portion_grams && d.portion_grams !== 100) {
+            // Medidas caseiras detectadas pela IA
+            _clearMeasures();
+            const aiMeasures = Array.isArray(d.measures) ? d.measures.filter(m => m.label && m.grams > 0) : [];
+            if (aiMeasures.length > 0) {
+                aiMeasures.forEach(m => _addMeasureRow(m.label, m.grams));
+            } else if (d.portion_grams && d.portion_grams !== 100) {
+                // Fallback: usa a porção principal se não encontrou medidas
                 _addMeasureRow('1 porção', d.portion_grams);
             }
 
-            const model = d._meta?.model || 'IA';
+            const model    = d._meta?.model || 'IA';
+            const measTxt  = aiMeasures.length > 0 ? ` + ${aiMeasures.length} medida${aiMeasures.length > 1 ? 's' : ''} caseira${aiMeasures.length > 1 ? 's' : ''} detectada${aiMeasures.length > 1 ? 's' : ''}` : '';
             if (scanInfo) {
-                scanInfo.textContent = `✓ Campos preenchidos por ${model}. Revise os valores e salve.`;
+                scanInfo.textContent = `✓ Campos preenchidos por ${model}${measTxt}. Revise e salve.`;
             }
         } catch (err) {
             if (scanInfo) { scanInfo.style.color = 'var(--color-danger)'; scanInfo.textContent = `Erro: ${err.message}`; }
