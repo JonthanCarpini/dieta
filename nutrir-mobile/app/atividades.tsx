@@ -55,6 +55,14 @@ interface ActivityData {
   date: string;
 }
 
+interface ActivityHistoryEntry {
+  date_str: string;
+  steps: number;
+  steps_target: number;
+  steps_calories: number;
+  exercises: Exercise[];
+}
+
 const getLocalDateString = () => {
   const d = new Date();
   const year = d.getFullYear();
@@ -84,6 +92,12 @@ export default function AtividadesScreen() {
     queryFn: () => api.get(`/user/activity?date=${today}`).then((r) => r.data),
   });
 
+  // Busca o histórico recente de atividades
+  const { data: activityHistory } = useQuery<ActivityHistoryEntry[]>({
+    queryKey: ['activity-history'],
+    queryFn: () => api.get('/user/activity/history?limit=7').then((r) => r.data),
+  });
+
   const { isTracking, setTracking } = useStepTrackerStore();
 
   // Hook do Pedometer Nativo
@@ -107,6 +121,7 @@ export default function AtividadesScreen() {
     onSuccess: (data, variables) => {
       refetch();
       qc.invalidateQueries({ queryKey: ['daily-summary'] });
+      qc.invalidateQueries({ queryKey: ['activity-history'] });
       onSaveSuccess(variables);
     },
     onError: () => Alert.alert('Erro', 'Não foi possível salvar os passos.'),
@@ -138,6 +153,7 @@ export default function AtividadesScreen() {
       setExDuration('');
       setExCustomCal('');
       qc.invalidateQueries({ queryKey: ['daily-summary'] });
+      qc.invalidateQueries({ queryKey: ['activity-history'] });
     },
     onError: () => Alert.alert('Erro', 'Não foi possível adicionar o exercício.'),
   });
@@ -148,6 +164,7 @@ export default function AtividadesScreen() {
     onSuccess: () => {
       refetch();
       qc.invalidateQueries({ queryKey: ['daily-summary'] });
+      qc.invalidateQueries({ queryKey: ['activity-history'] });
     },
     onError: () => Alert.alert('Erro', 'Não foi possível remover o exercício.'),
   });
@@ -358,6 +375,68 @@ export default function AtividadesScreen() {
                   </View>
                 </View>
               ))
+            )}
+          </View>
+
+          {/* Seção de Histórico */}
+          <View style={[styles.section, { marginTop: spacing.md }]}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Histórico Recente</Text>
+            </View>
+
+            {!activityHistory || activityHistory.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>Nenhum histórico registrado nos últimos dias</Text>
+              </View>
+            ) : (
+              activityHistory.map((item, idx) => {
+                const dateParts = item.date_str.split('-');
+                let dateLabel = item.date_str;
+                if (dateParts.length === 3) {
+                  const todayStr = getLocalDateString();
+                  const nowSP = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+                  const yesterdaySP = new Date(nowSP);
+                  yesterdaySP.setDate(nowSP.getDate() - 1);
+                  const yesterdayStr = `${yesterdaySP.getFullYear()}-${String(yesterdaySP.getMonth() + 1).padStart(2, '0')}-${String(yesterdaySP.getDate()).padStart(2, '0')}`;
+
+                  if (item.date_str === todayStr) {
+                    dateLabel = 'Hoje';
+                  } else if (item.date_str === yesterdayStr) {
+                    dateLabel = 'Ontem';
+                  } else {
+                    dateLabel = `${dateParts[2]}/${dateParts[1]}`;
+                  }
+                }
+
+                const totalKcal = Math.round(Number(item.steps_calories) + item.exercises.reduce((sum, ex) => sum + Number(ex.calories), 0));
+
+                return (
+                  <View key={idx} style={styles.historyCard}>
+                    <View style={styles.historyHeaderRow}>
+                      <Text style={styles.historyDate}>{dateLabel}</Text>
+                      <Text style={styles.historyTotalKcal}>{totalKcal} kcal queimadas</Text>
+                    </View>
+
+                    <View style={styles.historyBody}>
+                      <View style={styles.historyRow}>
+                        <Text style={styles.historyLabel}>Passos:</Text>
+                        <Text style={styles.historyValue}>
+                          {item.steps.toLocaleString('pt-BR')} / {item.steps_target.toLocaleString('pt-BR')} ({Math.round(item.steps_calories)} kcal)
+                        </Text>
+                      </View>
+
+                      {item.exercises.length > 0 && (
+                        <View style={[styles.historyRow, { alignItems: 'flex-start', marginTop: 4 }]}>
+                          <Text style={styles.historyLabel}>Atividades:</Text>
+                          <Text style={[styles.historyValue, { flex: 1, textAlign: 'right' }]}>
+                            {item.exercises.map(ex => `${ex.name} (${ex.duration_min} min)`).join(', ')}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
             )}
           </View>
         </ScrollView>
@@ -661,5 +740,49 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  historyCard: {
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    gap: 8,
+  },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    paddingBottom: 6,
+  },
+  historyDate: {
+    ...typography.body,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  historyTotalKcal: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.accentOrange,
+  },
+  historyBody: {
+    gap: 4,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  historyLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  historyValue: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
 });

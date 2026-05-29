@@ -422,7 +422,7 @@ export default function DiarioScreen() {
             {/* Calorie Ring */}
             <View style={styles.ringSection}>
               <CalorieRing
-                consumed={netConsumedCal}
+                consumed={consumedCal}
                 goal={data?.calories.goal ?? 2000}
               />
               <View style={styles.netCalRow}>

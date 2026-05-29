@@ -76,9 +76,9 @@ export default function PerfilScreen() {
     }),
   });
 
-  const { data: weightHistory } = useQuery<WeightEntry[]>({
+  const { data: weightHistory } = useQuery<any[]>({
     queryKey: ['weight-history'],
-    queryFn: () => api.get('/profile/weight-history', { params: { days: 30 } }).then((r) => r.data),
+    queryFn: () => api.get('/user/weight-log').then((r) => r.data),
   });
 
   const updateProfileMutation = useMutation({
@@ -92,7 +92,7 @@ export default function PerfilScreen() {
   });
 
   const logWeightMutation = useMutation({
-    mutationFn: (weight: number) => api.post('/profile/weight', { weight_kg: weight }),
+    mutationFn: (weight: number) => api.post('/user/weight-log', { weight }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['weight-history'] });
       qc.invalidateQueries({ queryKey: ['profile'] });
@@ -137,8 +137,16 @@ export default function PerfilScreen() {
     ? user.name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
     : '?';
 
-  const weightData = weightHistory?.map((e) => e.weight) ?? [];
-  const weightLabels = weightHistory?.map((e) => e.label) ?? [];
+  const weightData = weightHistory?.map((e) => Number(e.weight)) ?? [];
+  const weightLabels = weightHistory?.map((e) => {
+    if (!e.date) return '';
+    const cleanDate = e.date.split('T')[0];
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}`;
+    }
+    return cleanDate;
+  }) ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
