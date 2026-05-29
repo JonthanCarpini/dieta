@@ -252,38 +252,76 @@ async function _runScan() {
         if (!res.ok) throw new Error((await res.json()).error || 'Erro na IA');
         const d = await res.json();
 
-        // Preenche campos
-        if (d.name)            _setField('pf-name',          d.name);
-        if (d.category)        _setField('pf-category',      d.category);
-        if (d.portion_grams)   _setField('pf-portion',       Math.round(d.portion_grams));
-        if (d.energy_kcal_100g)  _setField('pf-kcal',          parseFloat(d.energy_kcal_100g).toFixed(1));
-        if (d.protein_g)         _setField('pf-protein',       parseFloat(d.protein_g).toFixed(1));
-        if (d.fat_g)             _setField('pf-fat',           parseFloat(d.fat_g).toFixed(1));
-        if (d.carbs_g)           _setField('pf-carbs',         parseFloat(d.carbs_g).toFixed(1));
-        if (d.fiber_g)           _setField('pf-fiber',         parseFloat(d.fiber_g).toFixed(1));
-        if (d.sodium_mg)         _setField('pf-sodium',        parseFloat(d.sodium_mg).toFixed(0));
-        if (d.saturated_fat_g)   _setField('pf-saturated-fat', parseFloat(d.saturated_fat_g).toFixed(1));
-        if (d.trans_fat_g)       _setField('pf-trans-fat',     parseFloat(d.trans_fat_g).toFixed(2));
-        if (d.calcium_mg)        _setField('pf-calcium',       parseFloat(d.calcium_mg).toFixed(0));
-        if (d.iron_mg)           _setField('pf-iron',          parseFloat(d.iron_mg).toFixed(2));
-
-        // Medidas caseiras
-        _clearMeasures();
-        const aiMeasures = Array.isArray(d.measures) ? d.measures.filter(m => m.label && m.grams > 0) : [];
-        if (aiMeasures.length > 0) {
-            aiMeasures.forEach(m => _addMeasureRow(m.label, m.grams));
-        } else if (d.portion_grams && d.portion_grams !== 100) {
-            _addMeasureRow('1 porção', d.portion_grams);
-        }
-
+        const { measuresCount } = _fillFromAIData(d);
         const model   = d._meta?.model || 'IA';
-        const measTxt = aiMeasures.length ? ` · ${aiMeasures.length} medida${aiMeasures.length > 1 ? 's' : ''} detectada${aiMeasures.length > 1 ? 's' : ''}` : '';
+        const measTxt = measuresCount ? ` · ${measuresCount} medida${measuresCount > 1 ? 's' : ''} detectada${measuresCount > 1 ? 's' : ''}` : '';
         if (scanInfo) { scanInfo.textContent = `✓ Preenchido por ${model}${measTxt}. Revise e salve.`; }
 
     } catch (err) {
         if (scanInfo) { scanInfo.style.color = 'var(--color-danger)'; scanInfo.textContent = `Erro: ${err.message}`; }
     } finally {
         _updateAnalyzeBtn();
+    }
+}
+
+// Preenche o formulário com dados estruturados retornados pela IA (scan ou URL)
+function _fillFromAIData(d) {
+    if (d.name)            _setField('pf-name',          d.name);
+    if (d.category)        _setField('pf-category',      d.category);
+    if (d.portion_grams)   _setField('pf-portion',       Math.round(d.portion_grams));
+    if (d.energy_kcal_100g)  _setField('pf-kcal',          parseFloat(d.energy_kcal_100g).toFixed(1));
+    if (d.protein_g)         _setField('pf-protein',       parseFloat(d.protein_g).toFixed(1));
+    if (d.fat_g)             _setField('pf-fat',           parseFloat(d.fat_g).toFixed(1));
+    if (d.carbs_g)           _setField('pf-carbs',         parseFloat(d.carbs_g).toFixed(1));
+    if (d.fiber_g)           _setField('pf-fiber',         parseFloat(d.fiber_g).toFixed(1));
+    if (d.sodium_mg)         _setField('pf-sodium',        parseFloat(d.sodium_mg).toFixed(0));
+    if (d.saturated_fat_g)   _setField('pf-saturated-fat', parseFloat(d.saturated_fat_g).toFixed(1));
+    if (d.trans_fat_g)       _setField('pf-trans-fat',     parseFloat(d.trans_fat_g).toFixed(2));
+    if (d.calcium_mg)        _setField('pf-calcium',       parseFloat(d.calcium_mg).toFixed(0));
+    if (d.iron_mg)           _setField('pf-iron',          parseFloat(d.iron_mg).toFixed(2));
+
+    _clearMeasures();
+    const aiMeasures = Array.isArray(d.measures) ? d.measures.filter(m => m.label && m.grams > 0) : [];
+    if (aiMeasures.length > 0) {
+        aiMeasures.forEach(m => _addMeasureRow(m.label, m.grams));
+    } else if (d.portion_grams && d.portion_grams !== 100) {
+        _addMeasureRow('1 porção', d.portion_grams);
+    }
+    return { measuresCount: aiMeasures.length };
+}
+
+// ── Importar de URL ────────────────────────────────────────────────────────────
+async function _importFromUrl() {
+    const urlInput = document.getElementById('pf-url-input');
+    const status   = document.getElementById('pf-url-status');
+    const btn      = document.getElementById('pf-btn-url');
+    const url      = urlInput?.value.trim();
+
+    if (!url || !url.startsWith('http')) {
+        if (status) { status.style.display = 'block'; status.style.color = 'var(--color-danger)'; status.textContent = 'Cole um link válido (começando com http).'; }
+        return;
+    }
+
+    if (btn)    { btn.disabled = true; btn.textContent = 'Buscando...'; }
+    if (status) { status.style.display = 'block'; status.style.color = 'var(--accent)'; status.textContent = 'Buscando dados do produto na página…'; }
+
+    try {
+        const res = await fetch(`${API_URL}/ai/from-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+            body: JSON.stringify({ url })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Erro ao buscar link');
+        const d = await res.json();
+
+        const { measuresCount } = _fillFromAIData(d);
+        const model   = d._meta?.model || 'IA';
+        const measTxt = measuresCount ? ` · ${measuresCount} medida${measuresCount > 1 ? 's' : ''}` : '';
+        if (status) { status.textContent = `✓ Importado por ${model}${measTxt}. Revise e salve.`; }
+    } catch (err) {
+        if (status) { status.style.color = 'var(--color-danger)'; status.textContent = `Erro: ${err.message}`; }
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Buscar'; }
     }
 }
 
@@ -361,6 +399,12 @@ export function initProFoods() {
     document.getElementById('pf-search-input')?.addEventListener('input', e => {
         clearTimeout(_searchTimer);
         _searchTimer = setTimeout(() => loadProFoodsData(e.target.value.trim()), 300);
+    });
+
+    // Importar de URL
+    document.getElementById('pf-btn-url')?.addEventListener('click', _importFromUrl);
+    document.getElementById('pf-url-input')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); _importFromUrl(); }
     });
 
     // Adicionar linha de medida

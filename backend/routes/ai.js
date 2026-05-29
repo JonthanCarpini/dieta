@@ -528,6 +528,116 @@ IMPORTANTE:
   }
 });
 
+// POST /api/ai/from-url — extrai informações nutricionais de uma URL de produto
+router.post('/from-url', authenticateToken, async (req, res) => {
+  const t0 = Date.now();
+  try {
+    const { url } = req.body;
+    if (!url || !url.startsWith('http')) return res.status(400).json({ error: 'URL inválida.' });
+
+    // 1. Busca o HTML da página
+    const pageRes = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+      },
+      redirect: 'follow',
+    });
+    if (!pageRes.ok) throw new Error(`HTTP ${pageRes.status} ao buscar a URL.`);
+    const html = await pageRes.text();
+
+    // 2. Extrai conteúdo relevante do HTML
+    const content = _extractPageContent(html, url);
+    if (!content || content.length < 50) throw new Error('Não foi possível extrair conteúdo da página.');
+
+    // 3. Envia ao LLM
+    const cfg = await getLLMConfig();
+    const prompt = `Você é um sistema de extração de dados de produtos alimentícios.
+
+Analise o conteúdo HTML/texto abaixo de uma página de produto de supermercado e extraia as informações nutricionais.
+
+CONTEÚDO DA PÁGINA:
+---
+${content}
+---
+
+Retorne SOMENTE um JSON válido com a seguinte estrutura (sem markdown, sem explicações):
+{
+  "name": "nome completo do produto incluindo marca, sabor e variante",
+  "category": "categoria do alimento em português (ex: Laticínios, Grãos e Cereais, Pães, Bebidas, Carnes, Industrializados, etc.)",
+  "portion_grams": porção de referência em gramas (número),
+  "energy_kcal_100g": kcal por 100g (número),
+  "energy_kcal_portion": kcal por porção (número ou null),
+  "protein_g": proteínas por 100g (número),
+  "fat_g": lipídios/gorduras totais por 100g (número),
+  "saturated_fat_g": gordura saturada por 100g (número ou null),
+  "trans_fat_g": gordura trans por 100g (número ou null),
+  "carbs_g": carboidratos totais por 100g (número),
+  "fiber_g": fibra alimentar por 100g (número ou null),
+  "sodium_mg": sódio em mg por 100g (número ou null),
+  "calcium_mg": cálcio em mg por 100g (número ou null),
+  "iron_mg": ferro em mg por 100g (número ou null),
+  "measures": [ { "label": "descrição da medida (ex: 1 unidade, 1 fatia, 1 colher de sopa)", "grams": equivalência em gramas } ]
+}
+
+IMPORTANTE: Normalize todos os valores para 100g. Se algum campo não estiver disponível na página, use null.`;
+
+    const { text, provider, model } = await callLLM(cfg, prompt);
+    const result = JSON.parse(extractJson(text));
+    result._meta = { provider, model, latency_ms: Date.now() - t0, source: 'url' };
+    res.json(result);
+
+  } catch (err) {
+    console.error('Erro from-url:', err.message);
+    res.status(502).json({ error: err.message || 'Falha ao extrair dados da URL.' });
+  }
+});
+
+// Extrai texto relevante do HTML para não ultrapassar o contexto do LLM
+function _extractPageContent(html, url) {
+  // 1. Tenta extrair JSON-LD (structured data)
+  const jsonLdMatches = html.match(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
+  const jsonLdTexts   = jsonLdMatches.map(m => m.replace(/<[^>]+>/g, '').trim()).join('\n');
+
+  // 2. Remove tags desnecessárias
+  let text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<header[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<aside[\s\S]*?<\/aside>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  // 3. Encontra a seção de informações nutricionais
+  const keywords = ['nutricional', 'nutrição', 'nutrientes', 'porção', 'calorias', 'proteínas', 'carboidratos', 'lipídios', 'sódio', 'gordura'];
+  let bestIdx = -1, bestScore = 0;
+  for (const kw of keywords) {
+    let idx = 0;
+    while ((idx = text.toLowerCase().indexOf(kw, idx)) !== -1) {
+      // conta quantas keywords estão próximas
+      const window = text.slice(Math.max(0, idx - 500), idx + 1000).toLowerCase();
+      const score  = keywords.filter(k => window.includes(k)).length;
+      if (score > bestScore) { bestScore = score; bestIdx = idx; }
+      idx++;
+    }
+  }
+
+  // 4. Extrai janela ao redor da seção nutricional + início da página (nome do produto)
+  const pageStart   = text.slice(0, 600);
+  const nutritional = bestIdx > -1 ? text.slice(Math.max(0, bestIdx - 200), bestIdx + 2000) : text.slice(0, 3000);
+
+  return `URL: ${url}\n\nJSON-LD ESTRUTURADO:\n${jsonLdTexts.slice(0, 1500)}\n\nINÍCIO DA PÁGINA:\n${pageStart}\n\nSEÇÃO NUTRICIONAL:\n${nutritional}`.slice(0, 8000);
+}
+
 router.getLLMConfig = getLLMConfig;
 router.callLLM = callLLM;
 
