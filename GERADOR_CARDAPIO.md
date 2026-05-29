@@ -281,7 +281,7 @@ Recurso polido, com variedade e ajustes finos, mantendo precisão numérica.
 
 ## 📋 FASE 6 — Camada Culinária Curada (cultura + regionalidade)
 **Status:** ✅ CONCLUÍDA (2026-05-29) — `curated_foods` + `seed_curated.json` + `match-curated.js`; `fetchFoodPool`/`micros` meal-aware.
-**Resultado:** café sem arroz, só staples nacionais, variedade por fonte. Seed atual = 94 itens (expansível). Re-semear: `docker exec nutrir_backend node nutrition/match-curated.js`.
+**Resultado:** café sem arroz, só staples nacionais, variedade por fonte. **Seed = 192 itens** (de ~196 no JSON; 4 sem match na TACO são pulados). Pool de almoço ~39 proteínas / 37 vegetais → ótima variedade entre dias. Re-semear após editar `seed_curated.json`: `docker exec nutrir_backend node nutrition/match-curated.js`.
 **Por quê:** a TACO é banco **nutricional**, não **culinário**. Gera "arroz no café" (cultura) e
 alimentos exóticos/indisponíveis (regionalidade). Solução: uma camada curada por cima da TACO.
 
