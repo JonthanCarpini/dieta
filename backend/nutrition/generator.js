@@ -56,7 +56,9 @@ const MEAL_TEMPLATES = {
 const ROLE_OWNS = { protein: 'protein', fat: 'fat', carb: 'kcal', legume: null, dairy: null, vegetable: null, fruit: null };
 const ROLE_FALLBACK = { protein: 'legume', dairy: null };
 const FIXED_PORTION = { vegetable: 90, fruit: 130, legume: 80, dairy: 200 };
-const CLAMP = { protein: [40, 220], carb: [30, 400], legume: [40, 150], dairy: [120, 250], fat: [3, 15], fruit: [80, 200], vegetable: [50, 150] };
+// mínimos baixos para NÃO inflar porções caseiras curadas (ex: queijo 30g) — antes
+// dairy mínimo 120 forçava queijo a 120g = ~400kcal, estourando a meta.
+const CLAMP = { protein: [30, 220], carb: [20, 400], legume: [30, 180], dairy: [15, 250], fat: [3, 30], fruit: [30, 220], vegetable: [25, 180] };
 // fixos primeiro, depois proteína, gordura, e CARBO por último (fecha kcal)
 const ROLE_ORDER = ['vegetable', 'fruit', 'legume', 'dairy', 'protein', 'fat', 'carb'];
 
@@ -155,7 +157,7 @@ function scaleItem(food, grams) {
   const item = {
     alimento_id: food.id, name: food.nome,
     medida_label: 'grama(s)', medida_grams: 1, quantidade: grams, grams,
-    available_measures: [], per100: food.per100,
+    available_measures: [{ label: 'grama(s)', grams: 1 }], per100: food.per100,
     calories: round1(food.per100.calories * f), protein: round1(food.per100.protein * f),
     carbs: round1(food.per100.carbs * f), fat: round1(food.per100.fat * f), fiber: round1(food.per100.fiber * f),
   };

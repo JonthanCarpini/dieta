@@ -556,7 +556,7 @@ export async function openSubstituteModal(dow, mealType, dayIdx, mealIdx, idx) {
         const newItem = {
             alimento_id: sub.alimento_id, name: sub.name,
             medida_label: 'grama(s)', medida_grams: 1, quantidade: grams, grams,
-            available_measures: [], per100: sub.per100, role: item.role,
+            available_measures: [{ label: 'grama(s)', grams: 1 }], per100: sub.per100, role: item.role,
             ...calcItemMacrosAndMicros(sub.per100, grams),
         };
         adminState._editingPlanData.days[dayIdx].meals[mealIdx].items[idx] = newItem;
