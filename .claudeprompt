@@ -1,0 +1,8 @@
+# Regras de Sincronização de IA (Claude)
+
+Antes de iniciar qualquer análise, modificação de código ou sugestão neste projeto, você DEVE seguir as seguintes diretrizes:
+
+1. **Leia o arquivo `CONTEXT.md`** na raiz do projeto. Ele é a nossa fonte central de verdade sobre o estado atual do aplicativo, backend e banco de dados.
+2. **Verifique o histórico recente** do git rodando `git status` e `git log -n 5 --oneline` para ver quais commits e arquivos foram modificados pelo outro agente (Gemini no Antigravity).
+3. **Mantenha o contexto atualizado**: Ao finalizar qualquer tarefa ou alteração significativa, atualize a respectiva seção em `CONTEXT.md` com detalhes técnicos e marque a tarefa como concluída.
+4. **Respeite os padrões estabelecidos**: Mantenha as tecnologias e padrões do projeto (React Native Expo, vanilla CSS no front, WebSocket sinalização customizada no backend, PostgreSQL).
