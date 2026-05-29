@@ -35,12 +35,14 @@ function computeWeeklyPanorama(plan_data, dri) {
   return { report, perDay };
 }
 
-// melhores "carregadores" do micro (maior densidade por kcal)
-function bestCarriers(micro, pool) {
+// melhores "carregadores" do micro DENTRO da refeição (preserva coerência cultural)
+function bestCarriers(micro, pool, meal) {
   const key = per100Key(micro);
   const out = [];
-  for (const role of Object.keys(pool)) {
-    for (const food of pool[role]) {
+  const roles = pool[meal] ? Object.keys(pool[meal]) : [];
+  for (const role of roles) {
+    if (role.startsWith('_')) continue;
+    for (const food of (pool[meal][role] || [])) {
       const m = Number(food.per100[key]) || 0;
       if (m <= 0) continue;
       const kcal = Number(food.per100.calories) || 0;
@@ -92,21 +94,21 @@ function compensateMicros(plan_data, pool, config, dri) {
 
     let improved = false;
     for (const micro of deficits) {
-      const carriers = bestCarriers(micro, pool);
-      if (!carriers.length) continue;
       // dias ordenados pelo menor teor do micro (reforçar onde está mais baixo)
       const days = [...plan_data.days].sort((a, b) => (pano.perDay[a.dow][micro] || 0) - (pano.perDay[b.dow][micro] || 0));
       let done = false;
 
-      for (const carrier of carriers) {
-        for (const day of days) {
-          const di = plan_data.days.indexOf(day);
-          for (let mi = 0; mi < day.meals.length && !done; mi++) {
-            const meal = day.meals[mi];
+      for (const day of days) {
+        const di = plan_data.days.indexOf(day);
+        for (let mi = 0; mi < day.meals.length && !done; mi++) {
+          const meal = day.meals[mi];
+          // carregadores ricos no micro DENTRO desta refeição (mantém coerência cultural)
+          const carriers = bestCarriers(micro, pool, meal.type);
+          for (const carrier of carriers) {
             for (let ii = 0; ii < meal.items.length; ii++) {
               const item = meal.items[ii];
               if (item.role !== carrier.role || item.alimento_id === carrier.food.id) continue;
-              const key = `${micro}|${di}|${mi}|${ii}`;
+              const key = `${micro}|${di}|${mi}|${ii}|${carrier.food.id}`;
               if (attempted.has(key)) continue;
 
               const ni = swapItemIso(item, carrier.food);
@@ -118,7 +120,6 @@ function compensateMicros(plan_data, pool, config, dri) {
 
               const kcalOk = config.kcal ? Math.abs(dayKcal(day) - config.kcal) / config.kcal <= KCAL_TOL : true;
               const ulAfter = dayMicroTotals(day, ULK);
-              // não pode estourar UL nem piorar um micro que já estava acima
               const ulOk = ULK.every(k => ulAfter[k] <= Math.max(L.UL[k], ulBefore[k] + 0.001));
 
               if (kcalOk && ulOk) {
@@ -127,7 +128,7 @@ function compensateMicros(plan_data, pool, config, dri) {
                 swapLog.push({ micro, dow: day.dow });
                 improved = true; done = true; break;
               } else {
-                meal.items[ii] = old; // reverte
+                meal.items[ii] = old;
                 attempted.add(key);
               }
             }

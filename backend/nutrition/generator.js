@@ -64,9 +64,59 @@ const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const round1 = n => Math.round(n * 10) / 10;
 const round  = n => Math.round(n);
 
-// ── Busca o pool de alimentos por papel ───────────────────────────────────────
+const MEAL_KEYS = ['cafe_da_manha', 'lanche_manha', 'almoco', 'lanche_tarde', 'jantar', 'ceia'];
+// tag curada (café/lanche/almoço/jantar/ceia) → tipos de refeição do sistema
+const TAG_TO_MEALS = {
+  cafe:   ['cafe_da_manha'],
+  lanche: ['lanche_manha', 'lanche_tarde'],
+  almoco: ['almoco'],
+  jantar: ['jantar'],
+  ceia:   ['ceia'],
+};
+
+// ── Pool de alimentos POR REFEIÇÃO (curated) com fallback à TACO legada ───────
 async function fetchFoodPool(db, exclusions) {
-  const pool = {};
+  // 1) Tenta a camada curada (Fase 6) — pool[meal][role]
+  try {
+    const cols = MICRO_KEYS.map(k => 'a.' + k).join(', ');
+    const res = await db.query(`
+      SELECT c.display_name, c.role, c.meals, c.default_portion_g,
+             a.id AS alimento_id, a.grupo, a.kcal, a.ptn, a.cho, a.lip, a.fibras, ${cols}
+      FROM curated_foods c JOIN alimentos a ON a.id = c.alimento_id
+      WHERE c.active = true`);
+    if (res.rows.length) return _buildCuratedPool(res.rows, exclusions);
+  } catch (_) { /* tabela ainda não existe → fallback */ }
+  // 2) Fallback legado (TACO por grupo, replicado em todas as refeições)
+  return _fetchLegacyPool(db, exclusions);
+}
+
+function _toCuratedFood(r) {
+  const per100 = {
+    calories: Number(r.kcal) || 0, protein: Number(r.ptn) || 0,
+    carbs: Number(r.cho) || 0, fat: Number(r.lip) || 0, fiber: Number(r.fibras) || 0,
+  };
+  MICRO_KEYS.forEach(k => { per100[k] = Number(r[k]) || 0; });
+  return { id: r.alimento_id, nome: r.display_name, grupo: r.grupo, per100, portion: Number(r.default_portion_g) || null };
+}
+
+function _buildCuratedPool(rows, exclusions) {
+  const pool = {}; MEAL_KEYS.forEach(m => { pool[m] = {}; });
+  for (const r of rows) {
+    if (planner.isExcluded({ nome: r.display_name, grupo: r.grupo }, exclusions)) continue;
+    const food = _toCuratedFood(r);
+    const tags = Array.isArray(r.meals) ? r.meals : JSON.parse(r.meals || '[]');
+    const meals = new Set();
+    tags.forEach(t => (TAG_TO_MEALS[t] || []).forEach(m => meals.add(m)));
+    meals.forEach(m => {
+      (pool[m][r.role] = pool[m][r.role] || []).push(food);
+    });
+  }
+  pool._curated = true;
+  return pool;
+}
+
+async function _fetchLegacyPool(db, exclusions) {
+  const byRole = {};
   for (const [role, grupos] of Object.entries(ROLE_GROUPS)) {
     const microReq    = role === 'fat' ? '' : 'AND ca>0 AND fe>0 AND na>0 AND k>0';
     const macroFilter = ROLE_MACRO_FILTER[role] ? `AND ${ROLE_MACRO_FILTER[role]}` : '';
@@ -76,15 +126,17 @@ async function fetchFoodPool(db, exclusions) {
       FROM alimentos
       WHERE (tipo IS NULL OR tipo='alimento') AND grupo IN (${grpList})
         ${microReq} ${macroFilter} AND kcal > 0
-      ORDER BY nome
-      LIMIT 200`;
+      ORDER BY nome LIMIT 200`;
     let rows = [];
     try { rows = (await db.query(sql, grupos)).rows; } catch (e) { rows = []; }
-    pool[role] = rows
+    byRole[role] = rows
       .filter(r => !planner.isExcluded(r, exclusions))
       .filter(r => BLACKLIST_SKIP.has(role) || !NAME_BLACKLIST.test(r.nome || ''))
       .map(toFood);
   }
+  // replica o pool por papel em todas as refeições (sem distinção cultural)
+  const pool = {}; MEAL_KEYS.forEach(m => { pool[m] = { ...byRole }; });
+  pool._curated = false;
   return pool;
 }
 
@@ -121,7 +173,7 @@ function fillMeal(target, picks) {
     const owns = ROLE_OWNS[role];
     let grams;
     if (!owns) {
-      grams = FIXED_PORTION[role] || 100;                       // porção fixa
+      grams = food.portion || FIXED_PORTION[role] || 100;        // porção caseira curada, senão padrão
     } else if (owns === 'kcal') {
       const perG = (food.per100.calories || 0) / 100;           // carbo fecha energia
       grams = perG > 0 ? remaining.kcal / perG : (CLAMP[role][0]);
@@ -188,19 +240,26 @@ function shuffle(arr, seed) {
   return a;
 }
 
-// ── Geração do plano semanal (7 dias) ─────────────────────────────────────────
+// ── Geração do plano semanal (7 dias) — pools por refeição ────────────────────
 function generatePlan(pool, config) {
   const shuffled = {}; const cursor = {};
-  for (const role of Object.keys(pool)) {
-    shuffled[role] = shuffle(pool[role], (config.kcal || 2000) + role.length * 7);
-    cursor[role] = 0;
+  for (const meal of MEAL_KEYS) {
+    shuffled[meal] = {};
+    const roles = pool[meal] ? Object.keys(pool[meal]) : [];
+    for (const role of roles) {
+      shuffled[meal][role] = shuffle(pool[meal][role], (config.kcal || 2000) + role.length * 7 + meal.length);
+      cursor[`${meal}|${role}`] = 0;
+    }
   }
-  const nextFood = role => {
-    let list = shuffled[role];
-    if ((!list || !list.length) && ROLE_FALLBACK[role]) { role = ROLE_FALLBACK[role]; list = role ? shuffled[role] : null; }
+  const nextFood = (meal, role) => {
+    let r = role;
+    let list = shuffled[meal] ? shuffled[meal][r] : null;
+    if ((!list || !list.length) && ROLE_FALLBACK[role]) { r = ROLE_FALLBACK[role]; list = r && shuffled[meal] ? shuffled[meal][r] : null; }
     if (!list || !list.length) return null;
-    const f = list[cursor[role] % list.length];
-    cursor[role]++;
+    const key = `${meal}|${r}`;
+    cursor[key] = cursor[key] || 0;
+    const f = list[cursor[key] % list.length];
+    cursor[key]++;
     return f;
   };
 
@@ -212,7 +271,7 @@ function generatePlan(pool, config) {
       const template = MEAL_TEMPLATES[mealType] || [];
       const picks = [];
       for (const role of template) {
-        const f = nextFood(role);
+        const f = nextFood(mealType, role);
         if (f) picks.push({ role, food: f });
       }
       const items = picks.length ? fillMeal(mt, picks) : [];
