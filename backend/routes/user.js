@@ -889,21 +889,35 @@ router.post('/clinical', async (req, res) => {
 });
 
 router.post('/exams', async (req, res) => {
-  const { fileName, mimeType, fileBase64, notes } = req.body;
-  if (!fileName || !mimeType || !fileBase64) {
+  const { 
+    name, fileName, 
+    type, mimeType, mime_type,
+    base64, fileBase64, 
+    category, 
+    size_kb, sizeKb,
+    notes 
+  } = req.body;
+
+  const fName = name || fileName;
+  const mType = mimeType || mime_type || (type === 'image' ? 'image/png' : 'application/pdf');
+  const fBase64 = base64 || fileBase64;
+  const fSize = size_kb || sizeKb || 0;
+  const fCategory = category || 'Outro';
+
+  if (!fName || !mType || !fBase64) {
     return res.status(400).json({ error: 'Arquivo ou metadados ausentes.' });
   }
 
   try {
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(mimeType)) {
+    if (!allowedTypes.includes(mType)) {
       return res.status(400).json({ error: 'Tipo de arquivo não suportado. Envie apenas PDF ou Imagens (JPEG/PNG/WEBP).' });
     }
 
-    const base64Data = fileBase64.replace(/^data:.*?;base64,/, "");
+    const base64Data = fBase64.replace(/^data:.*?;base64,/, "");
     const buffer = Buffer.from(base64Data, 'base64');
     
-    const fileExt = fileName.substring(fileName.lastIndexOf('.'));
+    const fileExt = fName.substring(fName.lastIndexOf('.'));
     const uniqueName = `exam_${req.user.id}_${Date.now()}${fileExt}`;
     const relativePath = `uploads/exams/${uniqueName}`;
     const absolutePath = path.join(__dirname, '..', relativePath);
@@ -911,12 +925,21 @@ router.post('/exams', async (req, res) => {
     fs.writeFileSync(absolutePath, buffer);
 
     const result = await db.query(`
-      INSERT INTO patient_exams (patient_id, file_name, file_path, mime_type, notes)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `, [req.user.id, fileName, relativePath, mimeType, notes || '']);
+      INSERT INTO patient_exams (patient_id, file_name, file_path, mime_type, category, size_kb, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, file_name AS name, mime_type, category, size_kb, created_at AS uploaded_at, notes, file_path
+    `, [req.user.id, fName, relativePath, mType, fCategory, fSize, notes || '']);
 
-    res.status(201).json(result.rows[0]);
+    const row = result.rows[0];
+    res.status(201).json({
+      id: row.id,
+      name: row.name,
+      type: row.mime_type.startsWith('image/') ? 'image' : 'pdf',
+      size_kb: row.size_kb,
+      uploaded_at: row.uploaded_at,
+      category: row.category,
+      url: `https://nutrir.online/api/user/exams/download/${path.basename(row.file_path)}`
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao fazer upload do exame.' });
@@ -926,10 +949,21 @@ router.post('/exams', async (req, res) => {
 router.get('/exams', async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT id, file_name, file_path, mime_type, notes, created_at FROM patient_exams WHERE patient_id = $1 ORDER BY created_at DESC',
+      'SELECT id, file_name, file_path, mime_type, category, size_kb, notes, created_at FROM patient_exams WHERE patient_id = $1 ORDER BY created_at DESC',
       [req.user.id]
     );
-    res.json(result.rows);
+
+    const mapped = result.rows.map(row => ({
+      id: row.id,
+      name: row.file_name,
+      type: row.mime_type.startsWith('image/') ? 'image' : 'pdf',
+      size_kb: row.size_kb || 0,
+      uploaded_at: row.created_at,
+      category: row.category || 'Outro',
+      url: `https://nutrir.online/api/user/exams/download/${path.basename(row.file_path)}`
+    }));
+
+    res.json(mapped);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar exames.' });

@@ -437,6 +437,11 @@ async function runMigrations() {
     )
   `);
   await db.query(`
+    ALTER TABLE patient_exams 
+      ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Outro',
+      ADD COLUMN IF NOT EXISTS size_kb INTEGER DEFAULT 0
+  `).catch((e) => console.error('Patient exams alter columns skip:', e.message));
+  await db.query(`
     CREATE INDEX IF NOT EXISTS idx_patient_exams_patient ON patient_exams(patient_id)
   `);
   console.log('Migrações executadas com sucesso.');

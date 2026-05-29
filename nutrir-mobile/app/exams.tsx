@@ -83,11 +83,11 @@ export default function ExamsScreen() {
 
   const { data: exams, isLoading, refetch } = useQuery<Exam[]>({
     queryKey: ['exams'],
-    queryFn: () => api.get('/profile/exams').then((r) => r.data),
+    queryFn: () => api.get('/user/exams').then((r) => r.data),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/profile/exams/${id}`),
+    mutationFn: (id: number) => api.delete(`/user/exams/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams'] }),
     onError: () => Alert.alert('Erro', 'Não foi possível excluir o exame.'),
   });
@@ -130,7 +130,7 @@ export default function ExamsScreen() {
       const fileType = asset.mimeType ?? 'application/octet-stream';
       const examType: 'pdf' | 'image' = fileType.startsWith('image/') ? 'image' : 'pdf';
 
-      await api.post('/profile/exams', {
+      await api.post('/user/exams', {
         name: asset.name,
         type: examType,
         category,
