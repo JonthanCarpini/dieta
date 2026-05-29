@@ -3,7 +3,7 @@
  */
 import { API_URL, adminState } from './state.js';
 import { loadAppointmentsData } from './pro-appointments.js';
-import { openMealPlanBuilder } from './pro-meals.js';
+import { openMealPlanBuilder, openGenerateModal } from './pro-meals.js';
 import { renderEnergyCalcTab } from './pro-energy.js';
 
 let localStream = null;
@@ -1857,9 +1857,14 @@ function _renderPatientPlansInTab(plans, patientId) {
                 <h3 style="margin:0; font-size:14px; font-weight:700;">Cardápios de ${patient?.name || 'Paciente'}</h3>
                 <p class="description" style="margin:4px 0 0; font-size:11px;">${plans.length} cardápio${plans.length !== 1 ? 's' : ''} encontrado${plans.length !== 1 ? 's' : ''}</p>
             </div>
-            <button class="btn-primary btn-sm" id="btn-new-plan-for-patient">
-                <i data-lucide="plus" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Novo Cardápio
-            </button>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-secondary btn-sm" id="btn-generate-plan">
+                    <i data-lucide="sparkles" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Gerar Automático
+                </button>
+                <button class="btn-primary btn-sm" id="btn-new-plan-for-patient">
+                    <i data-lucide="plus" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Novo Cardápio
+                </button>
+            </div>
         </div>
         ${plansHtml}
     `;
@@ -1868,6 +1873,11 @@ function _renderPatientPlansInTab(plans, patientId) {
         adminState._fromPatient      = patientId;
         adminState._newPlanPatientId = patientId;
         openMealPlanBuilder(null);
+    });
+
+    container.querySelector('#btn-generate-plan')?.addEventListener('click', () => {
+        adminState._fromPatient = patientId;
+        openGenerateModal(patientId);
     });
 
     container.querySelectorAll('.btn-open-plan-from-patient').forEach(btn => {

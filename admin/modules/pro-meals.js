@@ -282,6 +282,8 @@ export async function openMealPlanBuilder(planId) {
     const listEl = document.getElementById('patient-meal-plan-list');
     if (listEl) listEl.style.display = 'none';
     document.getElementById('meal-plans-builder-view').classList.remove('hidden');
+    const genReport = document.getElementById('builder-gen-report');
+    if (genReport) genReport.innerHTML = ''; // limpa relatório de rascunho gerado
 
     if (planId) {
         try {
@@ -337,6 +339,179 @@ export async function openMealPlanBuilder(planId) {
         updateBuilderClinicalBanner(adminState._newPlanPatientId);
         adminState._newPlanPatientId = null;
     }
+    if (window.lucide) window.lucide.createIcons();
+}
+
+// ==========================================
+// GERADOR AUTOMÁTICO (Fase 4 — UI)
+// ==========================================
+
+const _DOW_LABEL = { 1:'Seg', 2:'Ter', 3:'Qua', 4:'Qui', 5:'Sex', 6:'Sáb', 0:'Dom' };
+
+// Abre o modal de configuração da geração automática
+export function openGenerateModal(patientId) {
+    document.getElementById('gen-modal-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'gen-modal-overlay';
+    ov.className = 'wd-dup-overlay';
+    ov.innerHTML = `
+        <div class="wd-dup-modal" style="max-width:480px;">
+            <div class="wd-dup-modal-header">
+                <div>
+                    <h3 style="margin:0 0 3px;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;">
+                        <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--accent);"></i> Gerar Cardápio Automático
+                    </h3>
+                    <p style="margin:0;font-size:12px;color:var(--text-2);">Rascunho semanal respeitando metas, restrições e micronutrientes. Você revisa antes de salvar.</p>
+                </div>
+                <button id="gen-close" style="background:none;border:none;font-size:22px;color:var(--text-2);cursor:pointer;line-height:1;padding:0 4px;">×</button>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                        <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);">Objetivo</label>
+                        <select id="gen-objetivo" style="padding:8px 10px;font-size:13px;background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+                            <option value="">Automático (perfil)</option>
+                            <option value="lose">Emagrecer</option>
+                            <option value="gain">Ganhar Massa</option>
+                            <option value="maintain">Manutenção</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                        <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);">Meta kcal (opcional)</label>
+                        <input type="number" id="gen-kcal" placeholder="Auto (GET/perfil)" min="800" step="50" style="padding:8px 10px;font-size:13px;background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);box-sizing:border-box;">
+                    </div>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--text);">
+                    <input type="checkbox" id="gen-micro" checked style="width:auto;margin:0;"> Compensar micronutrientes na semana
+                </label>
+                <div style="font-size:11px;color:var(--text-2);background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.5;">
+                    <i data-lucide="info" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i>
+                    Macros, distribuição por refeição e exclusões (alergias/intolerâncias) vêm do perfil/ficha clínica do paciente.
+                </div>
+            </div>
+
+            <div class="wd-dup-footer">
+                <span id="gen-status" style="font-size:12px;color:var(--text-2);"></span>
+                <div style="display:flex;gap:8px;">
+                    <button id="gen-cancel" class="btn-secondary">Cancelar</button>
+                    <button id="gen-run" class="btn-primary">
+                        <i data-lucide="sparkles" style="width:13px;height:13px;display:inline;vertical-align:middle;margin-right:4px;"></i> Gerar Rascunho
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    if (window.lucide) window.lucide.createIcons();
+
+    const close = () => ov.remove();
+    ov.querySelector('#gen-close').addEventListener('click', close);
+    ov.querySelector('#gen-cancel').addEventListener('click', close);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+
+    ov.querySelector('#gen-run').addEventListener('click', async () => {
+        const objetivo = ov.querySelector('#gen-objetivo').value;
+        const kcal     = parseFloat(ov.querySelector('#gen-kcal').value) || undefined;
+        const micro    = ov.querySelector('#gen-micro').checked;
+        const runBtn   = ov.querySelector('#gen-run');
+        const status   = ov.querySelector('#gen-status');
+        runBtn.disabled = true;
+        status.textContent = 'Gerando… (pode levar alguns segundos)';
+        try {
+            const body = { micro };
+            if (objetivo) body.objetivo = objetivo;
+            if (kcal)     body.kcal = kcal;
+            const res = await fetch(`${API_URL}/professional/patients/${patientId}/generate-plan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao gerar');
+            close();
+            loadGeneratedPlan(data, patientId);
+        } catch (err) {
+            status.textContent = 'Erro: ' + err.message;
+            runBtn.disabled = false;
+        }
+    });
+}
+
+// Carrega o rascunho gerado no builder existente, com relatório de adequação
+export function loadGeneratedPlan(data, patientId) {
+    _expandedMeal = null;
+    const listEl = document.getElementById('patient-meal-plan-list');
+    if (listEl) listEl.style.display = 'none';
+    document.getElementById('meal-plans-builder-view').classList.remove('hidden');
+
+    adminState._editingPlanId     = null;       // rascunho novo
+    adminState._editingPlanData   = data.plan_data;
+    adminState._editingPlanActive = true;
+
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    const nameInput = document.getElementById('plan-name-input');
+    if (nameInput) nameInput.value = `Cardápio gerado — ${hoje}`;
+    const patSel = document.getElementById('plan-patient-select');
+
+    const togBtn = document.getElementById('btn-toggle-active-plan');
+    if (togBtn) { togBtn.textContent = 'Desativar'; togBtn.className = 'btn-secondary btn-sm'; }
+
+    document.querySelectorAll('.plan-day-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('.plan-day-tab[data-dow="1"]')?.classList.add('active');
+    renderPlanDayEditor(1);
+
+    populatePlanPatientSelect().then(() => {
+        if (patSel) patSel.value = patientId || '';
+        updateBuilderClinicalBanner(patientId);
+    });
+
+    _renderGenReport(data.summary || [], data.adequacy, data.config);
+    if (window.lucide) window.lucide.createIcons();
+}
+
+// Renderiza banner de rascunho + painel de adequação no topo do builder
+function _renderGenReport(summary, adequacy, config) {
+    const box = document.getElementById('builder-gen-report');
+    if (!box) return;
+    if (!adequacy) { box.innerHTML = ''; return; }
+
+    const STATUS = {
+        ok:          { c: '#4ade80', bg: 'rgba(74,222,128,.12)', t: 'OK' },
+        baixo:       { c: '#f5c14d', bg: 'rgba(245,193,77,.12)', t: 'baixo' },
+        muito_baixo: { c: '#f87171', bg: 'rgba(248,113,113,.14)', t: 'muito baixo' },
+        alto:        { c: '#f87171', bg: 'rgba(248,113,113,.14)', t: 'alto' },
+        monitorar:   { c: '#94a3b8', bg: 'rgba(148,163,184,.12)', t: 'monitorar' },
+        sem_dado:    { c: '#94a3b8', bg: 'rgba(148,163,184,.10)', t: '—' },
+    };
+    const chip = m => {
+        const s = STATUS[m.status] || STATUS.sem_dado;
+        const reinf = m.reinforcedDays?.length ? ` · ⤴${m.reinforcedDays.map(d => _DOW_LABEL[d]).join('/')}` : '';
+        const val = m.key === 'na' && m.maxDay != null ? `${m.maxDay}${m.unit}/dia` : (m.pct != null ? `${m.pct}%` : '—');
+        return `<span title="${m.label}: ${val}${reinf}" style="display:inline-flex;align-items:center;gap:4px;background:${s.bg};color:${s.c};border:1px solid ${s.c}33;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;">
+            ${m.label.replace(/\s*\(.*\)/, '')} ${val}</span>`;
+    };
+
+    const kcalChips = (summary || []).map(s => {
+        const dev = Math.abs(s.devKcalPct || 0);
+        const col = dev <= 10 ? '#4ade80' : (dev <= 20 ? '#f5c14d' : '#f87171');
+        return `<span style="font-size:10.5px;color:var(--text-2);">${_DOW_LABEL[s.dow]} <strong style="color:${col};">${s.kcal}</strong></span>`;
+    }).join(' · ');
+
+    box.innerHTML = `
+        <div style="background:var(--accent-dim);border:1px solid rgba(245,193,77,.25);border-radius:10px;padding:12px 14px;margin:10px 0;">
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px;">
+                <i data-lucide="sparkles" style="width:15px;height:15px;"></i> Rascunho gerado por IA — revise e ajuste antes de salvar
+            </div>
+            <div style="font-size:12px;color:var(--text-2);">kcal/dia (alvo ${config?.kcal || '—'}): ${kcalChips}</div>
+        </div>
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">Adequação de Micronutrientes (média semanal)</span>
+                <span style="font-size:11px;color:var(--text-2);">${adequacy.summary.ok}/${adequacy.summary.total} OK · ${adequacy.summary.swaps} ajustes</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">${adequacy.micros.map(chip).join('')}</div>
+            ${adequacy.floorAlerts?.length ? `<div style="margin-top:8px;font-size:11px;color:#f5c14d;"><i data-lucide="alert-triangle" style="width:11px;height:11px;display:inline;vertical-align:middle;"></i> Piso diário abaixo: ${adequacy.floorAlerts.map(f => f.label.replace(/\s*\(.*\)/, '') + ' (' + f.daysBelow.length + 'd)').join(', ')}</div>` : ''}
+        </div>`;
     if (window.lucide) window.lucide.createIcons();
 }
 
