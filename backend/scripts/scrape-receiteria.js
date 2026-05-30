@@ -128,12 +128,13 @@ const UNIT_G = [
 function parseGrams(line) {
   const low = line.toLowerCase();
   if (/\ba gosto\b|q\.?\s?b\.?|quanto baste|a vontade|à vontade/.test(low)) return 0;
-  // (N gramas|g|ml|l|kg) explícito
-  let m = low.match(/\((?:cerca de\s*)?(\d+(?:[.,]\d+)?)\s*(gramas?|g|ml|mls|l|litros?|kg)\b/);
+  // massa/volume explícita EM QUALQUER LUGAR da linha (parênteses ou não):
+  // "500 gramas de filé", "1 kg de frango", "(90 gramas)", "240 ml"
+  let m = low.match(/(\d+(?:[.,]\d+)?)\s*(kg|quilos?|gramas?|g|ml|mls|litros?|l)\b/);
   if (m) {
     const n = parseFloat(m[1].replace(',', '.')); const u = m[2];
-    if (/kg/.test(u)) return n * 1000;
-    if (/^l|litro/.test(u)) return n * 1000;
+    if (/kg|quilo/.test(u)) return n * 1000;
+    if (/^l$|litro/.test(u)) return n * 1000;
     return n;                                        // g e ml ~ 1:1
   }
   const qty = qtyOf(low);
@@ -159,30 +160,48 @@ function keywords(line) {
   w = w.map(x => (x.length > 4 && x.endsWith('s')) ? x.slice(0, -1) : x);          // singular naive
   return [...new Set(w)].slice(0, 4);
 }
-const PREPARED = /salada|sandu[ií]ch|\bsuco\b|\bdoce\b|em pó|\bbolo\b|receita|caramel|açúcar|rechead|\btorta\b|\bsopa\b|creme de|nugget|farofa|risoto|strogonoff|empad|pizza|lasanha|panqueca|pastel|coxinha|salgad|\bbarra\b|cereal|frit/;
+const PREPARED = /salada|sandu[ií]ch|\bsuco\b|\bdoce\b|em pó|\bbolo\b|receita|caramel|açúcar|rechead|\btorta\b|\bsopa\b|creme de|nugget|farofa|risoto|strogonoff|empad|pizza|lasanha|panqueca|pastel|coxinha|salgad|\bbarra\b|cereal|frit|maionese|ketchup|\bmolho\b|\bcaldo\b|tempero|gratin|espeto|à grega/;
+const esc = w => w.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+async function queryTaco(words) {
+  if (!words.length) return [];
+  const conds = words.map((_, i) => `nome ILIKE $${i + 1}`).join(' AND ');
+  const params = words.map(w => `%${w}%`);
+  try {
+    // exclui entradas com marca/qualificador entre parênteses ("Presunto (Seara)")
+    return (await db.query(
+      `SELECT id, nome, grupo, kcal, ptn, cho, lip, fibras, ${MICRO_KEYS.join(', ')}
+       FROM alimentos WHERE (tipo IS NULL OR tipo='alimento') AND nome NOT LIKE '%(%'
+         AND ${conds} AND kcal > 0 LIMIT 80`, params)).rows;
+  } catch { return []; }
+}
+function scoreRow(r, words) {
+  const n = (r.nome || '').toLowerCase(); let s = 0;
+  if (n.startsWith(words[0])) s += 40;
+  for (const w of words) if (new RegExp(`(^|[ ,])${esc(w)}([ ,]|$)`).test(n)) s += 12;
+  if (PREPARED.test(n)) s -= 45;
+  if (/\bcru\b|\bcrua\b/.test(n)) s -= 8;
+  if (/ com /.test(n)) s -= 15;
+  s -= Math.min(28, n.split(/[ ,]+/).filter(Boolean).length * 3);
+  return s;
+}
+// Relaxamento progressivo: tenta AND de todas as palavras; se vazio, tenta subconjuntos
+// (sem a 1ª — geralmente adjetivo como "filé"; as 2 mais longas; a mais longa). Resolve
+// casos como "filé de peito de frango" → "Peito de frango" (não tinha a palavra "filé").
 async function matchTaco(line) {
   const words = keywords(line);
   if (!words.length) return null;
-  const conds = words.map((_, i) => `nome ILIKE $${i + 1}`).join(' AND ');
-  const params = words.map(w => `%${w}%`);
-  let rows = [];
-  try {
-    rows = (await db.query(
-      `SELECT id, nome, grupo, kcal, ptn, cho, lip, fibras, ${MICRO_KEYS.join(', ')}
-       FROM alimentos WHERE (tipo IS NULL OR tipo='alimento') AND ${conds} AND kcal > 0 LIMIT 80`, params)).rows;
-  } catch { return null; }
-  if (!rows.length) return null;
-  let best = null, bestSc = -1e9;
-  for (const r of rows) {
-    const n = (r.nome || '').toLowerCase();
-    let s = 0;
-    if (n.startsWith(words[0])) s += 40;
-    if (new RegExp(`(^|[ ,])${words[0]}([ ,]|$)`).test(n)) s += 25;
-    if (PREPARED.test(n)) s -= 40;
-    if (/\bcru\b|\bcrua\b/.test(n)) s -= 10;
-    s -= Math.min(28, n.split(/[ ,]+/).filter(Boolean).length * 3);
-    if (s > bestSc) { bestSc = s; best = r; }
+  const longest = [...words].sort((a, b) => b.length - a.length);
+  const sets = [words, words.slice(1), words.slice(-2), longest.slice(0, 2), longest.slice(0, 1)]
+    .filter(s => s.length).map(s => s.join('|'));
+  const seen = new Set(); let best = null, bestSc = -1e9;
+  for (const key of sets) {
+    if (seen.has(key)) continue; seen.add(key);
+    const rows = await queryTaco(key.split('|'));
+    for (const r of rows) { const sc = scoreRow(r, words); if (sc > bestSc) { bestSc = sc; best = r; } }
+    if (best && bestSc >= 25) break;                   // já é um bom match — para
   }
+  if (!best || bestSc < 8) return null;                // abaixo do limiar → não-casado
   return { row: best, score: bestSc };
 }
 
@@ -258,20 +277,25 @@ async function ingestOne(src) {
   ['kcal','ptn','cho','lip','fibras'].forEach(k => per100[k] = +(acc[k] * dens).toFixed(2));
   MICRO_KEYS.forEach(k => per100[k] = +(acc[k] * dens).toFixed(3));
   const sn = srcNutr(r);
-  // filtro nutricional "fit": densidade calórica e gordura razoáveis, sem fritura/doce no nome
+  // PORTÃO DE CROSS-CHECK: só confia na decomposição se a cobertura for alta E o meu
+  // kcal/100g bater ±20% com o do site. Sem isto, nutrição errada poluiria o gerador.
+  const dev = sn.kcal ? Math.abs(per100.kcal - sn.kcal) / sn.kcal : 1;
+  const trustworthy = coverage >= 0.7 && sn.kcal > 0 && dev <= 0.20;
   const nm = (r.name || '').toLowerCase();
-  const healthy = coverage >= 0.5 && per100.kcal > 0 && per100.kcal <= 320 && per100.lip <= 22 &&
-                  !/frit|fritura|brigadeir|pudim|bolo|torta doce|brownie|sorvete|mousse|recheado|caramel/.test(nm);
+  const fit = per100.kcal > 0 && per100.kcal <= 320 && per100.lip <= 22 &&
+              !/frit|brigadeir|pudim|\bbolo\b|brownie|sorvete|mousse|caramel|rechead|\btorta\b/.test(nm);
+  const active = trustworthy;            // só receitas confiáveis ficam usáveis
+  const healthy = trustworthy && fit;
 
   if (DRY) {
-    console.log(`\n• ${r.name}  [cov ${(coverage*100|0)}%]  ${per100.kcal}kcal/100g (deles:${sn.kcal||'?'})  ${healthy?'✓fit':'·'}`);
+    console.log(`\n• ${r.name}  [cov ${(coverage*100|0)}%]  ${per100.kcal}kcal/100g vs ${sn.kcal||'?'} (dev ${(dev*100|0)}%)  ${active ? (healthy ? '✓fit' : '○ok') : '✗reprovada'}`);
     rows.forEach(x => console.log(`    ${x.grams != null ? (x.grams+'g').padEnd(7) : '   ?   '} ${x.matched_name ? '→ '+x.matched_name.slice(0,40) : '✗ '+x.raw.slice(0,40)}`));
-    return { status: 'pending' };
+    return { status: 'done', active, healthy };
   }
 
-  const cols = ['slug','url','name','category','meal','yield_servings','total_grams','coverage','healthy',
+  const cols = ['slug','url','name','category','meal','yield_servings','total_grams','coverage','healthy','active',
     'kcal','ptn','cho','lip','fibras', ...MICRO_KEYS, 'src_kcal','src_ptn','src_cho','src_lip'];
-  const vals = [src.slug, src.url, r.name, src.category, src.meal, srcYield(r), Math.round(knownG), +coverage.toFixed(3), healthy,
+  const vals = [src.slug, src.url, r.name, src.category, src.meal, srcYield(r), Math.round(knownG), +coverage.toFixed(3), healthy, active,
     per100.kcal, per100.ptn, per100.cho, per100.lip, per100.fibras, ...MICRO_KEYS.map(k => per100[k]),
     sn.kcal, sn.ptn, sn.cho, sn.lip];
   const ph = vals.map((_, i) => `$${i + 1}`).join(',');
@@ -295,18 +319,19 @@ async function ingest() {
     `SELECT url, slug, category, meal FROM recipe_sources WHERE status='pending' ORDER BY id LIMIT $1`,
     [MAX === Infinity ? 100000 : MAX]);
   console.log(`\n🍳 ingest ${rows.length} receitas ${DRY ? '(DRY)' : ''}\n`);
-  const st = { done: 0, healthy: 0, skipped: 0, failed: 0 };
+  const st = { done: 0, kept: 0, healthy: 0, skipped: 0, failed: 0 };
   let i = 0;
   for (const src of rows) {
     i++;
     let res; try { res = await ingestOne(src); } catch (e) { res = { status: 'failed' }; console.error('  erro', src.slug, e.message); }
-    st[res.status === 'done' ? 'done' : res.status] = (st[res.status === 'done' ? 'done' : res.status] || 0) + 1;
+    st[res.status] = (st[res.status] || 0) + 1;
+    if (res.active) st.kept++;
     if (res.healthy) st.healthy++;
     if (!DRY) await db.query(`UPDATE recipe_sources SET status=$2 WHERE url=$1`, [src.url, res.status]);
-    if (i % 25 === 0) console.log(`  ...${i}/${rows.length}  (done ${st.done}, fit ${st.healthy}, skip ${st.skipped}, fail ${st.failed})`);
+    if (i % 25 === 0) console.log(`  ...${i}/${rows.length}  (confiáveis ${st.kept}, fit ${st.healthy}, skip ${st.skipped}, fail ${st.failed})`);
     await sleep(DELAY);
   }
-  console.log(`\n✓ done ${st.done} | fit ${st.healthy} | skip ${st.skipped} | fail ${st.failed}`);
+  console.log(`\n✓ processadas ${st.done} | confiáveis ${st.kept} | fit ${st.healthy} | skip ${st.skipped} | fail ${st.failed}`);
 }
 
 // ── schema ───────────────────────────────────────────────────────────────────
@@ -332,9 +357,9 @@ async function ensureSchema() {
 async function stats() {
   await ensureSchema();
   const s = await db.query(`SELECT status, count(*) FROM recipe_sources GROUP BY status ORDER BY status`);
-  const r = await db.query(`SELECT count(*) tot, count(*) FILTER (WHERE healthy) fit, round(avg(coverage)*100) cov FROM recipes`);
+  const r = await db.query(`SELECT count(*) tot, count(*) FILTER (WHERE active) ok, count(*) FILTER (WHERE healthy) fit, round(avg(coverage) FILTER (WHERE active)*100) cov FROM recipes`);
   console.log('recipe_sources:', s.rows.map(x => `${x.status}=${x.count}`).join('  '));
-  console.log('recipes:', `total=${r.rows[0].tot}  fit=${r.rows[0].fit}  cobertura média=${r.rows[0].cov || 0}%`);
+  console.log('recipes:', `total=${r.rows[0].tot}  confiáveis=${r.rows[0].ok}  fit=${r.rows[0].fit}  cobertura média(ativas)=${r.rows[0].cov || 0}%`);
 }
 
 (async () => {
