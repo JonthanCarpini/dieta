@@ -153,14 +153,18 @@ const STOP = new Set(('de da do dos das e ou com sem para por em no na nos nas a
   'finos fina fino grosso grossa sopa chá cha xícara xicara xícaras copo copos colher colheres dente dentes ' +
   'fatia fatias folha folhas lata latas pacote ml gramas grama kg litro litros fio ramo talo pitada nanica ' +
   'integral natural sem-sal vermelho verde amarelo branco branca cheio cheia rasa rasas inteiro inteira ' +
-  'desfiado desfiada moído moida moído escaldado picadinho temperado').split(/\s+/));
+  'desfiado desfiada moído moida moído escaldado picadinho temperado ' +
+  'cortado cortada cortados cortadas triturado triturada triturados espremido espremida descascado ' +
+  'descascada descascados amassado amassada batido batida derretido derretida peneirado escorrido ' +
+  'escorrida lavado limpo limpa limpos tiras cubo rodela maduro madura congelado congelada caroço ' +
+  'pele osso médias pequenas pedaços pedaço ponta pontas').split(/\s+/));
 function keywords(line) {
   let s = line.toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[\d/.,½¼¾⅓⅔⅛]+/g, ' ').replace(/[^a-zà-ú\s]/gi, ' ');
   let w = s.split(/\s+/).filter(x => x.length > 2 && !STOP.has(x));
   w = w.map(x => (x.length > 4 && x.endsWith('s')) ? x.slice(0, -1) : x);          // singular naive
   return [...new Set(w)].slice(0, 4);
 }
-const PREPARED = /salada|sandu[ií]ch|\bsuco\b|\bdoce\b|em pó|\bbolo\b|receita|caramel|açúcar|rechead|\btorta\b|\bsopa\b|creme de|nugget|farofa|risoto|strogonoff|empad|pizza|lasanha|panqueca|pastel|coxinha|salgad|\bbarra\b|cereal|frit|maionese|ketchup|\bmolho\b|\bcaldo\b|tempero|gratin|espeto|à grega/;
+const PREPARED = /salada|sandu[ií]ch|\bsuco\b|\bdoce\b|em pó|\bbolo\b|receita|caramel|açúcar|rechead|\btorta\b|\bsopa\b|nugget|farofa|risoto|strogonoff|empad|pizza|lasanha|panqueca|pastel|coxinha|salgad|\bbarra\b|cereal|frit|maionese|ketchup|\bmolho\b|\bcaldo\b|tempero|gratin|espeto|à grega/;
 const esc = w => w.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
 
 async function queryTaco(words) {
