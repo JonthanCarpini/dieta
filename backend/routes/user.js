@@ -42,6 +42,31 @@ router.get('/profile', async (req, res) => {
   }
 });
 
+// Harris-Benedict 1984: TMB → GET → target_calories com déficit/superávit por speed
+function calcTargetCalories({ gender, age, weight, height, activity, goal, speed }) {
+  const w   = Number(weight)   || 0;
+  const h   = Number(height)   || 0;
+  const a   = Number(age)      || 0;
+  const act = Number(activity) || 1.375;
+  const spd = Number(speed)    || 0;
+  if (!w || !h || !a) return null;   // dados insuficientes — não sobrescreve
+
+  const tmb = gender === 'male'
+    ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * a
+    : 447.593 + 9.247 * w + 3.098 * h - 4.330 * a;
+  const get = tmb * act;
+
+  // Déficit/superávit por velocidade (kg/sem × 7.700 kcal / 7 dias)
+  if (spd > 0 && (goal === 'lose' || goal === 'gain')) {
+    const delta = Math.round(spd * 7700 / 7);
+    return Math.round(goal === 'gain' ? get + delta : get - delta);
+  }
+  // Fallback por objetivo sem speed
+  if (goal === 'lose')     return Math.round(get * 0.80);
+  if (goal === 'gain')     return Math.round(get * 1.10);
+  return Math.round(get);  // maintain
+}
+
 // Calcula idade a partir da data de nascimento (ISO ou DD/MM/AAAA)
 function calcAge(birthdate) {
   if (!birthdate) return null;
@@ -69,6 +94,18 @@ const saveProfileHandler = async (req, res) => {
 
   // birthdate é a fonte da verdade; age é calculado automaticamente
   const computedAge = birthdate ? calcAge(birthdate) : (ageOverride || null);
+
+  // target_calories calculado automaticamente se há dados suficientes
+  // Só sobrescreve se vier dos dados biométricos (birthdate ou age presentes)
+  const autoTarget = computedAge ? calcTargetCalories({
+    gender, age: computedAge,
+    weight: weight ?? req.body.weight,
+    height: height ?? req.body.height,
+    activity: activity ?? req.body.activity,
+    goal: goal ?? req.body.goal,
+    speed: req.body.speed,
+  }) : null;
+  const finalTarget = autoTarget || target_calories || null;
 
   try {
     // Adiciona coluna birthdate se ainda não existe (migração silenciosa)
@@ -99,7 +136,7 @@ const saveProfileHandler = async (req, res) => {
       req.user.id, gender,
       birthdate ? (birthdate.includes('/') ? (() => { const [dd,mm,yyyy]=birthdate.split('/'); return `${yyyy}-${mm}-${dd}`; })() : birthdate) : null,
       computedAge, weight, height, activity, goal,
-      goal_weight, speed, target_calories, target_protein, target_carbs, target_fat
+      goal_weight, speed, finalTarget, target_protein, target_carbs, target_fat
     ]);
 
     // Atualiza opcionalmente o peso base na tabela principal do usuário se necessário, ou mantém apenas em profiles
