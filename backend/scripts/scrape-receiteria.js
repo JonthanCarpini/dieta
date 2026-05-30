@@ -191,6 +191,18 @@ function keywords(line) {
 const PREPARED = /salada|sandu[ií]ch|\bsuco\b|\bdoce\b|em pó|\bbolo\b|receita|caramel|açúcar|rechead|\btorta\b|\bsopa\b|nugget|farofa|risoto|strogonoff|empad|pizza|lasanha|panqueca|pastel|coxinha|salgad|\bbarra\b|cereal|frit|maionese|ketchup|\bmolho\b|\bcaldo\b|tempero|gratin|espeto|à grega/;
 const esc = w => w.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
 
+// ── Classificação "fit" (nome + ingredientes decompostos + densidade) ─────────
+// A decomposição pode estar correta e a receita ainda NÃO ser dieta (ex.: parmegiana,
+// macarrão com creme de leite, arroz de Natal doce). Usamos os ingredientes casados.
+const BAD_ING = /creme de leite|catupiry|requeij|maionese|bacon|leite condensado|chantilly|batata palha|salsich|lingui[cç]|salame|\bpresunto\b|mortadela|\bnata\b|banha|toucinho|a[çc]úcar|doce de leite/i;
+const BAD_NAME = /parmegian|milanes|à dor[ée]?|\bnatal\b|\bdoce\b|brigadeir|brownie|pudim|mousse|sorvete|\bbolo\b|\btorta\b|frit|empanad|rechead|strogonoff|gratin|chantilly|cheesecake|brulee|p[ãa]o de mel|cocada|beijinho|sonho|churros/i;
+function isHealthy(name, per100, ingNames) {
+  const nm = (name || '').toLowerCase();
+  if (BAD_NAME.test(nm)) return false;
+  if ((ingNames || []).some(n => BAD_ING.test(n || ''))) return false;
+  return per100.kcal > 0 && per100.kcal <= 280 && per100.lip <= 20;
+}
+
 async function queryTaco(words) {
   if (!words.length) return [];
   const conds = words.map((_, i) => `nome ILIKE $${i + 1}`).join(' AND ');
@@ -329,11 +341,8 @@ async function ingestOne(src) {
   // kcal/100g bater ±20% com o do site. Sem isto, nutrição errada poluiria o gerador.
   const dev = sn.kcal ? Math.abs(per100.kcal - sn.kcal) / sn.kcal : 1;
   const trustworthy = coverage >= 0.7 && sn.kcal > 0 && dev <= 0.20;
-  const nm = (r.name || '').toLowerCase();
-  const fit = per100.kcal > 0 && per100.kcal <= 320 && per100.lip <= 22 &&
-              !/frit|brigadeir|pudim|\bbolo\b|brownie|sorvete|mousse|caramel|rechead|\btorta\b/.test(nm);
   const active = trustworthy;            // só receitas confiáveis ficam usáveis
-  const healthy = trustworthy && fit;
+  const healthy = trustworthy && isHealthy(r.name, per100, rows.map(x => x.matched_name));
 
   if (DRY) {
     console.log(`\n• ${r.name}  [cov ${(coverage*100|0)}%]  ${per100.kcal}kcal/100g vs ${sn.kcal||'?'} (dev ${(dev*100|0)}%)  ${active ? (healthy ? '✓fit' : '○ok') : '✗reprovada'}`);
@@ -405,6 +414,23 @@ async function ensureSchema() {
       raw TEXT, alimento_id INTEGER, matched_name TEXT, grams NUMERIC, match_score NUMERIC)`);
 }
 
+// Recalcula `healthy` sobre o banco (sem re-scrapear), usando nome + ingredientes.
+async function reclassify() {
+  await ensureSchema();
+  const { rows } = await db.query(`SELECT id, name, kcal, lip FROM recipes WHERE active`);
+  let changed = 0, fit = 0;
+  for (const r of rows) {
+    const ing = (await db.query(
+      `SELECT matched_name FROM recipe_ingredients WHERE recipe_id=$1 AND matched_name IS NOT NULL`, [r.id]
+    )).rows.map(x => x.matched_name);
+    const h = isHealthy(r.name, { kcal: +r.kcal, lip: +r.lip }, ing);
+    if (h) fit++;
+    const up = await db.query(`UPDATE recipes SET healthy=$2 WHERE id=$1 AND healthy IS DISTINCT FROM $2`, [r.id, h]);
+    changed += up.rowCount;
+  }
+  console.log(`✓ reclassificadas: ${changed} alteradas | fit agora = ${fit}/${rows.length}`);
+}
+
 async function stats() {
   await ensureSchema();
   const s = await db.query(`SELECT status, count(*) FROM recipe_sources GROUP BY status ORDER BY status`);
@@ -417,6 +443,7 @@ async function stats() {
   try {
     if (CMD === 'collect') await collect();
     else if (CMD === 'ingest') await ingest();
+    else if (CMD === 'reclassify') await reclassify();
     else await stats();
   } catch (e) { console.error(e); process.exitCode = 1; }
   finally { try { await db.pool.end(); } catch {} }
