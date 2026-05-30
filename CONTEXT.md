@@ -76,11 +76,24 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 - **Backend:** `GET /user/anamnesis/status`, `GET /user/anamnesis`, `POST /user/anamnesis`, `POST /user/exam-proxy`
 - **Atenção Gemini:** `app/exams.tsx` não foi modificado. `app/onboarding.tsx` é arquivo novo.
 
-### Média prioridade
-- **Fase B — Recipe-first:** receita como átomo primário no gerador (nome = ingredientes = preparo). Archetypes como fallback.
-- **Fase B — Crédito às receitas:** `author_name` + `source_url` na tabela `recipes`. JSON-LD do Receiteria já tem `author.name`. Exibir "Receita de [autor]" no app e no PDF.
-- **Fase C — Alertas clínicos em vez de compensação automática:** transformar `micros.js` de swaps automáticos para alertas visuais no builder.
+### Onboarding — cálculo automático de metas ✅ CONCLUÍDA
+- `saveProfileHandler` (`user.js`): ao salvar perfil, calcula automaticamente `target_calories`, `target_protein/carbs/fat` e `water_target_ml` (35ml/kg). `birthdate` (DATE) é a fonte da idade — recalculada dinamicamente.
+- Velocidade de perda/ganho: campo `speed` (kg/semana) com níveis Muito leve/Leve/Moderado/Intenso/Pesado (até 1,5 kg/sem). Déficit/superávit = speed × 7700 ÷ 7.
+- **Piso de segurança**: meta nunca abaixo da TMB nem do mínimo (♂1500/♀1200). Corrigiu o bug dos 79 kcal.
+- Perfil Clínico (aba `clinico.tsx`) preenchido automaticamente a partir da anamnese.
+
+### Fórmulas energéticas ✅ CONCLUÍDA
+- `backend/nutrition/formulas.js`: módulo único com as 10 fórmulas + `selectFormula()` automático por perfil (Mifflin p/ IMC≥25, Cunningham/Tinsley p/ atletas, H-B revisada p/ eutróficos). Usado por `planner_v2` e `user.js`.
+- **Atenção Gemini:** `pro-energy.js` (painel web) mantém sua própria cópia das fórmulas — coeficientes idênticos. Se alterar uma, sincronizar a outra.
+
+### Fase B — Recipe-first ✅ EM ANDAMENTO
+- **Crédito (concluído):** `recipes.author_name` + preparo ORIGINAL do JSON-LD (sem parafrasear). Comando `update-preparo`. Gerador injeta "Receita de [autor] — [url]". Builder mostra `.wd-meal-author`.
+- **goals[] (concluído):** `recipes.goals` (lose/maintain/gain) derivado de macros via `computeGoals()`. Substitui o binário `healthy`. Gerador filtra por objetivo do paciente. Acervo: **465 receitas** (lose 99, maintain 298, gain 144). +12 categorias scrapadas (alta-proteina, baixa-caloria, low-carb, etc.).
+- **Pendente:** atributos clínicos por protocolo nas receitas (low_purina, low_tg) + filtro do gerador por protocolo ativo.
+
+### Fase C — Alertas clínicos (pendente)
+- Transformar `micros.js` de compensação automática para alertas visuais no builder.
 
 ---
 
-*Última atualização: 30 de Maio de 2026 — Claude (VS Code) — Gerador V2 Fases 0+A deployadas*
+*Última atualização: 30 de Maio de 2026 — Claude (VS Code) — Fórmulas energéticas + goals[] + crédito receitas*

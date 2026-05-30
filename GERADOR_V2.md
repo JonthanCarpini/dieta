@@ -411,6 +411,20 @@ CREATE TABLE patient_exam_proxy (
 10. Atributos clínicos em receitas (low_purina, low_tg, low_ig, low_na)
 11. ✅ Crédito: `author_name` + `source_url` coletados do JSON-LD; `srcAuthor()` + `srcPreparo()` no scraper; `update-preparo` re-fetcha sem re-decompor; gerador injeta "Receita de [autor] — [url]" nas `instructions`; builder mostra `.wd-meal-author`. 38/45 receitas fit com autor+preparo original coletados.
 
+### Fase A+ — Fórmulas energéticas (✅ concluído)
+- `backend/nutrition/formulas.js`: módulo único com 10 fórmulas (H-B 1919/1984,
+  Katch-McArdle, Cunningham, Mifflin-St Jeor, FAO/WHO, Henry&Rees, Bolso,
+  Tinsley peso/MLG) — coeficientes idênticos ao painel web (`pro-energy.js`).
+- `selectFormula(profile)` escolhe automaticamente pela diretriz clínica:
+  - IMC ≥ 25 → **Mifflin-St Jeor** (sobrepeso/obesidade)
+  - atleta (atividade ≥ 1.725) com MLG → **Cunningham**; sem MLG → **Tinsley**
+  - eutrófico → **Harris-Benedict revisada**
+- `planner_v2` e `user.js/calcNutritionTargets` usam `formulas.autoCalc()`.
+- **Piso de segurança**: meta nunca abaixo de TMB nem do mínimo absoluto
+  (♂1500/♀1200). Corrige o bug dos 79 kcal (Nathila) e o déficit perigoso
+  do Marcelo (limitado à TMB Mifflin = 2162, em vez de 945).
+- Validado: Marcelo (IMC 31.7)→Mifflin, Nathila (23.9)→H-B, atleta→Tinsley/Cunningham.
+
 ### Fase C — Alertas clínicos
 12. Transformar `micros.js` de compensação automática → alertas visuais
 13. Painel de alertas no builder (déficit, micros críticos, protocolos ativos)
