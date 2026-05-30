@@ -480,6 +480,11 @@ async function runMigrations() {
       PRIMARY KEY (marker_name, status)
     )
   `);
+  await db.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS phone VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS profile_image TEXT
+  `).catch((e) => console.error('Migration users alter phone/profile_image skip:', e.message));
   console.log('Migrações executadas com sucesso.');
 }
 

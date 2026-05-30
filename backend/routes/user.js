@@ -22,6 +22,8 @@ router.get('/profile', async (req, res) => {
         id: req.user.id,
         email: req.user.email,
         name: req.user.name,
+        phone: req.user.phone,
+        profile_image: req.user.profile_image,
         role: req.user.role,
         plan: req.user.plan,
         trial_expires_at: req.user.trial_expires_at,
@@ -115,7 +117,8 @@ const saveProfileHandler = async (req, res) => {
   const {
     gender, birthdate, weight, height, activity, goal,
     goal_weight, speed, target_calories, target_protein, target_carbs, target_fat,
-    age: ageOverride  // aceita age direto se não houver birthdate (retrocompatibilidade)
+    age: ageOverride,  // aceita age direto se não houver birthdate (retrocompatibilidade)
+    name, email, phone, profile_image
   } = req.body;
 
   // birthdate é a fonte da verdade; age é calculado automaticamente
@@ -133,6 +136,24 @@ const saveProfileHandler = async (req, res) => {
   const finalWater   = autoTargets?.water_target_ml   || null;
 
   try {
+    // 1. Atualiza dados da conta na tabela 'users' se enviados
+    if (name) {
+      await db.query('UPDATE users SET name = $1 WHERE id = $2', [name.trim(), req.user.id]);
+    }
+    if (email && email.toLowerCase().trim() !== req.user.email.toLowerCase().trim()) {
+      const emailCheck = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+      if (emailCheck.rows.length > 0) {
+        return res.status(400).json({ error: 'E-mail já cadastrado por outro usuário.' });
+      }
+      await db.query('UPDATE users SET email = $1 WHERE id = $2', [email.toLowerCase().trim(), req.user.id]);
+    }
+    if (phone !== undefined) {
+      await db.query('UPDATE users SET phone = $1 WHERE id = $2', [phone ? phone.trim() : null, req.user.id]);
+    }
+    if (profile_image !== undefined) {
+      await db.query('UPDATE users SET profile_image = $1 WHERE id = $2', [profile_image || null, req.user.id]);
+    }
+
     // Adiciona coluna birthdate se ainda não existe (migração silenciosa)
     await db.query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS birthdate DATE`).catch(() => {});
 
@@ -188,6 +209,20 @@ const saveProfileHandler = async (req, res) => {
 
 router.post('/profile', saveProfileHandler);
 router.put('/profile', saveProfileHandler);
+
+router.post('/avatar', async (req, res) => {
+  const { image } = req.body;
+  if (!image) {
+    return res.status(400).json({ error: 'Imagem não fornecida.' });
+  }
+  try {
+    await db.query('UPDATE users SET profile_image = $1 WHERE id = $2', [image, req.user.id]);
+    res.json({ message: 'Foto de perfil atualizada com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar foto de perfil.' });
+  }
+});
 
 // ==========================================
 // 2. DIÁRIO DE REFEIÇÕES

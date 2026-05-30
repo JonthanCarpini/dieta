@@ -9,7 +9,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // 1. REGISTRO TRADICIONAL
 router.post('/register', async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, phone, profile_image } = req.body;
 
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Preencha todos os campos obrigatórios.' });
@@ -28,8 +28,8 @@ router.post('/register', async (req, res) => {
 
     // Salva no banco
     const newUser = await db.query(
-      'INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id, email, name, role, plan',
-      [email.toLowerCase().trim(), passwordHash, name]
+      'INSERT INTO users (email, password_hash, name, phone, profile_image) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, plan, phone, profile_image',
+      [email.toLowerCase().trim(), passwordHash, name, phone || null, profile_image || null]
     );
 
     // Cria token
@@ -79,6 +79,8 @@ router.post('/login', async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        phone: user.phone,
+        profile_image: user.profile_image,
         role: user.role,
         plan: user.plan
       }
@@ -139,6 +141,8 @@ router.post('/google', async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        phone: user.phone,
+        profile_image: user.profile_image,
         role: user.role,
         plan: user.plan
       }

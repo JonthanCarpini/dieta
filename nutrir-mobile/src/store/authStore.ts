@@ -10,6 +10,8 @@ export interface User {
   email: string;
   role: 'paciente' | 'nutricionista' | 'admin';
   avatar?: string;
+  phone?: string;
+  profile_image?: string;
   plan?: string;
 }
 

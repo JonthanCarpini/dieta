@@ -13,7 +13,7 @@ const authenticateToken = async (req, res, next) => {
     
     // Carrega dados atualizados do banco (permite alteração de cargo sem relogar)
     const userRes = await db.query(
-      `SELECT u.id, u.email, u.name, u.role, u.plan, u.trial_expires_at, u.premium_expires_at,
+      `SELECT u.id, u.email, u.name, u.role, u.plan, u.trial_expires_at, u.premium_expires_at, u.phone, u.profile_image,
               p.has_nutritionist, p.has_trainer, p.max_nutritionist_appointments_per_month, p.max_trainer_appointments_per_month
        FROM users u
        LEFT JOIN plans p ON u.plan = p.name
@@ -47,6 +47,8 @@ const authenticateToken = async (req, res, next) => {
       id: user.id,
       email: user.email,
       name: user.name,
+      phone: user.phone,
+      profile_image: user.profile_image,
       role: user.role,
       plan: user.plan,
       trial_expires_at: user.trial_expires_at,

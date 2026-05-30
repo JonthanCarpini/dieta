@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -115,6 +115,57 @@ export default function OnboardingScreen() {
   const [goal, setGoal] = useState<'lose' | 'maintain' | 'gain' | ''>('');
   const [speed, setSpeed] = useState<string>('');   // kg/semana
   const [activity, setActivity] = useState<string>('');
+
+  const getSafetyInfo = (spdVal: string) => {
+    const w = parseFloat(weight);
+    const h = parseFloat(height);
+    const act = parseFloat(activity);
+    if (isNaN(w) || isNaN(h) || isNaN(act) || !gender || !birthdateValid()) {
+      return { isBlocked: false, expectedKcal: 0, floor: 0 };
+    }
+
+    const [dd, mm, yyyy] = birthdate.split('/').map(Number);
+    const birth = new Date(yyyy, mm - 1, dd);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+
+    const imc = w / ((h / 100) ** 2);
+    let tmb = 0;
+    if (imc >= 25 || imc < 18.5) {
+      tmb = gender === 'male'
+        ? 9.99 * w + 6.25 * h - 4.92 * age + 5
+        : 9.99 * w + 6.25 * h - 4.92 * age - 161;
+    } else {
+      tmb = gender === 'male'
+        ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * age
+        : 447.593 + 9.247 * w + 3.098 * h - 4.330 * age;
+    }
+
+    const get = tmb * act;
+    const minAbsoluto = gender === 'male' ? 1500 : 1200;
+    const floor = Math.max(tmb, minAbsoluto);
+
+    const deficit = parseFloat(spdVal) * 1100;
+    const expectedKcal = Math.round(get - deficit);
+
+    return {
+      isBlocked: expectedKcal < floor,
+      expectedKcal,
+      floor: Math.round(floor),
+    };
+  };
+
+  // Reseta velocidade de perda se ela se tornar perigosa após alteração de dados biométricos
+  useEffect(() => {
+    if (speed && goal === 'lose') {
+      const safety = getSafetyInfo(speed);
+      if (safety.isBlocked) {
+        setSpeed('');
+      }
+    }
+  }, [weight, height, birthdate, gender, activity, goal]);
 
   // Máscara DD/MM/AAAA
   const handleBirthdate = (text: string) => {
@@ -389,19 +440,44 @@ export default function OnboardingScreen() {
                         { val: '0.25', level: 'Leve',     label: '0,25 kg / semana', desc: '~275 kcal/dia de superávit' },
                         { val: '0.5',  level: 'Moderado', label: '0,5 kg / semana',  desc: '~550 kcal/dia de superávit · Recomendado' },
                       ]
-                  ).map(o => (
-                    <TouchableOpacity key={o.val}
-                      style={[ob.btn, speed === o.val && ob.sel, o.val === '1.5' && speed !== '1.5' && ob.warn]}
-                      onPress={() => setSpeed(o.val)} activeOpacity={0.8}>
-                      <View style={s.speedRow}>
-                        <Text style={[ob.text, speed === o.val && ob.selText]}>{o.label}</Text>
-                        <View style={[s.levelBadge, speed === o.val && s.levelBadgeSel]}>
-                          <Text style={[s.levelText, speed === o.val && s.levelTextSel]}>{o.level}</Text>
+                  ).map(o => {
+                    const safety = getSafetyInfo(o.val);
+                    const isBlocked = goal === 'lose' && safety.isBlocked;
+                    return (
+                      <TouchableOpacity key={o.val}
+                        style={[
+                          ob.btn,
+                          speed === o.val && ob.sel,
+                          o.val === '1.5' && speed !== '1.5' && ob.warn,
+                          isBlocked && { opacity: 0.35, borderColor: colors.border }
+                        ]}
+                        onPress={() => {
+                          if (isBlocked) {
+                            Alert.alert(
+                              'Bloqueio de Segurança',
+                              `Esta opção reduziria seu consumo diário para ~${safety.expectedKcal} kcal, o que é abaixo do limite metabólico seguro de ${safety.floor} kcal para o seu perfil.\n\nPor favor, selecione uma velocidade de perda de peso mais lenta.`
+                            );
+                            return;
+                          }
+                          setSpeed(o.val);
+                        }}
+                        activeOpacity={isBlocked ? 1 : 0.8}>
+                        <View style={s.speedRow}>
+                          <Text style={[ob.text, speed === o.val && ob.selText, isBlocked && { textDecorationLine: 'line-through' }]}>
+                            {o.label} {isBlocked && '🔒'}
+                          </Text>
+                          <View style={[s.levelBadge, speed === o.val && s.levelBadgeSel, isBlocked && { backgroundColor: '#333' }]}>
+                            <Text style={[s.levelText, speed === o.val && s.levelTextSel, isBlocked && { color: colors.textMuted }]}>
+                              {isBlocked ? 'Bloqueado' : o.level}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                      <Text style={[s.speedDesc, speed === o.val && { color: colors.accentGreen + 'CC' }]}>{o.desc}</Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text style={[s.speedDesc, speed === o.val && { color: colors.accentGreen + 'CC' }]}>
+                          {isBlocked ? `Calorias estimadas (${safety.expectedKcal} kcal) ficariam abaixo do limite seguro de ${safety.floor} kcal.` : o.desc}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </>
               )}
 
