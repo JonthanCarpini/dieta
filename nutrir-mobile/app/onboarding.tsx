@@ -132,8 +132,11 @@ export default function OnboardingScreen() {
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
 
     const imc = w / ((h / 100) ** 2);
+    const isAthlete = act >= 1.725;
     let tmb = 0;
-    if (imc >= 25 || imc < 18.5) {
+    if (isAthlete) {
+      tmb = 24.8 * w + 10;
+    } else if (imc >= 25 || imc < 18.5) {
       tmb = gender === 'male'
         ? 9.99 * w + 6.25 * h - 4.92 * age + 5
         : 9.99 * w + 6.25 * h - 4.92 * age - 161;
