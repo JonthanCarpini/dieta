@@ -242,30 +242,182 @@ CREATE TABLE patient_lifestyle (
 
 ---
 
-## Ordem de implementação sugerida
+## Anamnese Obrigatória no Onboarding (APK + Web)
 
-### Fase A — Fundação clínica (implementar antes de tudo)
-1. `protocols.js` — mapa marcador/comorbidade → restrições concretas
-2. `planner_v2.js` — lê GET + exames + protocolo → config com meta real + exclusions
-3. Alerta de déficit no endpoint `generate-plan` (não bloqueia, avisa)
-4. Integrar no gerador existente sem quebrar o V1
+> Decisão de 2026-05-30: sem anamnese completa o sistema gera planos para um
+> "paciente genérico" que não existe. A anamnese é o portão de segurança clínica.
+> OBRIGATÓRIA na criação de conta — paciente não acessa o plano sem preenchê-la.
 
-### Fase B — Anamnese de estilo
-5. Tabela `patient_lifestyle` + formulário na ficha do paciente
-6. Número de refeições como parâmetro real do MEAL_DISTRIBUTION
+### Fluxo no APK (onboarding multi-etapas)
+```
+Criar conta → Etapa 1/5 → Etapa 2/5 → Etapa 3/5 → Etapa 4/5 → Etapa 5/5 → App
+```
+Progresso visual. Não pode pular. Pode revisar depois em "Meu Perfil".
+Nutricionista pode complementar/corrigir na ficha do paciente (web admin).
 
-### Fase C — Crédito às receitas
-7. Colunas `author_name` + `source_url` em `recipes`
-8. Coletar ao scrapear (JSON-LD tem `author.name`)
-9. Exibir no builder e no app
+### Etapa 1 — Dados biométricos (já existe, manter)
+- Nome, data de nascimento, gênero
+- Peso atual, altura, peso desejado
+- Objetivo: emagrecer / ganhar massa / manter / orientação terapêutica
 
-### Fase D — Recipe-first
-10. Receitas como primário, archetypes como fallback
-11. Atributos clínicos em receitas (low_purina, low_tg, etc.)
+### Etapa 2 — Estrutura alimentar do dia a dia
+```
+Quantas refeições você faz por dia?
+  ○ 3   ○ 4   ○ 5   ○ 6 ou mais
 
-### Fase E — Alertas em vez de compensação
-12. Transformar `micros.js` de compensação → alertas visuais
-13. Painel de alertas clínicos no builder (além do painel de adequação)
+Horários aproximados (preencha os que se aplicam):
+  Café da manhã [__:__]   Lanche manhã [__:__]   Almoço [__:__]
+  Lanche tarde  [__:__]   Jantar       [__:__]   Ceia   [__:__]
+
+Você costuma comer fora de casa?
+  ○ Nunca / raramente   ○ Algumas vezes   ○ Todo dia
+
+Você sabe cozinhar?
+  ○ Não cozinho (só esquento)   ○ Coisas simples   ○ Cozinho bem
+```
+
+### Etapa 3 — Histórico de saúde (checklist, não texto livre)
+```
+Marque o que um médico já te disse ou você já sabe:
+
+METABÓLICO
+□ Diabetes tipo 2 ou pré-diabetes
+□ Colesterol alto (LDL elevado)
+□ Triglicerídeos altos
+□ Pressão alta (hipertensão)
+□ Gota ou ácido úrico elevado
+
+DIGESTIVO / RENAL
+□ Doença celíaca (intolerância ao glúten)
+□ Síndrome do intestino irritável (SII)
+□ Doença inflamatória intestinal (Crohn / Colite)
+□ Doença renal crônica
+□ Cálculo renal (pedra nos rins)
+
+HORMONAL / OUTRO
+□ Hipotireoidismo (tireoide lenta)
+□ Hipertireoidismo (tireoide acelerada)
+□ SOP — Síndrome dos Ovários Policísticos
+□ Doença cardíaca / insuficiência cardíaca
+□ Anemia (ferro baixo diagnosticado)
+
+□ Nenhuma das anteriores
+```
+
+### Etapa 4 — Restrições e preferências alimentares
+```
+O QUE VOCÊ NÃO COME (por saúde ou escolha):
+□ Sou vegetariano       □ Sou vegano
+□ Não como carne vermelha   □ Não como frango
+□ Não como peixe / frutos do mar
+□ Intolerância à lactose    □ Intolerância ao glúten
+□ Não como porco        □ Restrição religiosa (halal / kosher)
+
+O QUE VOCÊ NÃO GOSTA (aversões):
+[campo livre — ex: "odeio fígado, não como beterraba"]
+
+O QUE VOCÊ MAIS GOSTA:
+[campo livre — ex: "adoro frango, como muito arroz e feijão"]
+```
+
+### Etapa 5 — Exames laboratoriais
+```
+Você tem resultados de exames de sangue dos últimos 6 meses?
+
+  ○ SIM → [Enviar PDF ou foto]  — sistema extrai valores automaticamente
+
+  ○ NÃO → Responda para personalizar seu plano:
+
+    Médico já disse que seu colesterol ou triglicerídeos estão altos?
+      ○ Sim   ○ Não   ○ Nunca fiz exame
+
+    Médico já disse que seu ácido úrico está alto ou você tem gota?
+      ○ Sim   ○ Não   ○ Nunca fiz exame
+
+    Sua glicemia (açúcar no sangue) já esteve acima do normal?
+      ○ Sim   ○ Não   ○ Nunca fiz exame
+
+    Você já teve pedra nos rins?
+      ○ Sim   ○ Não
+
+    Toma algum medicamento de uso contínuo?
+      [campo livre — ex: "metformina, losartana"]
+```
+
+### Respostas proxy → protocolos (sem exame)
+| Resposta "Sim" | Protocolo | Equivalente laboratorial |
+|---|---|---|
+| Colesterol/TG altos | baixo_tg + baixo_colesterol | TG > 150, HDL < 40 |
+| Ácido úrico alto / Gota | baixa_purina | Ácido úrico > 7,0 |
+| Glicemia acima do normal | baixo_ig | HbA1c > 5,7% |
+| Pedra nos rins | baixo_oxalato | Cristais oxalato |
+| Medicamento metformina | protocolo_diabetes | — |
+| Medicamento losartana/enalapril | protocolo_has | Sódio alto |
+
+### Status no painel do nutricionista (antes de gerar)
+```
+⚠️  Anamnese incompleta — etapas 3 e 5 não preenchidas
+✅  Anamnese sem exames — protocolos derivados de respostas proxy
+✅  Anamnese completa — exames de 29/05/2026 disponíveis
+```
+Gerador não bloqueia por anamnese incompleta — avisa, nutricionista decide.
+
+### Tabelas novas necessárias
+```sql
+CREATE TABLE patient_anamnesis (
+  patient_id      INTEGER PRIMARY KEY REFERENCES users(id),
+  meal_count      INTEGER DEFAULT 5,
+  meal_times      JSONB,           -- {"cafe":"07:00","almoco":"12:00",...}
+  eats_out        VARCHAR(20),     -- never / sometimes / always
+  cooking_level   VARCHAR(20),     -- none / basic / good
+  conditions      TEXT[],          -- ['diabetes','gota','hipertensao',...]
+  restrictions    TEXT[],          -- ['vegetariano','sem_lactose',...]
+  avoids_text     TEXT,
+  prefers_text    TEXT,
+  medications     TEXT,
+  completed_at    TIMESTAMPTZ,     -- NULL = incompleta
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE patient_exam_proxy (
+  patient_id      INTEGER PRIMARY KEY REFERENCES users(id),
+  cholesterol_high  BOOLEAN,
+  uric_acid_high    BOOLEAN,
+  glucose_high      BOOLEAN,
+  kidney_stones     BOOLEAN,
+  answered_at       TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+## Ordem de implementação sugerida (REVISADA)
+
+### Fase 0 — Anamnese no onboarding (PRÉ-REQUISITO de tudo)
+> Sem anamnese o V2 não tem dados para funcionar.
+1. Tabelas `patient_anamnesis` + `patient_exam_proxy`
+2. Telas de onboarding no APK (5 etapas, obrigatório)
+3. Formulário de anamnese na ficha do paciente (web admin)
+4. Status da anamnese visível antes de gerar o plano
+
+### Fase A — Fundação clínica
+5. `protocols.js` — mapa marcador/comorbidade/proxy → restrições concretas
+6. `planner_v2.js` — lê GET + exames + proxy + anamnese → config com meta real
+7. Alerta de déficit no `generate-plan`
+8. Integrar sem quebrar o V1 em produção
+
+### Fase B — Recipe-first
+9. Receitas como primário (nome = ingredientes = preparo), archetypes como fallback
+10. Atributos clínicos em receitas (low_purina, low_tg, low_ig, low_na)
+11. Crédito: `author_name` + `source_url` + texto original de preparo com atribuição
+
+### Fase C — Alertas clínicos
+12. Transformar `micros.js` de compensação automática → alertas visuais
+13. Painel de alertas no builder (déficit, micros críticos, protocolos ativos)
+
+### Fase D — Objetivos terapêuticos
+14. Perfis expandidos: diabetes, hipertensão, gota, renal, gestante, atleta
+15. Split de macro e restrições específicos por perfil
 
 ---
 
