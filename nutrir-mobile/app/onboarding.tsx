@@ -139,18 +139,44 @@ export default function OnboardingScreen() {
   const uploadExam = async () => {
     try {
       setUploadingExam(true);
-      const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
       if (result.canceled || !result.assets?.length) return;
-      const file = result.assets[0];
-      const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 });
-      const formData = new FormData();
-      formData.append('file', { uri: file.uri, name: file.name, type: file.mimeType || 'application/pdf' } as unknown as Blob);
-      formData.append('category', 'Triagem');
-      await api.post('/user/exams', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
+
+      const asset = result.assets[0];
+      const sizeKb = asset.size ? Math.round(asset.size / 1024) : 0;
+
+      if (sizeKb > 10_240) {
+        Alert.alert('Arquivo muito grande', 'O arquivo deve ter no máximo 10 MB.');
+        return;
+      }
+
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const fileType = asset.mimeType ?? 'application/octet-stream';
+      const examType: 'pdf' | 'image' = fileType.startsWith('image/') ? 'image' : 'pdf';
+
+      // Mesmo formato do exams.tsx — JSON com base64, não FormData
+      await api.post('/user/exams', {
+        name: asset.name,
+        type: examType,
+        category: 'Triagem',
+        size_kb: sizeKb,
+        base64,
+        mime_type: fileType,
+      });
+
       setExamUploaded(true);
-      Alert.alert('Exame enviado!', 'Seus resultados serão analisados automaticamente.');
-    } catch (e) {
-      Alert.alert('Erro', 'Não foi possível enviar o exame. Tente novamente.');
+      Alert.alert('Exame enviado!', 'Seus resultados serão analisados automaticamente por IA.');
+    } catch (e: unknown) {
+      const err = e as Error;
+      if (err.message !== 'canceled') {
+        Alert.alert('Erro no upload', 'Não foi possível enviar o arquivo. Tente novamente.');
+      }
     } finally {
       setUploadingExam(false);
     }
