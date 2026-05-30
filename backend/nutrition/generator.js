@@ -65,11 +65,12 @@ const FIXED_PORTION = { vegetable: 90, fruit: 130, legume: 80, dairy: 200, bebid
 // mínimos baixos para NÃO inflar porções caseiras curadas (ex: queijo 30g) — antes
 // dairy mínimo 120 forçava queijo a 120g = ~400kcal, estourando a meta.
 const CLAMP = { protein: [30, 220], carb: [20, 400], legume: [30, 180], dairy: [15, 250], fat: [3, 30], fruit: [30, 220], vegetable: [25, 180], bebida: [100, 250] };
-// Clamp CASEIRO do staple arroz: mesmo sendo o fechador de kcal, fica numa faixa de
-// prato real (~3 a 6 colheres). Sem isto o arroz vira 20g no almoço (espremido pelos
-// outros itens) e 200g no jantar (poucos itens). Faixa idêntica nas 2 refeições; a
-// MEAL_DISTRIBUTION já dá ao almoço mais kcal, então ele tende a levar o arroz maior.
-const STAPLE_CLAMP = { arroz: [80, 180] };
+// Clamp CASEIRO do staple arroz, SENSÍVEL À REFEIÇÃO: no almoço (refeição principal) o
+// arroz é farto (~5 colheres, piso alto) e os demais itens flexionam pra caber; no jantar
+// (leve) o arroz é menor. Isto garante almoço com arroz MAIOR que o jantar — como na vida
+// real — em vez do inverso (jantar tem menos itens, então o arroz inflava lá).
+const STAPLE_CLAMP = { arroz: { almoco: [110, 180], jantar: [60, 110], default: [80, 160] } };
+const stapleClamp = (staple, meal) => { const c = STAPLE_CLAMP[staple]; return c ? (c[meal] || c.default) : null; };
 // ordem de resolução: fixos primeiro, depois owns protein/fat, e owns 'kcal' por último (fecha energia)
 const ROLE_ORDER = ['vegetable', 'fruit', 'legume', 'dairy', 'bebida', 'protein', 'fat', 'carb'];
 
@@ -374,7 +375,8 @@ function generatePlan(pool, config) {
         else f = nextFood(mealType, slot.role, slot.only);
         if (f) {
           const pk = { role: slot.role, food: f, owns: slot.owns };
-          if (STAPLE_CLAMP[slot.staple]) pk.clamp = STAPLE_CLAMP[slot.staple];   // arroz na faixa caseira
+          const sc = stapleClamp(slot.staple, mealType);
+          if (sc) pk.clamp = sc;   // arroz na faixa caseira (almoço farto, jantar leve)
           picks.push(pk);
         }
       }
