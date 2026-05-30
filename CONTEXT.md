@@ -89,7 +89,7 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 ### Fase B — Recipe-first ✅ EM ANDAMENTO
 - **Crédito (concluído):** `recipes.author_name` + preparo ORIGINAL do JSON-LD (sem parafrasear). Comando `update-preparo`. Gerador injeta "Receita de [autor] — [url]". Builder mostra `.wd-meal-author`.
 - **goals[] (concluído):** `recipes.goals` (lose/maintain/gain) derivado de macros via `computeGoals()`. Substitui o binário `healthy`. Gerador filtra por objetivo do paciente. Acervo: **465 receitas** (lose 99, maintain 298, gain 144). +12 categorias scrapadas (alta-proteina, baixa-caloria, low-carb, etc.).
-- **Pendente:** atributos clínicos por protocolo nas receitas (low_purina, low_tg) + filtro do gerador por protocolo ativo.
+- **clinical_tags (concluído):** `recipes.clinical_tags` lista os protocolos que a receita RESPEITA, via `protocols.clinicalTagsFor()` com match por **palavra inteira** (`wordHit` — corrige falso positivo "nata"≠"natural"). Gerador filtra `clinical_tags @> protocolIds`. Restrições do paciente separadas em `exclusions.patientKeywords`. Acervo (de 465 ativas): baixa_purina 254, baixo_tg 345, baixo_ig 342, baixo_na 216, renal 460, baixo_colesterol 225. Validado: Marcelo (Gota) → 77 receitas, sem camarão/sardinha, com escondidinho de frango.
 
 ### Fase C — Alertas clínicos (pendente)
 - Transformar `micros.js` de compensação automática para alertas visuais no builder.

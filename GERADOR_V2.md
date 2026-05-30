@@ -408,7 +408,7 @@ CREATE TABLE patient_exam_proxy (
 
 ### Fase B — Recipe-first
 9. Receitas como primário (nome = ingredientes = preparo), archetypes como fallback
-10. Atributos clínicos em receitas (low_purina, low_tg, low_ig, low_na)
+10. ✅ Atributos clínicos: `recipes.clinical_tags` (protocolos respeitados) via `clinicalTagsFor()` com `wordHit` (palavra inteira, sem falso positivo). `recipes.goals[]` (lose/maintain/gain). Gerador filtra por objetivo + `clinical_tags @> protocolIds`. 465 receitas ativas; cobertura por protocolo: purina 254, tg 345, ig 342, na 216, renal 460, colesterol 225.
 11. ✅ Crédito: `author_name` + `source_url` coletados do JSON-LD; `srcAuthor()` + `srcPreparo()` no scraper; `update-preparo` re-fetcha sem re-decompor; gerador injeta "Receita de [autor] — [url]" nas `instructions`; builder mostra `.wd-meal-author`. 38/45 receitas fit com autor+preparo original coletados.
 
 ### Fase A+ — Fórmulas energéticas (✅ concluído)
