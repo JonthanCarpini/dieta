@@ -814,10 +814,12 @@ router.post('/patients/:id/generate-plan', verifyPatientAccess, async (req, res)
     const profile = profRes.rows[0] || {};
     const dri = limits.getDRI(profile.age, profile.gender);
     const adequacy = micros.buildAdequacyReport(plan_data, dri, []);
+    // Fase C: alertas acionáveis de micros (UL ultrapassado, micro muito baixo, piso)
+    const microAlerts = micros.buildMicroAlerts(adequacy, dri);
 
     res.json({
       plan_data, config, summary, adequacy,
-      alerts: config.alerts || [],
+      alerts: [...(config.alerts || []), ...microAlerts],
       protocols: config.protocols || {},
       anamnesisStatus: config.anamnesisStatus,
       clinicalSource: config.clinicalSource,

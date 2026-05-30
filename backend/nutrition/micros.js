@@ -205,4 +205,60 @@ function buildAdequacyReport(plan_data, dri, swapLog = []) {
   };
 }
 
-module.exports = { computeWeeklyPanorama, compensateMicros, buildAdequacyReport };
+// ── Fase C: alimentos-fonte por micronutriente (sugestão acionável) ───────────
+const MICRO_FOOD_SOURCES = {
+  fe:   'carnes magras, feijão, lentilha, vegetais verde-escuros (consumir com fonte de vit. C)',
+  ca:   'leite, iogurte, queijo, sardinha, couve, gergelim',
+  mg:   'oleaginosas, sementes, leguminosas, vegetais verdes, aveia',
+  k:    'banana, batata, feijão, abacate, água de coco',
+  zn:   'carnes, ovos, leguminosas, sementes de abóbora',
+  vitc: 'laranja, acerola, limão, goiaba, pimentão, brócolis',
+  vita: 'cenoura, abóbora, manga, fígado (cuidado se gota), vegetais alaranjados',
+  vitd: 'exposição solar, peixes gordos, ovos, suplementação se indicado',
+  vite: 'azeite, oleaginosas, sementes, abacate',
+  vitb12:'carnes, ovos, laticínios (vegetarianos estritos: suplementar)',
+  vitb9: 'vegetais verde-escuros, leguminosas, fígado',
+  tiamina:    'cereais integrais, leguminosas, carne suína',
+  riboflavina:'leite, ovos, vegetais verdes',
+  niacina:    'carnes, peixes, amendoim, cereais integrais',
+  piridoxina: 'carnes, banana, batata, grão-de-bico',
+  fiber:'vegetais, frutas com casca, leguminosas, aveia, cereais integrais',
+};
+
+// ── Fase C: alertas clínicos ACIONÁVEIS de micronutrientes (não compensa, avisa)
+// Gera alertas no mesmo formato dos alertas do planner (level/label/message),
+// destacando UL ultrapassado (erro) e micros muito baixos (atenção, com sugestão).
+function buildMicroAlerts(adequacy, dri = {}) {
+  if (!adequacy || !adequacy.micros) return [];
+  const alerts = [];
+  for (const m of adequacy.micros) {
+    // Teto (UL) — sódio acima do limite diário → risco
+    if (m.key === 'na' && m.status === 'alto') {
+      alerts.push({
+        level: 'error', protocol: 'ul_sodio', label: 'Sódio acima do limite',
+        message: `Sódio chega a ${m.maxDay} ${m.unit}/dia — acima do teto seguro (${L.UL.na} mg). Reduza embutidos, enlatados, queijos curados e sal de adição.`,
+      });
+      continue;
+    }
+    // Micro muito baixo na média semanal → atenção com sugestão de fontes
+    if (m.status === 'muito_baixo' && m.pct != null) {
+      const src = MICRO_FOOD_SOURCES[m.key];
+      alerts.push({
+        level: 'warning', protocol: `micro_${m.key}`,
+        label: `${m.label} baixo (${m.pct}% da meta)`,
+        message: `Média semanal de ${m.label} em ${m.pct}% do recomendado.` + (src ? ` Considere reforçar: ${src}.` : ''),
+      });
+    }
+  }
+  // Piso diário hidrossolúvel (vit C / complexo B) abaixo em algum dia
+  (adequacy.floorAlerts || []).forEach(f => {
+    alerts.push({
+      level: 'warning', protocol: `floor_${f.micro}`,
+      label: `${f.label} abaixo do piso diário`,
+      message: `${f.label} ficou abaixo do mínimo em ${f.daysBelow.length} dia(s). Hidrossolúveis têm pouca reserva corporal — distribua melhor ao longo da semana.`,
+    });
+  });
+  return alerts;
+}
+
+module.exports = { computeWeeklyPanorama, compensateMicros, buildAdequacyReport, buildMicroAlerts, MICRO_FOOD_SOURCES };
