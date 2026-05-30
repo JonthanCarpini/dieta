@@ -30,6 +30,30 @@ const DELAY = parseInt(flag('--delay')) || 700;
 const FETCH_TIMEOUT = 15000;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ── LLM híbrido: normaliza só o resíduo que o regex não resolveu ──────────────
+const ai = require('../routes/ai');                 // reusa callLLM/getLLMConfig/extractJson
+let _cfg = null, _llmOn = !args.includes('--no-llm');
+async function llmNormalize(lines) {
+  if (!_llmOn || !lines.length) return [];
+  if (!_cfg) {
+    try { _cfg = await ai.getLLMConfig(); } catch { _cfg = {}; }
+    if (!(_cfg.gemini_api_key || _cfg.mistral_api_key || _cfg.openai_api_key)) {
+      _llmOn = false; console.warn('  (sem chave LLM — híbrido desativado)'); return [];
+    }
+  }
+  const prompt = `Você recebe linhas de ingredientes de uma receita brasileira. Para CADA linha, ` +
+    `identifique o ALIMENTO BASE (nome simples, singular, SEM marca e SEM modo de preparo) e estime ` +
+    `a MASSA TOTAL em GRAMAS para a quantidade citada (receita inteira). Para água, sal, temperos e ` +
+    `itens "a gosto", use grams 0. Responda APENAS JSON: ` +
+    `{"itens":[{"i":<indice>,"food":"<nome>","grams":<numero>}]}.\nLinhas:\n` +
+    lines.map((l, i) => `${i}. ${l}`).join('\n');
+  try {
+    const { text } = await ai.callLLM(_cfg, prompt);
+    const j = JSON.parse(ai.extractJson(text));
+    return Array.isArray(j.itens) ? j.itens : (Array.isArray(j) ? j : []);
+  } catch (e) { console.warn('  LLM falhou:', e.message.slice(0, 80)); return []; }
+}
+
 const MICRO_KEYS = ['ca','mg','p','fe','na','k','co','zn','se','re','rea','tiamina','riboflavina','piridoxina','niacina','vitc','vitb12','vitb9','vite','vitd'];
 
 // Categorias a varrer (relevantes p/ refeições). Mapeadas à refeição do gerador.
@@ -249,32 +273,50 @@ async function ingestOne(src) {
   const r = extractRecipe(html);
   if (!r) return { status: 'skipped' };
   const ings = r.recipeIngredient.filter(Boolean);
+
+  // PASSO 1 — regex: gramas + match TACO
+  const recs = [];
+  for (const raw of ings) {
+    const g = parseGrams(raw);
+    if (g === 0) { recs.push({ raw, skip: true }); continue; }            // "a gosto"
+    const m = await matchTaco(raw);
+    let grams = null, row = null;
+    if (m && m.row) {
+      row = m.row;
+      if (typeof g === 'number' && g > 0) grams = g;
+      else if (g && g.unit) { const ug = await unitGrams(m.row.id); grams = ug ? g.qty * ug : null; }
+    } else if (typeof g === 'number' && g > 0) grams = g;                  // tem massa, falta alimento
+    recs.push({ raw, row, grams, score: m ? m.score : null });
+  }
+
+  // PASSO 2 — LLM HÍBRIDO: só no resíduo (sem alimento OU sem gramas). 1 chamada/receita.
+  const resIdx = recs.map((x, i) => i).filter(i => !recs[i].skip && (!recs[i].row || recs[i].grams == null));
+  if (resIdx.length) {
+    const out = await llmNormalize(resIdx.map(i => recs[i].raw));
+    for (const it of out) {
+      const idx = resIdx[it.i]; if (idx == null) continue;
+      const rec = recs[idx]; if (!rec || rec.skip) continue;
+      const grams = Number(it.grams);
+      if (!rec.row && it.food) { const m = await matchTaco(it.food); if (m && m.row) { rec.row = m.row; rec.score = m.score; rec.llm = true; } }
+      if (rec.row && rec.grams == null && grams > 0) { rec.grams = grams; rec.llm = true; }
+    }
+  }
+
+  // acumula nutrição
   const rows = [];
   let matchedG = 0, knownG = 0;
   const acc = { kcal: 0, ptn: 0, cho: 0, lip: 0, fibras: 0 }; MICRO_KEYS.forEach(k => acc[k] = 0);
-
-  for (const raw of ings) {
-    let g = parseGrams(raw);
-    const m = await matchTaco(raw);
-    const rec = { raw, alimento_id: null, matched_name: null, grams: null, score: m ? m.score : null };
-    if (m && m.row) {
-      rec.alimento_id = m.row.id; rec.matched_name = m.row.nome;
-      if (g && typeof g === 'object' && g.unit) {           // unidade → medidas_caseiras
-        const ug = await unitGrams(m.row.id);
-        g = ug ? g.qty * ug : null;
-      }
-      if (typeof g === 'number' && g > 0) {
-        rec.grams = Math.round(g);
-        knownG += g; matchedG += g;
-        const f = g / 100;
-        acc.kcal += (+m.row.kcal || 0) * f; acc.ptn += (+m.row.ptn || 0) * f;
-        acc.cho += (+m.row.cho || 0) * f; acc.lip += (+m.row.lip || 0) * f; acc.fibras += (+m.row.fibras || 0) * f;
-        MICRO_KEYS.forEach(k => acc[k] += (+m.row[k] || 0) * f);
-      }
-    } else if (typeof g === 'number' && g > 0) {
-      knownG += g;                                          // contribui p/ massa mas não p/ nutrição
+  for (const rec of recs) {
+    if (rec.skip) { rows.push({ raw: rec.raw, alimento_id: null, matched_name: null, grams: null, score: null, llm: false }); continue; }
+    if (typeof rec.grams === 'number' && rec.grams > 0) knownG += rec.grams;
+    if (rec.row && typeof rec.grams === 'number' && rec.grams > 0) {
+      matchedG += rec.grams; const f = rec.grams / 100;
+      acc.kcal += (+rec.row.kcal || 0) * f; acc.ptn += (+rec.row.ptn || 0) * f;
+      acc.cho += (+rec.row.cho || 0) * f; acc.lip += (+rec.row.lip || 0) * f; acc.fibras += (+rec.row.fibras || 0) * f;
+      MICRO_KEYS.forEach(k => acc[k] += (+rec.row[k] || 0) * f);
     }
-    rows.push(rec);
+    rows.push({ raw: rec.raw, alimento_id: rec.row ? rec.row.id : null, matched_name: rec.row ? rec.row.nome : null,
+                grams: rec.grams != null ? Math.round(rec.grams) : null, score: rec.score, llm: !!rec.llm });
   }
 
   if (matchedG < 30) return { status: 'skipped' };           // sem massa casada suficiente
@@ -295,7 +337,7 @@ async function ingestOne(src) {
 
   if (DRY) {
     console.log(`\n• ${r.name}  [cov ${(coverage*100|0)}%]  ${per100.kcal}kcal/100g vs ${sn.kcal||'?'} (dev ${(dev*100|0)}%)  ${active ? (healthy ? '✓fit' : '○ok') : '✗reprovada'}`);
-    rows.forEach(x => console.log(`    ${x.grams != null ? (x.grams+'g').padEnd(7) : '   ?   '} ${x.matched_name ? '→ '+x.matched_name.slice(0,40) : '✗ '+x.raw.slice(0,40)}`));
+    rows.forEach(x => console.log(`    ${x.llm ? '🤖' : '  '} ${x.grams != null ? (x.grams+'g').padEnd(7) : '   ?   '} ${x.matched_name ? '→ '+x.matched_name.slice(0,40) : '✗ '+x.raw.slice(0,40)}`));
     return { status: 'done', active, healthy };
   }
 

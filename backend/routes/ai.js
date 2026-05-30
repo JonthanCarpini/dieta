@@ -669,5 +669,6 @@ Retorne SOMENTE JSON válido (sem markdown):
 
 router.getLLMConfig = getLLMConfig;
 router.callLLM = callLLM;
+router.extractJson = extractJson;
 
 module.exports = router;
