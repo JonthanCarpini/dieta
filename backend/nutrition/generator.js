@@ -98,10 +98,30 @@ async function fetchFoodPool(db, exclusions) {
              a.id AS alimento_id, a.grupo, a.kcal, a.ptn, a.cho, a.lip, a.fibras, ${cols}
       FROM curated_foods c JOIN alimentos a ON a.id = c.alimento_id
       WHERE c.active = true`);
-    if (res.rows.length) return _buildCuratedPool(res.rows, exclusions);
+    if (res.rows.length) {
+      const pool = _buildCuratedPool(res.rows, exclusions);
+      await _attachPoolMeasures(db, pool);
+      return pool;
+    }
   } catch (_) { /* tabela ainda não existe → fallback */ }
   // 2) Fallback legado (TACO por grupo, replicado em todas as refeições)
-  return _fetchLegacyPool(db, exclusions);
+  const pool = await _fetchLegacyPool(db, exclusions);
+  await _attachPoolMeasures(db, pool).catch(() => {});
+  return pool;
+}
+
+// Carrega e anexa medidas caseiras a todos os alimentos do pool (dedup por id)
+async function _attachPoolMeasures(db, pool) {
+  const foods = new Map();
+  for (const meal of MEAL_KEYS) {
+    const roles = pool[meal] || {};
+    for (const role of Object.keys(roles)) {
+      for (const f of (roles[role] || [])) if (f && f.id) foods.set(f.id, f);
+    }
+  }
+  if (!foods.size) return;
+  const byId = await _loadMeasuresMap(db, [...foods.keys()]);
+  for (const f of foods.values()) _applyMeasures(f, byId);
 }
 
 function _toCuratedFood(r) {
@@ -217,16 +237,79 @@ async function fetchRecipePool(db, exclusions, objetivo, protocolIds) {
     rc.ingredients.push({ food: { id: r.alimento_id, nome: r.nome, per100 }, grams });
     rc.totalKcal += per100.calories * grams / 100;
   }
-  return [...map.values()].filter(rc => !rc.excluded && rc.ingredients.length);
+  const recipes = [...map.values()].filter(rc => !rc.excluded && rc.ingredients.length);
+  // anexa medidas caseiras aos ingredientes das receitas
+  const allIds = [...new Set(recipes.flatMap(rc => rc.ingredients.map(i => i.food.id)))];
+  const byId = await _loadMeasuresMap(db, allIds);
+  recipes.forEach(rc => rc.ingredients.forEach(i => _applyMeasures(i.food, byId)));
+  return recipes;
 }
 
 // Escala um alimento para `grams` no formato EXATO de item do builder (pro-meals.js)
+// ── Medidas caseiras (unidade, fatia, colher...) por alimento ─────────────────
+async function _loadMeasuresMap(db, ids) {
+  const byId = new Map();
+  if (!ids || !ids.length) return byId;
+  try {
+    const r = await db.query(
+      `SELECT alimento_id, nome_mc, peso_g FROM medidas_caseiras
+       WHERE alimento_id = ANY($1) AND peso_g > 0 ORDER BY peso_g`, [ids]);
+    for (const row of r.rows) {
+      const list = byId.get(row.alimento_id) || [];
+      list.push({ label: row.nome_mc, grams: Number(row.peso_g) });
+      byId.set(row.alimento_id, list);
+    }
+  } catch (_) { /* tabela ausente → só gramas */ }
+  return byId;
+}
+// Anexa food.measures garantindo "grama(s)" sempre presente
+function _applyMeasures(food, byId) {
+  let m = byId.get(food.id) || [];
+  if (!m.some(x => Math.abs(x.grams - 1) < 0.01)) m = [{ label: 'grama(s)', grams: 1 }, ...m];
+  food.measures = m;
+}
+
+// ── Modo de preparo para refeições MONTADAS (sem receita) ─────────────────────
+// Gera passos a partir dos ingredientes via templates por palavra-chave. Cada
+// item vira uma instrução curta; itens crus (fruta/iogurte/bebida) agrupam no fim.
+const PREPARO_RULES = [
+  { re: /arroz/,                          step: g => `Cozinhe o arroz (${g}g) em água fervente com um pouco de sal e óleo até secar (~15 min).` },
+  { re: /feij[ãa]o|lentilha|grão|grao/,   step: g => `Refogue o ${'feijão/leguminosa'} já cozido (${g}g) com alho e cebola.` },
+  { re: /frango|peito|coxa|sobrecoxa|file de frango|filé de frango/, step: g => `Tempere e grelhe/asse o frango (${g}g) até dourar.` },
+  { re: /carne|patinho|acém|alcatra|maminha|músculo|musculo|moíd|moid|bife|cupim|fraldinha|lombo|costela/, step: g => `Tempere e grelhe/refogue a carne (${g}g) no ponto desejado.` },
+  { re: /peixe|tilápia|tilapia|merluza|sardinha|salmão|salmao|bacalhau|pescada/, step: g => `Tempere com limão e sal e grelhe/asse o peixe (${g}g).` },
+  { re: /ovo|omelete/,                     step: g => `Prepare o ovo (${g}g) cozido, mexido ou em omelete, conforme preferir.` },
+  { re: /tapioca/,                         step: g => `Hidrate a goma e prepare a tapioca (${g}g) na frigideira.` },
+  { re: /panqueca|crepioca|mingau|aveia/,  step: g => `Misture e prepare na frigideira/panela (${g}g).` },
+  { re: /legume|abóbora|abobora|cenoura|brócolis|brocolis|couve|abobrinha|chuchu|berinjela|batata|mandioca/, step: g => `Cozinhe/refogue os legumes (${g}g) temperados a gosto.` },
+  { re: /salada|alface|rúcula|rucula|tomate|pepino|agrião|agriao|escarola|acelga/, step: g => `Lave e corte os vegetais da salada (${g}g); tempere com azeite, limão e sal.` },
+  { re: /azeite|óleo|oleo/,                step: () => null },   // tempero — não vira passo isolado
+];
+const RAW_SERVE = /fruta|maçã|maca|banana|mamão|mamao|melão|melao|melancia|pera|laranja|abacaxi|uva|manga|iogurte|leite|queijo|requeij|castanha|amêndoa|amendoa|noz|pão|pao|biscoito|granola|mel\b|café|cafe|chá|cha|suco|água de coco|agua de coco|refrigerante/;
+
+function buildMealPreparo(items) {
+  if (!items || !items.length) return '';
+  const steps = [];
+  const serve = [];
+  for (const it of items) {
+    const nm = (it.name || '').toLowerCase();
+    if (RAW_SERVE.test(nm)) { serve.push(it.name); continue; }
+    const rule = PREPARO_RULES.find(r => r.re.test(nm));
+    const s = rule ? rule.step(it.grams) : null;
+    if (s) steps.push(s);
+  }
+  if (serve.length) steps.push(`Sirva acompanhado de: ${serve.join(', ')}.`);
+  if (!steps.length) return '';
+  return steps.map((s, i) => `${i + 1}. ${s}`).join('\n');
+}
+
 function scaleItem(food, grams) {
   const f = grams / 100;
   const item = {
     alimento_id: food.id, name: food.nome,
     medida_label: 'grama(s)', medida_grams: 1, quantidade: grams, grams,
-    available_measures: [{ label: 'grama(s)', grams: 1 }], per100: food.per100,
+    available_measures: (food.measures && food.measures.length) ? food.measures : [{ label: 'grama(s)', grams: 1 }],
+    per100: food.per100,
     calories: round1(food.per100.calories * f), protein: round1(food.per100.protein * f),
     carbs: round1(food.per100.carbs * f), fat: round1(food.per100.fat * f), fiber: round1(food.per100.fiber * f),
   };
@@ -471,7 +554,7 @@ function generatePlan(pool, config) {
         if (carb) carb.owns = 'kcal';
       }
       const items = picks.length ? fillMeal(mt, picks) : [];
-      meals.push({ type: mealType, label: mt.label, time: mt.time, archetype: arch ? arch.name : null, items, instructions: '', total: sumTotals(items) });
+      meals.push({ type: mealType, label: mt.label, time: mt.time, archetype: arch ? arch.name : null, items, instructions: buildMealPreparo(items), total: sumTotals(items) });
     }
     const dayTotal = sumTotals(meals.flatMap(m => m.items));
     days.push({ dow, meals });

@@ -192,12 +192,26 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
   }
 
   // ── 7. Distribuição de refeições ──────────────────────────────────────────
+  // Prioriza as refeições que o paciente REALMENTE faz (anamnese.meal_times).
+  // Ex: se faz só café+almoço+jantar, gera só essas 3 (kcal redistribuída).
+  const MEAL_ORDER  = ['cafe_da_manha', 'lanche_manha', 'almoco', 'lanche_tarde', 'jantar', 'ceia'];
+  const MEAL_WEIGHT = { cafe_da_manha: 0.25, lanche_manha: 0.06, almoco: 0.36, lanche_tarde: 0.06, jantar: 0.27, ceia: 0.06 };
+  const selectedMeals = anamnesis && anamnesis.meal_times && Object.keys(anamnesis.meal_times).length
+    ? MEAL_ORDER.filter(m => Object.keys(anamnesis.meal_times).includes(m))
+    : null;
   const mealCount = anamnesis && anamnesis.meal_count
     ? Math.min(6, Math.max(3, Number(anamnesis.meal_count)))
     : 6;
-  const mealDistribution = overrides.mealDistribution
-    || DIST_BY_MEAL_COUNT[mealCount]
-    || DEFAULT_MEAL_DIST;
+  let mealDistribution;
+  if (overrides.mealDistribution) {
+    mealDistribution = overrides.mealDistribution;
+  } else if (selectedMeals && selectedMeals.length) {
+    const sum = selectedMeals.reduce((s, m) => s + (MEAL_WEIGHT[m] || 0.1), 0) || 1;
+    mealDistribution = {};
+    selectedMeals.forEach(m => { mealDistribution[m] = (MEAL_WEIGHT[m] || 0.1) / sum; });
+  } else {
+    mealDistribution = DIST_BY_MEAL_COUNT[mealCount] || DEFAULT_MEAL_DIST;
+  }
 
   // Horários da anamnese (se disponíveis)
   const mealTimesDB = (anamnesis && anamnesis.meal_times) || {};
