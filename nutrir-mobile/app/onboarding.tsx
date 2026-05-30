@@ -105,6 +105,15 @@ export default function OnboardingScreen() {
   const [uploadingExam, setUploadingExam] = useState(false);
   const [examUploaded, setExamUploaded] = useState(false);
 
+  // Etapa 1 — dados biométricos
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
+  const [age, setAge] = useState('');
+  const [weight, setWeight] = useState('');
+  const [height, setHeight] = useState('');
+  const [goalWeight, setGoalWeight] = useState('');
+  const [goal, setGoal] = useState<'lose' | 'maintain' | 'gain' | ''>('');
+  const [activity, setActivity] = useState<string>('');
+
   // Etapa 2 — estrutura alimentar
   const [mealCount, setMealCount] = useState<number>(5);
   const [eatsOut, setEatsOut] = useState<string>('');
@@ -183,6 +192,7 @@ export default function OnboardingScreen() {
   };
 
   const canAdvance = () => {
+    if (step === 0) return !!gender && !!age && !!weight && !!height && !!goal && !!activity;
     if (step === 1) return mealCount > 0 && eatsOut && cookingLevel;
     if (step === 2) return conditions.size > 0;
     if (step === 4) return hasExams !== null && (hasExams ? examUploaded : true);
@@ -192,6 +202,17 @@ export default function OnboardingScreen() {
   const saveAndFinish = async () => {
     setSaving(true);
     try {
+      // Salva perfil biométrico (Etapa 1)
+      await api.put('/user/profile', {
+        gender,
+        age: parseInt(age),
+        weight: parseFloat(weight),
+        height: parseInt(height),
+        goal_weight: goalWeight ? parseFloat(goalWeight) : null,
+        goal,
+        activity: parseFloat(activity),
+      });
+      // Salva anamnese (Etapas 2-5)
       await api.post('/user/anamnesis', {
         meal_count: mealCount,
         eats_out: eatsOut,
@@ -224,9 +245,9 @@ export default function OnboardingScreen() {
   };
   const back = () => { if (step > 0) setStep(s => s - 1); };
 
-  const TITLES = ['Seu perfil', 'Sua rotina alimentar', 'Sua saúde', 'Preferências alimentares', 'Seus exames'];
+  const TITLES = ['Seus dados', 'Sua rotina alimentar', 'Sua saúde', 'Preferências alimentares', 'Seus exames'];
   const SUBTITLES = [
-    'Confirme seus dados biométricos e objetivo.',
+    'Informe seus dados para calcular suas necessidades nutricionais.',
     'Como é sua rotina com a alimentação?',
     'Selecione todas as condições que se aplicam a você.',
     'Isso ajuda a personalizar seu cardápio.',
@@ -246,16 +267,61 @@ export default function OnboardingScreen() {
             <Text style={s.subtitle}>{SUBTITLES[step]}</Text>
           </View>
 
-          {/* ── Etapa 1 — Biometria (readonly — já preenchida no cadastro) ─── */}
+          {/* ── Etapa 1 — Dados biométricos ──────────────────────────────── */}
           {step === 0 && (
             <View style={s.section}>
-              <View style={s.infoBox}>
-                <Text style={s.infoText}>✓ Seus dados básicos (nome, peso, altura, objetivo) foram salvos no cadastro. Você pode atualizá-los em Perfil a qualquer momento.</Text>
+
+              <Text style={s.sectionTitle}>Sexo biológico</Text>
+              <View style={s.rowGroup}>
+                <OptionBtn label="Feminino" selected={gender === 'female'} onPress={() => setGender('female')} />
+                <OptionBtn label="Masculino" selected={gender === 'male'} onPress={() => setGender('male')} />
               </View>
-              <Text style={s.sectionTitle}>Por que fazemos isso?</Text>
-              <Text style={s.bodyText}>
-                Essas 5 etapas permitem que seu nutricionista gere um cardápio personalizado para você, respeitando sua saúde, rotina e preferências. Leva menos de 3 minutos.
-              </Text>
+
+              <View style={s.row2col}>
+                <View style={s.col}>
+                  <Text style={s.sectionTitle}>Idade (anos)</Text>
+                  <TextInput style={s.input} value={age} onChangeText={setAge}
+                    placeholder="Ex: 35" placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric" maxLength={3} />
+                </View>
+                <View style={s.col}>
+                  <Text style={s.sectionTitle}>Peso atual (kg)</Text>
+                  <TextInput style={s.input} value={weight} onChangeText={setWeight}
+                    placeholder="Ex: 75.5" placeholderTextColor={colors.textMuted}
+                    keyboardType="decimal-pad" maxLength={6} />
+                </View>
+              </View>
+
+              <View style={s.row2col}>
+                <View style={s.col}>
+                  <Text style={s.sectionTitle}>Altura (cm)</Text>
+                  <TextInput style={s.input} value={height} onChangeText={setHeight}
+                    placeholder="Ex: 170" placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric" maxLength={3} />
+                </View>
+                <View style={s.col}>
+                  <Text style={s.sectionTitle}>Peso desejado (kg)</Text>
+                  <TextInput style={s.input} value={goalWeight} onChangeText={setGoalWeight}
+                    placeholder="Ex: 65" placeholderTextColor={colors.textMuted}
+                    keyboardType="decimal-pad" maxLength={6} />
+                </View>
+              </View>
+
+              <Text style={[s.sectionTitle, { marginTop: spacing.sm }]}>Objetivo</Text>
+              <OptionBtn label="Emagrecer" selected={goal === 'lose'} onPress={() => setGoal('lose')} />
+              <OptionBtn label="Manter peso" selected={goal === 'maintain'} onPress={() => setGoal('maintain')} />
+              <OptionBtn label="Ganhar massa muscular" selected={goal === 'gain'} onPress={() => setGoal('gain')} />
+
+              <Text style={[s.sectionTitle, { marginTop: spacing.sm }]}>Nível de atividade física</Text>
+              {[
+                { val: '1.2',  label: 'Sedentário — sem exercício' },
+                { val: '1.375', label: 'Levemente ativo — 1-3x / semana' },
+                { val: '1.55',  label: 'Moderadamente ativo — 3-5x / semana' },
+                { val: '1.725', label: 'Muito ativo — 6-7x / semana' },
+                { val: '1.9',  label: 'Extremamente ativo — atleta / trabalho físico' },
+              ].map(o => (
+                <OptionBtn key={o.val} label={o.label} selected={activity === o.val} onPress={() => setActivity(o.val)} />
+              ))}
             </View>
           )}
 
@@ -419,6 +485,8 @@ const s = StyleSheet.create({
   bodyText:     { ...typography.body, color: colors.textSecondary, lineHeight: 22, marginBottom: spacing.md },
 
   rowGroup: { gap: 6 },
+  row2col:  { flexDirection: 'row', gap: spacing.sm, marginBottom: 4 },
+  col:      { flex: 1 },
 
   infoBox:  { backgroundColor: colors.accentGreen + '10', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.accentGreen + '30', marginBottom: spacing.md },
   infoText: { ...typography.body, color: colors.accentGreen, lineHeight: 22 },

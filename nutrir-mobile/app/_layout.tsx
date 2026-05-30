@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import type { Router } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -33,6 +33,8 @@ function AuthGuard() {
   const { token, isReady } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
+  // Garante que a checagem de anamnese no app load só roda UMA vez por sessão
+  const didCheckOnLoad = useRef(false);
 
   useEffect(() => {
     if (!isReady) return;
@@ -42,11 +44,19 @@ function AuthGuard() {
 
     if (!token && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (token && inAuthGroup) {
-      // Após login/registro, verifica se anamnese está completa
+      return;
+    }
+
+    if (token && inAuthGroup) {
+      // Vindo de login/registro → checa anamnese
       checkAnamnesisAndRedirect(router);
-    } else if (token && !inAuthGroup && !inOnboarding) {
-      // Usuário já logado navegando — não re-checa para não interromper
+      return;
+    }
+
+    if (token && !inAuthGroup && !inOnboarding && !didCheckOnLoad.current) {
+      // App aberto com token existente (reinstalação, reinício) → checa uma vez
+      didCheckOnLoad.current = true;
+      checkAnamnesisAndRedirect(router);
     }
   }, [token, isReady, segments]);
 
