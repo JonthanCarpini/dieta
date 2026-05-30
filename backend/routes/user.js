@@ -42,21 +42,47 @@ router.get('/profile', async (req, res) => {
   }
 });
 
+// Calcula idade a partir da data de nascimento (ISO ou DD/MM/AAAA)
+function calcAge(birthdate) {
+  if (!birthdate) return null;
+  let d;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(birthdate)) {
+    const [dd, mm, yyyy] = birthdate.split('/');
+    d = new Date(`${yyyy}-${mm}-${dd}`);
+  } else {
+    d = new Date(birthdate);
+  }
+  if (isNaN(d)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  return age;
+}
+
 const saveProfileHandler = async (req, res) => {
   const {
-    gender, age, weight, height, activity, goal,
-    goal_weight, speed, target_calories, target_protein, target_carbs, target_fat
+    gender, birthdate, weight, height, activity, goal,
+    goal_weight, speed, target_calories, target_protein, target_carbs, target_fat,
+    age: ageOverride  // aceita age direto se não houver birthdate (retrocompatibilidade)
   } = req.body;
 
+  // birthdate é a fonte da verdade; age é calculado automaticamente
+  const computedAge = birthdate ? calcAge(birthdate) : (ageOverride || null);
+
   try {
+    // Adiciona coluna birthdate se ainda não existe (migração silenciosa)
+    await db.query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS birthdate DATE`).catch(() => {});
+
     // Insere ou atualiza o perfil (UPSERT)
     await db.query(`
       INSERT INTO profiles (
-        user_id, gender, age, weight, height, activity, goal, 
+        user_id, gender, birthdate, age, weight, height, activity, goal,
         goal_weight, speed, target_calories, target_protein, target_carbs, target_fat, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
       ON CONFLICT (user_id) DO UPDATE SET
         gender = EXCLUDED.gender,
+        birthdate = COALESCE(EXCLUDED.birthdate, profiles.birthdate),
         age = EXCLUDED.age,
         weight = EXCLUDED.weight,
         height = EXCLUDED.height,
@@ -70,7 +96,9 @@ const saveProfileHandler = async (req, res) => {
         target_fat = EXCLUDED.target_fat,
         updated_at = NOW()
     `, [
-      req.user.id, gender, age, weight, height, activity, goal,
+      req.user.id, gender,
+      birthdate ? (birthdate.includes('/') ? (() => { const [dd,mm,yyyy]=birthdate.split('/'); return `${yyyy}-${mm}-${dd}`; })() : birthdate) : null,
+      computedAge, weight, height, activity, goal,
       goal_weight, speed, target_calories, target_protein, target_carbs, target_fat
     ]);
 

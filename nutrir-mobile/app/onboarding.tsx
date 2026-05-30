@@ -107,12 +107,28 @@ export default function OnboardingScreen() {
 
   // Etapa 1 — dados biométricos
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
-  const [age, setAge] = useState('');
+  const [birthdate, setBirthdate] = useState('');   // DD/MM/AAAA
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
   const [goalWeight, setGoalWeight] = useState('');
   const [goal, setGoal] = useState<'lose' | 'maintain' | 'gain' | ''>('');
   const [activity, setActivity] = useState<string>('');
+
+  // Máscara DD/MM/AAAA
+  const handleBirthdate = (text: string) => {
+    const digits = text.replace(/\D/g, '').slice(0, 8);
+    let masked = digits;
+    if (digits.length > 4) masked = `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+    else if (digits.length > 2) masked = `${digits.slice(0,2)}/${digits.slice(2)}`;
+    setBirthdate(masked);
+  };
+  const birthdateValid = () => {
+    if (birthdate.length !== 10) return false;
+    const [dd, mm, yyyy] = birthdate.split('/').map(Number);
+    if (!dd || !mm || !yyyy || yyyy < 1900 || yyyy > new Date().getFullYear()) return false;
+    const d = new Date(yyyy, mm - 1, dd);
+    return d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd;
+  };
 
   // Etapa 2 — estrutura alimentar
   const [mealCount, setMealCount] = useState<number>(5);
@@ -192,7 +208,7 @@ export default function OnboardingScreen() {
   };
 
   const canAdvance = () => {
-    if (step === 0) return !!gender && !!age && !!weight && !!height && !!goal && !!activity;
+    if (step === 0) return !!gender && birthdateValid() && !!weight && !!height && !!goal && !!activity;
     if (step === 1) return mealCount > 0 && eatsOut && cookingLevel;
     if (step === 2) return conditions.size > 0;
     if (step === 4) return hasExams !== null && (hasExams ? examUploaded : true);
@@ -202,10 +218,10 @@ export default function OnboardingScreen() {
   const saveAndFinish = async () => {
     setSaving(true);
     try {
-      // Salva perfil biométrico (Etapa 1)
+      // Salva perfil biométrico (Etapa 1) — birthdate é fonte da verdade, idade calculada no backend
       await api.put('/user/profile', {
         gender,
-        age: parseInt(age),
+        birthdate,          // DD/MM/AAAA — backend converte e calcula age dinamicamente
         weight: parseFloat(weight),
         height: parseInt(height),
         goal_weight: goalWeight ? parseFloat(goalWeight) : null,
@@ -277,27 +293,26 @@ export default function OnboardingScreen() {
                 <OptionBtn label="Masculino" selected={gender === 'male'} onPress={() => setGender('male')} />
               </View>
 
-              <View style={s.row2col}>
-                <View style={s.col}>
-                  <Text style={s.sectionTitle}>Idade (anos)</Text>
-                  <TextInput style={s.input} value={age} onChangeText={setAge}
-                    placeholder="Ex: 35" placeholderTextColor={colors.textMuted}
-                    keyboardType="numeric" maxLength={3} />
-                </View>
+              <Text style={s.sectionTitle}>Data de nascimento</Text>
+              <TextInput
+                style={[s.input, birthdate.length > 0 && !birthdateValid() && s.inputError]}
+                value={birthdate}
+                onChangeText={handleBirthdate}
+                placeholder="DD/MM/AAAA"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+                maxLength={10}
+              />
+              {birthdate.length > 0 && !birthdateValid() && (
+                <Text style={s.fieldError}>Data inválida — use o formato DD/MM/AAAA</Text>
+              )}
+
+              <View style={[s.row2col, { marginTop: spacing.sm }]}>
                 <View style={s.col}>
                   <Text style={s.sectionTitle}>Peso atual (kg)</Text>
                   <TextInput style={s.input} value={weight} onChangeText={setWeight}
                     placeholder="Ex: 75.5" placeholderTextColor={colors.textMuted}
                     keyboardType="decimal-pad" maxLength={6} />
-                </View>
-              </View>
-
-              <View style={s.row2col}>
-                <View style={s.col}>
-                  <Text style={s.sectionTitle}>Altura (cm)</Text>
-                  <TextInput style={s.input} value={height} onChangeText={setHeight}
-                    placeholder="Ex: 170" placeholderTextColor={colors.textMuted}
-                    keyboardType="numeric" maxLength={3} />
                 </View>
                 <View style={s.col}>
                   <Text style={s.sectionTitle}>Peso desejado (kg)</Text>
@@ -306,6 +321,11 @@ export default function OnboardingScreen() {
                     keyboardType="decimal-pad" maxLength={6} />
                 </View>
               </View>
+
+              <Text style={s.sectionTitle}>Altura (cm)</Text>
+              <TextInput style={s.input} value={height} onChangeText={setHeight}
+                placeholder="Ex: 170" placeholderTextColor={colors.textMuted}
+                keyboardType="numeric" maxLength={3} />
 
               <Text style={[s.sectionTitle, { marginTop: spacing.sm }]}>Objetivo</Text>
               <OptionBtn label="Emagrecer" selected={goal === 'lose'} onPress={() => setGoal('lose')} />
@@ -491,8 +511,10 @@ const s = StyleSheet.create({
   infoBox:  { backgroundColor: colors.accentGreen + '10', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.accentGreen + '30', marginBottom: spacing.md },
   infoText: { ...typography.body, color: colors.accentGreen, lineHeight: 22 },
 
-  textarea: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, color: colors.textPrimary, fontSize: 14, borderWidth: 1, borderColor: colors.border, minHeight: 80, textAlignVertical: 'top', marginBottom: 4 },
-  input:    { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 14, color: colors.textPrimary, fontSize: 14, borderWidth: 1, borderColor: colors.border },
+  textarea:   { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, color: colors.textPrimary, fontSize: 14, borderWidth: 1, borderColor: colors.border, minHeight: 80, textAlignVertical: 'top', marginBottom: 4 },
+  input:      { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 14, color: colors.textPrimary, fontSize: 14, borderWidth: 1, borderColor: colors.border },
+  inputError: { borderColor: colors.accentRed },
+  fieldError: { fontSize: 11, color: colors.accentRed, marginTop: 2, marginBottom: 4 },
 
   uploadBox:    { marginTop: spacing.md, gap: spacing.sm },
   uploadBtn:    { backgroundColor: colors.surface, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.accentGreen + '50', borderStyle: 'dashed' },

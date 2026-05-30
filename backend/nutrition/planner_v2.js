@@ -53,6 +53,17 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
   ]);
 
   const profile   = profileRes.rows[0]   || {};
+  // Recalcula idade dinamicamente a partir de birthdate (nunca fica desatualizada)
+  if (profile.birthdate) {
+    const d = new Date(profile.birthdate);
+    if (!isNaN(d)) {
+      const today = new Date();
+      let age = today.getFullYear() - d.getFullYear();
+      const m = today.getMonth() - d.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+      profile.age = age;
+    }
+  }
   const energyCalc = calcRes.rows[0]     || null;
   const markers    = markersRes.rows      || [];
   const anamnesis  = anamnesisRes.rows[0] || null;
