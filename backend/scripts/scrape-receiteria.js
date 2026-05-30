@@ -316,7 +316,7 @@ async function ingestOne(src) {
       `INSERT INTO recipe_ingredients (recipe_id, raw, alimento_id, matched_name, grams, match_score)
        VALUES ($1,$2,$3,$4,$5,$6)`, [rid, x.raw, x.alimento_id, x.matched_name, x.grams, x.score]);
   }
-  return { status: 'done', healthy };
+  return { status: 'done', active, healthy };
 }
 
 async function ingest() {
