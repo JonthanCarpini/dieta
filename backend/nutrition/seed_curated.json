@@ -213,6 +213,9 @@
   { "name": "Café",                       "q": "café",                 "role": "bebida",    "meals": ["cafe","lanche"], "portion": 50 },
   { "name": "Chá",                        "q": "chá",                  "role": "bebida",    "meals": ["cafe","lanche","ceia"], "portion": 200 },
   { "name": "Refrigerante zero",          "q": "refrigerante",         "role": "bebida",    "meals": ["almoco","jantar"], "portion": 200 },
-  { "name": "Suco de laranja natural",    "q": "suco de laranja",      "role": "bebida",    "meals": ["cafe","almoco"], "portion": 200 },
-  { "name": "Água de coco",               "q": "água de coco",         "role": "bebida",    "meals": ["lanche"], "portion": 200 }
+  { "name": "Suco de laranja natural",    "q": "suco de laranja",  "id": 8139, "role": "bebida", "meals": ["almoco"], "portion": 200 },
+  { "name": "Suco de acerola natural",    "q": "suco acerola",     "id": 3556, "role": "bebida", "meals": ["almoco"], "portion": 200 },
+  { "name": "Suco de caju natural",       "q": "suco caju",        "id": 95,   "role": "bebida", "meals": ["almoco"], "portion": 200 },
+  { "name": "Suco de abacaxi natural",    "q": "suco abacaxi",     "id": 3545, "role": "bebida", "meals": ["almoco"], "portion": 200 },
+  { "name": "Água de coco",               "q": "água de coco",         "role": "bebida",    "meals": ["almoco","lanche"], "portion": 200 }
 ]

@@ -101,7 +101,17 @@ async function main() {
 
   let ok = 0, low = 0, miss = 0;
   for (const e of seed) {
-    const m = await findBest(e);
+    let m;
+    if (e.id) {
+      // id explícito no seed → casa direto (sem chute de score). Para itens que a
+      // TACO mapeia mal por nome (sucos, sementes), fixamos o alimento certo.
+      const micros = gen.MICRO_KEYS.join(', ');
+      const r = await db.query(
+        `SELECT id, nome, grupo, kcal, ptn, cho, lip, fibras, ${micros} FROM alimentos WHERE id=$1`, [e.id]);
+      m = r.rows.length ? { row: r.rows[0], score: 999 } : null;
+    } else {
+      m = await findBest(e);
+    }
     if (!m || !m.row) { miss++; console.log(`  ✗ ${e.name}  (q="${e.q}") — NÃO ACHADO`); continue; }
     const conf = m.score >= 30 ? '✓' : '⚠';
     if (m.score >= 30) ok++; else low++;

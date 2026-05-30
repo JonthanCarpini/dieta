@@ -307,9 +307,55 @@ function generatePlan(pool, config) {
     return a;
   };
 
+  // ── Despensa da semana: staples (arroz/feijão) FIXOS por blocos de 3-4 dias ──────
+  // O brasileiro médio cozinha 1 panela e come por dias (~2 cozimentos/semana). Trocar
+  // o tipo de arroz/feijão todo dia é irreal e inviável de seguir. Aqui a IDENTIDADE do
+  // staple é travada por bloco; a quantidade (gramas) continua variando normalmente.
+  const STAPLE = { arroz: { role: 'carb', re: /arroz/ }, feijao: { role: 'legume', re: /feij[ãa]o/ } };
+  const gatherStaple = name => {
+    const { role, re } = STAPLE[name]; const seen = new Set(); const out = [];
+    for (const meal of MEAL_KEYS) {
+      for (const f of (pool[meal] && pool[meal][role]) || []) {
+        if (re.test((f.nome || '').toLowerCase()) && !seen.has(f.id)) { seen.add(f.id); out.push(f); }
+      }
+    }
+    return out;
+  };
+  const BLOCKS = [[0, 1, 2], [3, 4, 5, 6]];   // 3 + 4 dias → ~2 cozimentos por semana
+  const buildBlocks = (list, seed) => {
+    if (!list || !list.length) return null;
+    const sh = shuffle(list, seed); const out = new Array(7);
+    BLOCKS.forEach((idx, bi) => { const f = sh[bi % sh.length]; idx.forEach(d => { out[d] = f; }); });
+    return out;
+  };
+  const pantry = {
+    arroz:  buildBlocks(gatherStaple('arroz'),  (config.kcal || 2000) + 11),
+    feijao: buildBlocks(gatherStaple('feijao'), (config.kcal || 2000) + 47),
+  };
+
+  // ── Bebida do almoço: suco natural na maioria dos dias (micros), leve na rotação ──
+  const buildBebidaAlmoco = seed => {
+    const list = (pool['almoco'] && pool['almoco']['bebida']) || [];
+    if (!list.length) return null;
+    const isJuice = f => /suco|coco/.test((f.nome || '').toLowerCase());
+    const juices = shuffle(list.filter(isJuice), seed);
+    const light  = shuffle(list.filter(f => !isJuice(f)), seed + 1);   // água/refri zero
+    const lightDays = new Set([2, 5]);          // 2 dias leves, 5 com suco (vitaminas)
+    const out = new Array(7); let ji = 0, li = 0;
+    for (let d = 0; d < 7; d++) {
+      if (lightDays.has(d) && light.length) out[d] = light[li++ % light.length];
+      else if (juices.length) out[d] = juices[ji++ % juices.length];
+      else if (light.length) out[d] = light[li++ % light.length];
+    }
+    return out;
+  };
+  const bebidaAlmoco = buildBebidaAlmoco((config.kcal || 2000) + 23);
+
   const days = [];
   const summary = [];
+  let di = -1;
   for (const dow of DOW_ORDER) {
+    di++;
     const meals = [];
     for (const [mealType, mt] of Object.entries(config.perMeal)) {
       const arch = nextArchetype(mealType);
@@ -317,7 +363,10 @@ function generatePlan(pool, config) {
       const slots = arch ? arch.slots : (MEAL_TEMPLATES[mealType] || []).map(role => ({ role }));
       const picks = [];
       for (const slot of slots) {
-        const f = nextFood(mealType, slot.role, slot.only);
+        let f;
+        if (slot.staple && pantry[slot.staple]) f = pantry[slot.staple][di];   // despensa fixa
+        else if (mealType === 'almoco' && slot.role === 'bebida' && bebidaAlmoco) f = bebidaAlmoco[di];
+        else f = nextFood(mealType, slot.role, slot.only);
         if (f) picks.push({ role: slot.role, food: f, owns: slot.owns });
       }
       // garante um fechador de kcal: se nenhum pick ficou com owns:'kcal', promove o carbo ou o de maior caloria
