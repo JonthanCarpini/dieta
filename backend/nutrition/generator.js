@@ -167,11 +167,13 @@ function toFood(r) {
 // Mapa do `meal` da receita → tipos de refeição do gerador.
 const RECIPE_MEAL_MAP = {
   almoco_jantar:      ['almoco', 'jantar'],
-  cafe_almoco_jantar: ['cafe_da_manha', 'almoco', 'jantar'],
-  cafe_lanche:        ['cafe_da_manha', 'lanche_manha', 'lanche_tarde'],
+  cafe_almoco_jantar: ['almoco', 'jantar'],
+  cafe_lanche:        ['lanche_manha', 'lanche_tarde'],
   lanche:             ['lanche_manha', 'lanche_tarde'],
-  ceia:               ['ceia'],
 };
+// Receitas SÓ nas refeições onde a biblioteca é forte e idiomática. Café e ceia
+// ficam nos archetypes (pão+ovo+café, iogurte) — evita "risoto no café da manhã".
+const RECIPE_USABLE = new Set(['almoco', 'jantar', 'lanche_manha', 'lanche_tarde']);
 // Carrega receitas confiáveis (active+healthy) com ingredientes já casados na TACO.
 // Cada receita traz ingredientes {food:{id,nome,per100}, grams} → escalável e com micros.
 async function fetchRecipePool(db, exclusions) {
@@ -403,8 +405,10 @@ function generatePlan(pool, config) {
   const nextRecipe = m => { const l = recShuf[m]; if (!l || !l.length) return null; const r = l[recCur[m] % l.length]; recCur[m]++; return r; };
   // escala a receita inteira para bater a kcal da refeição (fator limitado p/ não distorcer)
   const buildRecipeMeal = (rc, mt) => {
+    // totalKcal é da receita INTEIRA (serve várias porções); f reduz para a porção
+    // que bate a kcal da refeição. Piso baixo p/ encolher receitas grandes.
     let f = rc.totalKcal > 0 ? mt.kcal / rc.totalKcal : 1;
-    f = Math.max(0.3, Math.min(2.5, f));
+    f = Math.max(0.05, Math.min(3, f));
     return rc.ingredients.map(ing => scaleItem(ing.food, Math.max(5, Math.round((ing.grams * f) / 5) * 5)));
   };
 
@@ -417,7 +421,7 @@ function generatePlan(pool, config) {
     for (const [mealType, mt] of Object.entries(config.perMeal)) {
       // MODO HÍBRIDO: em ~metade dos dias usa uma RECEITA inteira da biblioteca
       // (escalada p/ a kcal da refeição); na outra metade monta pelo archetype.
-      const useRec = recShuf[mealType] && recShuf[mealType].length &&
+      const useRec = RECIPE_USABLE.has(mealType) && recShuf[mealType] && recShuf[mealType].length &&
                      ((di + MEAL_KEYS.indexOf(mealType)) % 2 === 0);
       const rec = useRec ? nextRecipe(mealType) : null;
       if (rec) {
