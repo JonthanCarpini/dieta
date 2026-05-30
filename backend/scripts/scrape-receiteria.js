@@ -408,6 +408,7 @@ async function ensureSchema() {
       kcal NUMERIC, ptn NUMERIC, cho NUMERIC, lip NUMERIC, fibras NUMERIC, ${microCols},
       src_kcal NUMERIC, src_ptn NUMERIC, src_cho NUMERIC, src_lip NUMERIC,
       created_at TIMESTAMPTZ DEFAULT NOW())`);
+  await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS preparo TEXT`);   // modo de preparo (gerado por nós via LLM)
   await db.query(`
     CREATE TABLE IF NOT EXISTS recipe_ingredients (
       id SERIAL PRIMARY KEY, recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
@@ -431,6 +432,37 @@ async function reclassify() {
   console.log(`✓ reclassificadas: ${changed} alteradas | fit agora = ${fit}/${rows.length}`);
 }
 
+// Gera MODO DE PREPARO próprio (LLM) a partir do nome + ingredientes decompostos.
+// Texto original nosso (não copiamos o preparo do site). Default: só as fit (que o gerador usa).
+async function prep() {
+  await ensureSchema();
+  _cfg = _cfg || await ai.getLLMConfig();
+  if (!(_cfg.gemini_api_key || _cfg.mistral_api_key || _cfg.openai_api_key)) { console.error('sem chave LLM configurada'); return; }
+  const onlyFit = !args.includes('--all');
+  const { rows } = await db.query(
+    `SELECT id, name FROM recipes WHERE active ${onlyFit ? 'AND healthy' : ''} AND (preparo IS NULL OR preparo='') ORDER BY id LIMIT $1`,
+    [MAX === Infinity ? 100000 : MAX]);
+  console.log(`\n👨‍🍳 gerar preparo p/ ${rows.length} receitas ${onlyFit ? '(fit)' : '(todas ativas)'}\n`);
+  let ok = 0, i = 0;
+  for (const r of rows) {
+    i++;
+    const ing = (await db.query(
+      `SELECT matched_name, grams FROM recipe_ingredients WHERE recipe_id=$1 AND matched_name IS NOT NULL ORDER BY grams DESC`, [r.id]
+    )).rows;
+    const list = ing.map(x => `${Math.round(x.grams)}g ${x.matched_name}`).join(', ');
+    const prompt = `Você é chef. Escreva um MODO DE PREPARO ORIGINAL e conciso (3 a 6 passos curtos, numerados) ` +
+      `para o prato "${r.name}", usando aproximadamente estes ingredientes: ${list}. Escreva do zero, objetivo, ` +
+      `em português do Brasil — NÃO copie textos de sites. Responda APENAS JSON: {"preparo":"1. ...\\n2. ..."}.`;
+    let txt = null;
+    try { const { text } = await ai.callLLM(_cfg, prompt); txt = JSON.parse(ai.extractJson(text)).preparo; }
+    catch (e) { console.warn(`  ✗ ${r.name}: ${e.message.slice(0, 60)}`); }
+    if (txt && txt.length > 10) { await db.query(`UPDATE recipes SET preparo=$2 WHERE id=$1`, [r.id, txt]); ok++; }
+    if (i % 10 === 0) console.log(`  ...${i}/${rows.length} (ok ${ok})`);
+    await sleep(DELAY);
+  }
+  console.log(`\n✓ preparo gerado: ${ok}/${rows.length}`);
+}
+
 async function stats() {
   await ensureSchema();
   const s = await db.query(`SELECT status, count(*) FROM recipe_sources GROUP BY status ORDER BY status`);
@@ -444,6 +476,7 @@ async function stats() {
     if (CMD === 'collect') await collect();
     else if (CMD === 'ingest') await ingest();
     else if (CMD === 'reclassify') await reclassify();
+    else if (CMD === 'prep') await prep();
     else await stats();
   } catch (e) { console.error(e); process.exitCode = 1; }
   finally { try { await db.pool.end(); } catch {} }
