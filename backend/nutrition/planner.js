@@ -14,13 +14,16 @@ const MACRO_SPLITS = {
 
 // ── 1.3 Distribuição de kcal por refeição (soma = 1.0) ────────────────────────
 // Bulk nas 3 principais (café/almoço/jantar = ~84%); lanches leves; ceia mínima.
+// Distribuição idiomática do brasileiro: ALMOÇO é a refeição principal (prato feito
+// arroz+feijão+proteína), jantar mais leve. Antes almoço 32 ≈ jantar 27 (quase empatado),
+// o que espremia o arroz do almoço. Agora almoço 36 / jantar 21. Soma = 1.00.
 const MEAL_DISTRIBUTION = {
   cafe_da_manha: 0.25,
-  lanche_manha:  0.05,
-  almoco:        0.32,
+  lanche_manha:  0.06,
+  almoco:        0.36,
   lanche_tarde:  0.06,
-  jantar:        0.27,
-  ceia:          0.05,
+  jantar:        0.21,
+  ceia:          0.06,
 };
 const MEAL_LABELS = {
   cafe_da_manha: 'Café da Manhã', lanche_manha: 'Lanche da Manhã', almoco: 'Almoço',
