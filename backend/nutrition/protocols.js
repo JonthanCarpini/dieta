@@ -224,6 +224,32 @@ function buildProtocolExclusions(protocolIds = []) {
   };
 }
 
+// ── Match por PALAVRA INTEIRA (evita "nata" casar com "natural") ──────────────
+// Keyword multi-palavra ("creme de leite") → substring direta.
+// Keyword de palavra única ("nata", "manteiga") → compara token a token (com plural).
+function wordHit(name, kw) {
+  const n = (name || '').toLowerCase();
+  const k = (kw || '').toLowerCase().trim();
+  if (!k) return false;
+  if (k.includes(' ')) return n.includes(k);
+  const tokens = n.split(/[^a-zà-ÿ0-9]+/).filter(Boolean);
+  return tokens.some(t => t === k || t === k + 's' || t + 's' === k);
+}
+
+// clinicalTagsFor: dado os nomes dos ingredientes (matched_name da TACO), retorna
+// a lista de protocolos que a receita RESPEITA (nenhum ingrediente os viola).
+// Protocolos sem exclusões (ex: hdl_boost) são sempre respeitados.
+function clinicalTagsFor(ingredientNames = []) {
+  const tags = [];
+  for (const id of Object.keys(PROTOCOLS)) {
+    const p = PROTOCOLS[id];
+    if (!p.exclusions.length) { tags.push(id); continue; }
+    const violates = ingredientNames.some(nm => p.exclusions.some(kw => wordHit(nm, kw)));
+    if (!violates) tags.push(id);
+  }
+  return tags;
+}
+
 // ── Resolve todos os protocolos a partir de todas as fontes disponíveis ───────
 function resolveProtocols({ markers, comorbidities, proxy, anamnesis_conditions }) {
   const ids = new Set([
@@ -243,4 +269,6 @@ module.exports = {
   protocolsFromAnamnesis,
   buildProtocolExclusions,
   resolveProtocols,
+  wordHit,
+  clinicalTagsFor,
 };

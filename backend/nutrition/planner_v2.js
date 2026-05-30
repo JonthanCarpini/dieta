@@ -234,12 +234,16 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
   if (Array.isArray(overrides.excludedKeywords)) {
     overrides.excludedKeywords.forEach(k => { if (k) v1Excl.keywords.push(String(k).toLowerCase()); });
   }
-  // mescla protocolos V2
+  // mescla protocolos V2. `patientKeywords` guarda SÓ as restrições do paciente
+  // (intolerâncias/dieta/aversões) — usado nas receitas para não reintroduzir
+  // falsos positivos de substring dos protocolos (que viram clinical_tags).
   const exclusions = {
-    keywords:    [...new Set([...v1Excl.keywords, ...protocols.keywords])],
-    grupos:      [...new Set([...v1Excl.grupos,   ...protocols.grupos])],
-    matchedRules: v1Excl.matchedRules,
-    protocolIds:  protocols.ids,
+    keywords:        [...new Set([...v1Excl.keywords, ...protocols.keywords])],
+    grupos:          [...new Set([...v1Excl.grupos,   ...protocols.grupos])],
+    patientKeywords: [...new Set(v1Excl.keywords)],   // só restrições do paciente
+    patientGrupos:   [...new Set(v1Excl.grupos)],
+    matchedRules:    v1Excl.matchedRules,
+    protocolIds:     protocols.ids,
   };
 
   // ── 9. Status da anamnese ─────────────────────────────────────────────────

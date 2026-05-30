@@ -17,6 +17,7 @@
  */
 'use strict';
 const db = require('../db');
+const { clinicalTagsFor } = require('../nutrition/protocols');
 
 const args = process.argv.slice(2);
 const CMD = args[0] || 'stats';
@@ -429,9 +430,10 @@ async function ingestOne(src) {
   const dev = sn.kcal ? Math.abs(per100.kcal - sn.kcal) / sn.kcal : 1;
   const trustworthy = coverage >= 0.7 && sn.kcal > 0 && dev <= 0.20;
   const active  = trustworthy;
-  const ingNames = rows.map(x => x.matched_name);
+  const ingNames = rows.map(x => x.matched_name).filter(Boolean);
   const goals   = trustworthy ? computeGoals(r.name, per100, ingNames) : [];
   const healthy = goals.includes('lose');   // retrocompatibilidade
+  const clinicalTags = trustworthy ? clinicalTagsFor(ingNames) : [];   // protocolos que a receita respeita
   const author  = srcAuthor(r);
   const preparo = srcPreparo(r);   // texto original — nunca parafrasear
 
@@ -444,10 +446,10 @@ async function ingestOne(src) {
   }
 
   const cols = ['slug','url','name','author_name','category','meal','yield_servings','total_grams','coverage','healthy','active',
-    'kcal','ptn','cho','lip','fibras', ...MICRO_KEYS, 'src_kcal','src_ptn','src_cho','src_lip','preparo','goals'];
+    'kcal','ptn','cho','lip','fibras', ...MICRO_KEYS, 'src_kcal','src_ptn','src_cho','src_lip','preparo','goals','clinical_tags'];
   const vals = [src.slug, src.url, r.name, author, src.category, src.meal, srcYield(r), Math.round(knownG), +coverage.toFixed(3), healthy, active,
     per100.kcal, per100.ptn, per100.cho, per100.lip, per100.fibras, ...MICRO_KEYS.map(k => per100[k]),
-    sn.kcal, sn.ptn, sn.cho, sn.lip, preparo, goals];
+    sn.kcal, sn.ptn, sn.cho, sn.lip, preparo, goals, clinicalTags];
   const ph = vals.map((_, i) => `$${i + 1}`).join(',');
   const up = cols.slice(2).map(c => `${c}=EXCLUDED.${c}`).join(',');
   const ins = await db.query(
@@ -504,6 +506,7 @@ async function ensureSchema() {
   await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS preparo TEXT`);
   await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS author_name TEXT`);
   await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS goals TEXT[]`);
+  await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS clinical_tags TEXT[]`);   // protocolos respeitados
   await db.query(`
     CREATE TABLE IF NOT EXISTS recipe_ingredients (
       id SERIAL PRIMARY KEY, recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
@@ -523,11 +526,12 @@ async function reclassify() {
     const goals  = computeGoals(r.name, per100, ing);
     const h      = goals.includes('lose');
     const meal   = classifyMeal(r.name, ing);
+    const ctags  = clinicalTagsFor(ing);
     if (h) fit++;
     const up = await db.query(
-      `UPDATE recipes SET healthy=$2, goals=$3, meal=$4 WHERE id=$1
-       AND (healthy IS DISTINCT FROM $2 OR goals IS DISTINCT FROM $3 OR meal IS DISTINCT FROM $4)`,
-      [r.id, h, goals, meal]);
+      `UPDATE recipes SET healthy=$2, goals=$3, meal=$4, clinical_tags=$5 WHERE id=$1
+       AND (healthy IS DISTINCT FROM $2 OR goals IS DISTINCT FROM $3 OR meal IS DISTINCT FROM $4 OR clinical_tags IS DISTINCT FROM $5)`,
+      [r.id, h, goals, meal, ctags]);
     changed += up.rowCount;
   }
   console.log(`✓ reclassificadas: ${changed} alteradas | fit(lose) = ${fit}/${rows.length}`);

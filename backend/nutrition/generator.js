@@ -177,28 +177,40 @@ const RECIPE_MEAL_MAP = {
 const RECIPE_USABLE = new Set(['almoco', 'jantar', 'lanche_manha', 'lanche_tarde']);
 // Carrega receitas confiáveis (active+healthy) com ingredientes já casados na TACO.
 // Cada receita traz ingredientes {food:{id,nome,per100}, grams} → escalável e com micros.
-// Filtra receitas pelo objetivo do paciente (goals[])
-// objetivo: 'lose' | 'maintain' | 'gain' — se null, usa todas as ativas
-async function fetchRecipePool(db, exclusions, objetivo) {
+// Filtra receitas pelo objetivo do paciente (goals[]) E pelos protocolos clínicos
+// (clinical_tags — a receita precisa RESPEITAR todos os protocolos ativos).
+//   objetivo:   'lose' | 'maintain' | 'gain' — se null, usa todas as ativas
+//   protocolIds: ['baixa_purina', ...] — receita deve conter todos em clinical_tags
+// As restrições do paciente (vegetariano/alergias/aversões) são aplicadas por
+// ingrediente usando exclusions.patientKeywords (não os protocolos, que já viram tags).
+async function fetchRecipePool(db, exclusions, objetivo, protocolIds) {
   const cols = MICRO_KEYS.map(k => 'a.' + k).join(', ');
+  const protoArr = Array.isArray(protocolIds) ? protocolIds : [];
   let rows;
   try {
-    const params = objetivo ? [objetivo] : [];
+    const params = [];
+    let where = `r.active AND (r.goals IS NOT NULL AND array_length(r.goals, 1) > 0)`;
+    if (objetivo) { params.push(objetivo); where += ` AND $${params.length} = ANY(r.goals)`; }
+    if (protoArr.length) { params.push(protoArr); where += ` AND r.clinical_tags @> $${params.length}`; }
     rows = (await db.query(`
       SELECT r.id, r.name, r.meal, r.yield_servings, r.preparo, r.author_name, r.url AS source_url,
              ri.alimento_id, ri.grams, a.nome, a.kcal, a.ptn, a.cho, a.lip, a.fibras, ${cols}
       FROM recipes r
       JOIN recipe_ingredients ri ON ri.recipe_id = r.id AND ri.alimento_id IS NOT NULL AND ri.grams > 0
       JOIN alimentos a ON a.id = ri.alimento_id
-      WHERE r.active AND (r.goals IS NOT NULL AND array_length(r.goals, 1) > 0)
-        ${objetivo ? `AND $1 = ANY(r.goals)` : ''}
+      WHERE ${where}
       ORDER BY r.id`, params)).rows;
   } catch (_) { return []; }
+  // restrições do paciente (sem os protocolos — esses já filtrados por clinical_tags)
+  const patientExcl = {
+    keywords: (exclusions && exclusions.patientKeywords) || (exclusions && exclusions.keywords) || [],
+    grupos:   (exclusions && exclusions.patientGrupos)   || (exclusions && exclusions.grupos)   || [],
+  };
   const map = new Map();
   for (const r of rows) {
     let rc = map.get(r.id);
     if (!rc) { rc = { id: r.id, name: r.name, meal: r.meal, servings: Number(r.yield_servings) || 1, preparo: r.preparo || '', author: r.author_name || null, sourceUrl: r.source_url || null, ingredients: [], totalKcal: 0, excluded: false }; map.set(r.id, rc); }
-    if (planner.isExcluded({ nome: r.nome, grupo: '' }, exclusions)) rc.excluded = true;
+    if (planner.isExcluded({ nome: r.nome, grupo: '' }, patientExcl)) rc.excluded = true;
     const per100 = { calories: +r.kcal || 0, protein: +r.ptn || 0, carbs: +r.cho || 0, fat: +r.lip || 0, fiber: +r.fibras || 0 };
     MICRO_KEYS.forEach(k => { per100[k] = +r[k] || 0; });
     const grams = Number(r.grams) || 0;
