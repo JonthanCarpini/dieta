@@ -64,7 +64,12 @@ const ROLE_FALLBACK = { protein: 'legume', dairy: null };
 const FIXED_PORTION = { vegetable: 90, fruit: 130, legume: 80, dairy: 200, bebida: 200 };
 // mínimos baixos para NÃO inflar porções caseiras curadas (ex: queijo 30g) — antes
 // dairy mínimo 120 forçava queijo a 120g = ~400kcal, estourando a meta.
-const CLAMP = { protein: [30, 220], carb: [20, 400], legume: [30, 180], dairy: [15, 250], fat: [3, 30], fruit: [30, 220], vegetable: [25, 180], bebida: [50, 300] };
+const CLAMP = { protein: [30, 220], carb: [20, 400], legume: [30, 180], dairy: [15, 250], fat: [3, 30], fruit: [30, 220], vegetable: [25, 180], bebida: [100, 250] };
+// Clamp CASEIRO do staple arroz: mesmo sendo o fechador de kcal, fica numa faixa de
+// prato real (~3 a 6 colheres). Sem isto o arroz vira 20g no almoço (espremido pelos
+// outros itens) e 200g no jantar (poucos itens). Faixa idêntica nas 2 refeições; a
+// MEAL_DISTRIBUTION já dá ao almoço mais kcal, então ele tende a levar o arroz maior.
+const STAPLE_CLAMP = { arroz: [80, 180] };
 // ordem de resolução: fixos primeiro, depois owns protein/fat, e owns 'kcal' por último (fecha energia)
 const ROLE_ORDER = ['vegetable', 'fruit', 'legume', 'dairy', 'bebida', 'protein', 'fat', 'carb'];
 
@@ -197,11 +202,11 @@ function fillMeal(target, picks) {
       const perG = (food.per100[owns] || 0) / 100;              // proteína / gordura
       grams = perG > 0 ? remaining[owns] / perG : (CLAMP[role] ? CLAMP[role][0] : 50);
     }
-    const clamp = CLAMP[role] || [20, 300];
+    const clamp = pick.clamp || CLAMP[role] || [20, 300];
     grams = Math.max(clamp[0], Math.min(clamp[1], grams));
     grams = Math.max(5, Math.round(grams / 5) * 5);             // múltiplos de 5g
     const item = scaleItem(food, grams);
-    item.role = role; item._food = food; item._owns = owns;
+    item.role = role; item._food = food; item._owns = owns; item._clamp = pick.clamp || null;
     items.push(item);
     remaining.protein -= item.protein;
     remaining.fat     -= item.fat;
@@ -219,7 +224,7 @@ function fillMeal(target, picks) {
     let factor = budget / scalableKcal;
     factor = Math.max(0.4, Math.min(1.8, factor));
     scalable.forEach(it => {
-      const cl = CLAMP[it.role] || [20, 300];
+      const cl = it._clamp || CLAMP[it.role] || [20, 300];
       let g = Math.max(cl[0], Math.min(cl[1], it.grams * factor));
       g = Math.max(5, Math.round(g / 5) * 5);
       const scaled = scaleItem(it._food, g);
@@ -229,7 +234,7 @@ function fillMeal(target, picks) {
   }
 
   // limpa campos internos (mantém role para a Fase 3)
-  items.forEach(it => { delete it._food; delete it._owns; });
+  items.forEach(it => { delete it._food; delete it._owns; delete it._clamp; });
   return items;
 }
 
@@ -367,7 +372,11 @@ function generatePlan(pool, config) {
         if (slot.staple && pantry[slot.staple]) f = pantry[slot.staple][di];   // despensa fixa
         else if (mealType === 'almoco' && slot.role === 'bebida' && bebidaAlmoco) f = bebidaAlmoco[di];
         else f = nextFood(mealType, slot.role, slot.only);
-        if (f) picks.push({ role: slot.role, food: f, owns: slot.owns });
+        if (f) {
+          const pk = { role: slot.role, food: f, owns: slot.owns };
+          if (STAPLE_CLAMP[slot.staple]) pk.clamp = STAPLE_CLAMP[slot.staple];   // arroz na faixa caseira
+          picks.push(pk);
+        }
       }
       // garante um fechador de kcal: se nenhum pick ficou com owns:'kcal', promove o carbo ou o de maior caloria
       if (picks.length && !picks.some(p => p.owns === 'kcal')) {
