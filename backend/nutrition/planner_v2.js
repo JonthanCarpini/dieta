@@ -127,14 +127,16 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
   const kcalFromSpeedVal = speed > 0 ? kcalFromSpeed(get, speed, objetivo) : null;
 
   // Limite seguro por protocolo (ex: gota → déficit máximo 12% = 88% do GET)
+  const hasSpeed = speed > 0;
   const minSafeKcal = objetivo === 'lose'
-    ? round(get * protocols.deficitCap)   // déficit_cap é o máximo → menor kcal permitida
+    ? (hasSpeed ? round(tmb * 0.7) : round(get * protocols.deficitCap))   // se há speed selecionado, a TMB-based speed tem precedência
     : round(get * (DEFICIT_FACTOR[objetivo] || 1.0));
   const minKcal     = MIN_KCAL[profile.gender] || MIN_KCAL.default;
 
-  // Aplica floor: nunca abaixo de TMB, nunca abaixo do mínimo absoluto, nunca abaixo do protocolo
+  // Aplica floor: nunca abaixo de TMB (exceto se emagrecimento, até TMB * 0.7), nunca abaixo do mínimo absoluto, nunca abaixo do protocolo
+  const floorTmb    = objetivo === 'lose' ? round(tmb * 0.7) : round(tmb);
   const safeKcal    = kcalFromSpeedVal ?? round(get * (DEFICIT_FACTOR[objetivo] || 1.0));
-  const flooredKcal = Math.max(safeKcal, minSafeKcal, minKcal, round(tmb));
+  const flooredKcal = Math.max(safeKcal, minSafeKcal, minKcal, floorTmb);
 
   // Override manual do nutricionista (do formulário) tem precedência, mas gera alerta
   const requestedKcal = Number(overrides.kcal) > 0 ? round(Number(overrides.kcal)) : null;

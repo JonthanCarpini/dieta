@@ -120,4 +120,4 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 
 ---
 
-*Última atualização: 30 de Maio de 2026 — Antigravity (IDE Antigravity) — Ajuste das velocidades de perda de peso para serem calculadas dinamicamente com base na TMB (Muito Leve, Leve, Moderado, Intenso e Pesado) e rebuild bem-sucedido do APK*
+*Última atualização: 30 de Maio de 2026 — Antigravity (IDE Antigravity) — Correção no cálculo de metas calóricas no backend (`user.js` e `planner_v2.js`) permitindo déficit abaixo da TMB até `TMB * 0.7` no objetivo de emagrecimento para refletir corretamente as opções de velocidade de perda de peso (Muito Leve, Leve, Moderado, Intenso, Pesado) no Diário/Dashboard.*
