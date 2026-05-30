@@ -231,8 +231,10 @@ const MICRO_FOOD_SOURCES = {
 function buildMicroAlerts(adequacy, dri = {}) {
   if (!adequacy || !adequacy.micros) return [];
   const alerts = [];
+  const lowKeys = new Set();   // micros já alertados como "muito baixo" (evita duplicar no piso)
+
   for (const m of adequacy.micros) {
-    // Teto (UL) — sódio acima do limite diário → risco
+    // Teto (UL) — sódio acima do limite diário → risco (erro)
     if (m.key === 'na' && m.status === 'alto') {
       alerts.push({
         level: 'error', protocol: 'ul_sodio', label: 'Sódio acima do limite',
@@ -242,22 +244,27 @@ function buildMicroAlerts(adequacy, dri = {}) {
     }
     // Micro muito baixo na média semanal → atenção com sugestão de fontes
     if (m.status === 'muito_baixo' && m.pct != null) {
+      lowKeys.add(m.key);
       const src = MICRO_FOOD_SOURCES[m.key];
       alerts.push({
         level: 'warning', protocol: `micro_${m.key}`,
-        label: `${m.label} baixo (${m.pct}% da meta)`,
-        message: `Média semanal de ${m.label} em ${m.pct}% do recomendado.` + (src ? ` Considere reforçar: ${src}.` : ''),
+        label: `${m.label} baixo (${m.pct}% da meta semanal)`,
+        message: `Média semanal de ${m.label} em ${m.pct}% do recomendado.` + (src ? ` Reforce com: ${src}.` : ''),
       });
     }
   }
-  // Piso diário hidrossolúvel (vit C / complexo B) abaixo em algum dia
-  (adequacy.floorAlerts || []).forEach(f => {
+
+  // Piso diário hidrossolúvel — CONSOLIDADO num único alerta (sem repetir os já listados acima)
+  const floors = (adequacy.floorAlerts || []).filter(f => !lowKeys.has(f.micro));
+  if (floors.length) {
+    const list = floors.sort((a, b) => b.daysBelow.length - a.daysBelow.length)
+      .map(f => `${f.label} (${f.daysBelow.length}d)`).join(', ');
     alerts.push({
-      level: 'warning', protocol: `floor_${f.micro}`,
-      label: `${f.label} abaixo do piso diário`,
-      message: `${f.label} ficou abaixo do mínimo em ${f.daysBelow.length} dia(s). Hidrossolúveis têm pouca reserva corporal — distribua melhor ao longo da semana.`,
+      level: 'warning', protocol: 'floor_diario',
+      label: 'Vitaminas hidrossolúveis abaixo do piso em alguns dias',
+      message: `Abaixo do mínimo diário: ${list}. Como o corpo tem pouca reserva dessas vitaminas, distribua as fontes (frutas, vegetais, integrais, carnes) ao longo da semana.`,
     });
-  });
+  }
   return alerts;
 }
 
