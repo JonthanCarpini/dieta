@@ -65,6 +65,11 @@ function calcNutritionTargets({ gender, age, weight, height, activity, goal, spe
   else if (goal === 'gain')    { kcal = Math.round(get * 1.10); }
   else                         { kcal = Math.round(get); }
 
+  // PISO DE SEGURANÇA — nunca abaixo da TMB nem do mínimo absoluto
+  // Sem isso, 1.5 kg/sem com GET baixo gera valores absurdos (ex: 79 kcal)
+  const minAbsoluto = gender === 'male' ? 1500 : 1200;
+  kcal = Math.max(kcal, Math.round(tmb), minAbsoluto);
+
   // Split de macros por objetivo
   const splits = {
     lose:     { protein: 0.30, carbs: 0.40, fat: 0.30 },
