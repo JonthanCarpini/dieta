@@ -112,6 +112,7 @@ export default function OnboardingScreen() {
   const [height, setHeight] = useState('');
   const [goalWeight, setGoalWeight] = useState('');
   const [goal, setGoal] = useState<'lose' | 'maintain' | 'gain' | ''>('');
+  const [speed, setSpeed] = useState<string>('');   // kg/semana
   const [activity, setActivity] = useState<string>('');
 
   // Máscara DD/MM/AAAA
@@ -207,8 +208,10 @@ export default function OnboardingScreen() {
     }
   };
 
+  const needsSpeed = goal === 'lose' || goal === 'gain';
+
   const canAdvance = () => {
-    if (step === 0) return !!gender && birthdateValid() && !!weight && !!height && !!goal && !!activity;
+    if (step === 0) return !!gender && birthdateValid() && !!weight && !!height && !!goal && !!activity && (!needsSpeed || !!speed);
     if (step === 1) return mealCount > 0 && eatsOut && cookingLevel;
     if (step === 2) return conditions.size > 0;
     if (step === 4) return hasExams !== null && (hasExams ? examUploaded : true);
@@ -218,31 +221,61 @@ export default function OnboardingScreen() {
   const saveAndFinish = async () => {
     setSaving(true);
     try {
-      // Salva perfil biométrico (Etapa 1) — birthdate é fonte da verdade, idade calculada no backend
+      // Salva perfil biométrico (Etapa 1)
       await api.put('/user/profile', {
         gender,
-        birthdate,          // DD/MM/AAAA — backend converte e calcula age dinamicamente
+        birthdate,
         weight: parseFloat(weight),
         height: parseInt(height),
         goal_weight: goalWeight ? parseFloat(goalWeight) : null,
         goal,
+        speed: speed ? parseFloat(speed) : null,   // kg/semana → backend calcula déficit real
         activity: parseFloat(activity),
       });
+
+      // Converte condições/restrições da anamnese para texto legível no Perfil Clínico
+      const condLabels: Record<string, string> = {
+        diabetes: 'Diabetes tipo 2 / pré-diabetes', colesterol: 'Colesterol alto',
+        triglicerideos: 'Triglicerídeos altos', hipertensao: 'Hipertensão',
+        gota: 'Gota / ácido úrico elevado', celiaca: 'Doença celíaca',
+        sii: 'Síndrome do intestino irritável', renal: 'Doença renal crônica',
+        calculo_renal: 'Cálculo renal', hipotireoidismo: 'Hipotireoidismo',
+        sop: 'SOP', cardiopatia: 'Doença cardíaca', anemia: 'Anemia',
+      };
+      const restLabels: Record<string, string> = {
+        vegetariano: 'Vegetariano', vegano: 'Vegano',
+        sem_carne_verm: 'Sem carne vermelha', sem_frango: 'Sem frango',
+        sem_peixe: 'Sem peixe / frutos do mar', sem_lactose: 'Intolerância à lactose',
+        sem_gluten: 'Intolerância ao glúten', sem_porco: 'Sem porco',
+        religioso: 'Restrição religiosa',
+      };
+      const goalLabels: Record<string, string> = {
+        lose: `Emagrecer${speed ? ` — ${speed} kg/semana` : ''}`,
+        maintain: 'Manutenção de peso',
+        gain: `Ganho de massa muscular${speed ? ` — ${speed} kg/semana` : ''}`,
+      };
+      const comorbStr = [...conditions].filter(c => c !== 'nenhuma').map(c => condLabels[c] || c).join(', ');
+      const restStr   = [...restrictions].map(r => restLabels[r] || r).join(', ');
+      const intolerances = restrictions.has('sem_lactose') ? 'Lactose' : '';
+      const restFinal = [...restrictions].filter(r => r !== 'sem_lactose').map(r => restLabels[r] || r).join(', ');
+      const dietFinal = [restFinal, avoidsText].filter(Boolean).join('. ');
+
+      // Popula Perfil Clínico automaticamente com os dados da anamnese
+      await api.post('/user/clinical', {
+        comorbidities:        comorbStr || '',
+        intolerances:         intolerances,
+        dietary_restrictions: dietFinal || '',
+        medications:          medications || '',
+        health_goals:         goalLabels[goal] || goal,
+      });
+
       // Salva anamnese (Etapas 2-5)
       await api.post('/user/anamnesis', {
-        meal_count: mealCount,
-        eats_out: eatsOut,
-        cooking_level: cookingLevel,
-        conditions: [...conditions],
-        restrictions: [...restrictions],
-        avoids_text: avoidsText,
-        prefers_text: prefersText,
-        medications,
-        complete: true,
+        meal_count: mealCount, eats_out: eatsOut, cooking_level: cookingLevel,
+        conditions: [...conditions], restrictions: [...restrictions],
+        avoids_text: avoidsText, prefers_text: prefersText, medications, complete: true,
       });
-      if (!hasExams) {
-        await api.post('/user/exam-proxy', proxy);
-      }
+      if (!hasExams) await api.post('/user/exam-proxy', proxy);
       router.replace('/(tabs)');
     } catch (e) {
       Alert.alert('Erro', 'Não foi possível salvar. Tente novamente.');
@@ -331,6 +364,39 @@ export default function OnboardingScreen() {
               <OptionBtn label="Emagrecer" selected={goal === 'lose'} onPress={() => setGoal('lose')} />
               <OptionBtn label="Manter peso" selected={goal === 'maintain'} onPress={() => setGoal('maintain')} />
               <OptionBtn label="Ganhar massa muscular" selected={goal === 'gain'} onPress={() => setGoal('gain')} />
+
+              {/* Velocidade — só para emagrecer ou ganhar massa */}
+              {needsSpeed && (
+                <>
+                  <Text style={[s.sectionTitle, { marginTop: spacing.sm }]}>
+                    Velocidade de {goal === 'lose' ? 'perda' : 'ganho'} de peso
+                  </Text>
+                  <Text style={s.fieldHint}>
+                    {goal === 'lose'
+                      ? 'Déficit calórico calculado automaticamente. Perdas acima de 1 kg/semana aumentam risco de perda muscular.'
+                      : 'Superávit calórico calculado automaticamente. Ganhos acima de 0.5 kg/semana podem aumentar gordura.'}
+                  </Text>
+                  {(goal === 'lose'
+                    ? [
+                        { val: '0.25', label: '0,25 kg / semana', desc: 'Muito gradual — ~275 kcal/dia de déficit' },
+                        { val: '0.5',  label: '0,5 kg / semana',  desc: 'Leve — ~550 kcal/dia de déficit' },
+                        { val: '0.75', label: '0,75 kg / semana', desc: 'Moderado — ~825 kcal/dia de déficit' },
+                        { val: '1.0',  label: '1 kg / semana',    desc: 'Intenso — ~1.100 kcal/dia de déficit' },
+                      ]
+                    : [
+                        { val: '0.25', label: '0,25 kg / semana', desc: 'Lento e limpo — ~275 kcal/dia de superávit' },
+                        { val: '0.5',  label: '0,5 kg / semana',  desc: 'Moderado — ~550 kcal/dia de superávit' },
+                      ]
+                  ).map(o => (
+                    <TouchableOpacity key={o.val}
+                      style={[ob.btn, speed === o.val && ob.sel]}
+                      onPress={() => setSpeed(o.val)} activeOpacity={0.8}>
+                      <Text style={[ob.text, speed === o.val && ob.selText]}>{o.label}</Text>
+                      <Text style={[s.speedDesc, speed === o.val && { color: colors.accentGreen + 'CC' }]}>{o.desc}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
 
               <Text style={[s.sectionTitle, { marginTop: spacing.sm }]}>Nível de atividade física</Text>
               {[
@@ -515,6 +581,8 @@ const s = StyleSheet.create({
   input:      { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 14, color: colors.textPrimary, fontSize: 14, borderWidth: 1, borderColor: colors.border },
   inputError: { borderColor: colors.accentRed },
   fieldError: { fontSize: 11, color: colors.accentRed, marginTop: 2, marginBottom: 4 },
+  fieldHint:  { fontSize: 12, color: colors.textMuted, marginBottom: 8, lineHeight: 18 },
+  speedDesc:  { fontSize: 11, color: colors.textMuted, marginTop: 2 },
 
   uploadBox:    { marginTop: spacing.md, gap: spacing.sm },
   uploadBtn:    { backgroundColor: colors.surface, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.accentGreen + '50', borderStyle: 'dashed' },

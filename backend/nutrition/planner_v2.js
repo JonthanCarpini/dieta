@@ -22,12 +22,20 @@ const round = n => Math.round(n);
 // ── Limites mínimos absolutos de kcal (segurança) ────────────────────────────
 const MIN_KCAL = { male: 1500, female: 1200, default: 1200 };
 
-// ── Fator de déficit por objetivo ─────────────────────────────────────────────
+// ── Fator de déficit por objetivo (fallback quando speed não está disponível) ──
 const DEFICIT_FACTOR = {
   lose:     0.80,   // 20% de déficit sobre o GET
   maintain: 1.00,
   gain:     1.10,
 };
+
+// Calcula meta calórica a partir do GET e da velocidade desejada (kg/semana).
+// 1 kg de gordura ≈ 7.700 kcal → 1 kg/semana = 1.100 kcal/dia de déficit.
+function kcalFromSpeed(get, speed, objetivo) {
+  if (!speed || speed <= 0) return null;
+  const dailyDelta = Math.round(speed * 7700 / 7);  // kcal/dia
+  return objetivo === 'gain' ? Math.round(get + dailyDelta) : Math.round(get - dailyDelta);
+}
 
 // ── Distribuição de refeições por nº de refeições/dia ─────────────────────────
 // Respeita a anamnese: se o paciente faz só 3 refeições, não gerar 6.
@@ -87,13 +95,19 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
     anamnesis_conditions: anamnesis ? (anamnesis.conditions || []) : [],
   });
 
-  // ── 4. Meta calórica: déficit seguro respeitando protocolos ──────────────
-  const baseFactor  = DEFICIT_FACTOR[objetivo] || 1.0;
-  // protocolo pode restringir o déficit (ex: gota → máximo 12%)
-  const safeFactor  = objetivo === 'lose' ? Math.max(baseFactor, protocols.deficitCap) : baseFactor;
-  const safeKcal    = round(get * safeFactor);
+  // ── 4. Meta calórica: usa speed se disponível, senão fator percentual ────
+  const speed = Number(profile.speed) || 0;
+  const kcalFromSpeedVal = speed > 0 ? kcalFromSpeed(get, speed, objetivo) : null;
+
+  // Limite seguro por protocolo (ex: gota → déficit máximo 12% = 88% do GET)
+  const minSafeKcal = objetivo === 'lose'
+    ? round(get * protocols.deficitCap)   // déficit_cap é o máximo → menor kcal permitida
+    : round(get * (DEFICIT_FACTOR[objetivo] || 1.0));
   const minKcal     = MIN_KCAL[profile.gender] || MIN_KCAL.default;
-  const flooredKcal = Math.max(safeKcal, minKcal, round(tmb));   // nunca abaixo da TMB
+
+  // Aplica floor: nunca abaixo de TMB, nunca abaixo do mínimo absoluto, nunca abaixo do protocolo
+  const safeKcal    = kcalFromSpeedVal ?? round(get * (DEFICIT_FACTOR[objetivo] || 1.0));
+  const flooredKcal = Math.max(safeKcal, minSafeKcal, minKcal, round(tmb));
 
   // Override manual do nutricionista (do formulário) tem precedência, mas gera alerta
   const requestedKcal = Number(overrides.kcal) > 0 ? round(Number(overrides.kcal)) : null;
