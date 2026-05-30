@@ -42,8 +42,8 @@ router.get('/profile', async (req, res) => {
   }
 });
 
-// Harris-Benedict 1984: TMB → GET → target_calories com déficit/superávit por speed
-function calcTargetCalories({ gender, age, weight, height, activity, goal, speed }) {
+// Harris-Benedict 1984: calcula TMB/GET e todos os alvos nutricionais
+function calcNutritionTargets({ gender, age, weight, height, activity, goal, speed }) {
   const w   = Number(weight)   || 0;
   const h   = Number(height)   || 0;
   const a   = Number(age)      || 0;
@@ -56,15 +56,33 @@ function calcTargetCalories({ gender, age, weight, height, activity, goal, speed
     : 447.593 + 9.247 * w + 3.098 * h - 4.330 * a;
   const get = tmb * act;
 
-  // Déficit/superávit por velocidade (kg/sem × 7.700 kcal / 7 dias)
+  // Meta calórica: speed (kg/sem × 7700 kcal / 7 dias) ou fator percentual
+  let kcal;
   if (spd > 0 && (goal === 'lose' || goal === 'gain')) {
     const delta = Math.round(spd * 7700 / 7);
-    return Math.round(goal === 'gain' ? get + delta : get - delta);
-  }
-  // Fallback por objetivo sem speed
-  if (goal === 'lose')     return Math.round(get * 0.80);
-  if (goal === 'gain')     return Math.round(get * 1.10);
-  return Math.round(get);  // maintain
+    kcal = Math.round(goal === 'gain' ? get + delta : get - delta);
+  } else if (goal === 'lose')  { kcal = Math.round(get * 0.80); }
+  else if (goal === 'gain')    { kcal = Math.round(get * 1.10); }
+  else                         { kcal = Math.round(get); }
+
+  // Split de macros por objetivo
+  const splits = {
+    lose:     { protein: 0.30, carbs: 0.40, fat: 0.30 },
+    gain:     { protein: 0.25, carbs: 0.50, fat: 0.25 },
+    maintain: { protein: 0.20, carbs: 0.50, fat: 0.30 },
+  };
+  const split = splits[goal] || splits.maintain;
+
+  // Hidratação: 35ml/kg (mín 2000ml, máx 4000ml)
+  const waterMl = Math.min(4000, Math.max(2000, Math.round(w * 35)));
+
+  return {
+    target_calories: kcal,
+    target_protein:  Math.round((kcal * split.protein) / 4),   // 4 kcal/g
+    target_carbs:    Math.round((kcal * split.carbs)   / 4),
+    target_fat:      Math.round((kcal * split.fat)     / 9),   // 9 kcal/g
+    water_target_ml: waterMl,
+  };
 }
 
 // Calcula idade a partir da data de nascimento (ISO ou DD/MM/AAAA)
@@ -95,17 +113,16 @@ const saveProfileHandler = async (req, res) => {
   // birthdate é a fonte da verdade; age é calculado automaticamente
   const computedAge = birthdate ? calcAge(birthdate) : (ageOverride || null);
 
-  // target_calories calculado automaticamente se há dados suficientes
-  // Só sobrescreve se vier dos dados biométricos (birthdate ou age presentes)
-  const autoTarget = computedAge ? calcTargetCalories({
+  // Calcula todos os alvos nutricionais automaticamente (se há dados suficientes)
+  const autoTargets = computedAge ? calcNutritionTargets({
     gender, age: computedAge,
-    weight: weight ?? req.body.weight,
-    height: height ?? req.body.height,
-    activity: activity ?? req.body.activity,
-    goal: goal ?? req.body.goal,
-    speed: req.body.speed,
+    weight, height, activity, goal, speed: req.body.speed,
   }) : null;
-  const finalTarget = autoTarget || target_calories || null;
+  const finalTarget  = (autoTargets?.target_calories) || target_calories || null;
+  const finalProtein = (autoTargets?.target_protein)  || target_protein  || null;
+  const finalCarbs   = (autoTargets?.target_carbs)    || target_carbs    || null;
+  const finalFat     = (autoTargets?.target_fat)      || target_fat      || null;
+  const finalWater   = autoTargets?.water_target_ml   || null;
 
   try {
     // Adiciona coluna birthdate se ainda não existe (migração silenciosa)
@@ -136,8 +153,21 @@ const saveProfileHandler = async (req, res) => {
       req.user.id, gender,
       birthdate ? (birthdate.includes('/') ? (() => { const [dd,mm,yyyy]=birthdate.split('/'); return `${yyyy}-${mm}-${dd}`; })() : birthdate) : null,
       computedAge, weight, height, activity, goal,
-      goal_weight, speed, finalTarget, target_protein, target_carbs, target_fat
+      goal_weight, speed, finalTarget, finalProtein, finalCarbs, finalFat
     ]);
+
+    // Salva meta de hidratação personalizada em `profiles` (coluna water_target_ml)
+    // e propaga para o registro de água de hoje
+    if (finalWater) {
+      await db.query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS water_target_ml INTEGER`).catch(() => {});
+      await db.query(`UPDATE profiles SET water_target_ml=$2 WHERE user_id=$1`, [req.user.id, finalWater]);
+      const today = new Date().toISOString().split('T')[0];
+      await db.query(`
+        INSERT INTO water_log (user_id, date, consumed, target)
+        VALUES ($1, $2, 0, $3)
+        ON CONFLICT (user_id, date) DO UPDATE SET target=EXCLUDED.target
+      `, [req.user.id, today, finalWater]);
+    }
 
     // Atualiza opcionalmente o peso base na tabela principal do usuário se necessário, ou mantém apenas em profiles
     const updatedProfile = await db.query('SELECT * FROM profiles WHERE user_id = $1', [req.user.id]);
@@ -217,8 +247,14 @@ router.delete('/meals/:id', async (req, res) => {
 router.get('/water', async (req, res) => {
   const date = req.query.date || new Date().toISOString().split('T')[0];
   try {
-    const waterRes = await db.query('SELECT * FROM water_log WHERE user_id = $1 AND date = $2', [req.user.id, date]);
-    res.json(waterRes.rows[0] || { consumed: 0, target: 2500, date });
+    const [waterRes, profileRes] = await Promise.all([
+      db.query('SELECT * FROM water_log WHERE user_id = $1 AND date = $2', [req.user.id, date]),
+      db.query('SELECT water_target_ml FROM profiles WHERE user_id=$1', [req.user.id]).catch(() => ({ rows: [] })),
+    ]);
+    // Target: registro do dia > water_target_ml do perfil > fallback 2500ml
+    const profileTarget = Number(profileRes.rows[0]?.water_target_ml) || 0;
+    const defaultTarget = profileTarget || 2500;
+    res.json(waterRes.rows[0] || { consumed: 0, target: defaultTarget, date });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar hidratação.' });
