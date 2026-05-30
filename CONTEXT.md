@@ -56,10 +56,30 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 
 ---
 
-## 🚀 Próximos Passos (Pendências)
-
-*Nenhuma pendência crítica. Aguardando validação do usuário referente ao fluxo de upload e análise automática de PDF/Imagens de exames.*
+### 4. Gerador de Cardápios V2 (`backend/nutrition/`)
+- **GERADOR_V2.md** criado como documento-bússola da reestruturação. Ler antes de qualquer código novo no gerador.
+- **`protocols.js`** (novo): mapa clínico marcador/comorbidade/proxy → protocolos alimentares concretos (baixa_purina, baixo_tg, hdl_boost, baixo_ig, renal, baixo_na, baixo_colesterol, baixo_oxalato). Cada protocolo tem exclusões, prioridades e `deficit_cap`.
+- **`planner_v2.js`** (novo): `buildClinicalConfig(db, patientId, overrides)` — conecta as três camadas antes ignoradas: `energy_calculations` (GET real), `patient_exam_markers` (marcadores de exame), `patient_anamnesis` + `patient_exam_proxy`. Meta calórica = GET × fator_objetivo respeitando `deficit_cap` do protocolo e floor(TMB, mínimo absoluto).
+- **`generate-plan` endpoint** atualizado para usar `plannerV2`. Retorna `alerts[]`, `protocols`, `anamnesisStatus`, `clinicalSource`. Cria tabelas `patient_anamnesis` e `patient_exam_proxy` sob demanda.
+- **Builder** (`pro-meals.js`): painel de alertas clínicos visível antes do cardápio (erro vermelho = déficit perigoso, warning = atenção) + status da anamnese + fonte do GET.
+- **Validado no Marcelo (id=7):** GET real 2848 kcal detectado. Meta gerada: 2506 kcal (vs 1200 kcal que o V1 usava — 58% abaixo). 5 protocolos ativos: baixa_purina, baixo_tg, hdl_boost, baixo_colesterol, baixo_oxalato. Exclusões automáticas: fígado, moela, sardinha, embutidos, etc.
 
 ---
 
-*Última atualização: 29 de Maio de 2026 às 12:45 (Gemini - Antigravity)*
+## 🚀 Próximos Passos (Pendências)
+
+### Alta prioridade
+- **Fase 0 — Anamnese obrigatória no APK (Expo/React Native):**
+  - Criar 5 telas de onboarding obrigatórias após cadastro (antes de acessar o plano).
+  - Etapa 1: biometria (já existe — integrar). Etapa 2: estrutura alimentar (nº refeições, horários, culinária). Etapa 3: checklist de condições de saúde. Etapa 4: restrições/preferências. Etapa 5: upload de exame (já existe em `app/exams.tsx`) ou 4 perguntas proxy.
+  - Gravar em `patient_anamnesis` + `patient_exam_proxy` (tabelas já criadas no backend).
+  - **Atenção Gemini:** Não modificar `app/exams.tsx` — apenas reutilizar o fluxo de upload existente dentro do onboarding.
+
+### Média prioridade
+- **Fase B — Recipe-first:** receita como átomo primário no gerador (nome = ingredientes = preparo). Archetypes como fallback.
+- **Fase B — Crédito às receitas:** `author_name` + `source_url` na tabela `recipes`. JSON-LD do Receiteria já tem `author.name`. Exibir "Receita de [autor]" no app e no PDF.
+- **Fase C — Alertas clínicos em vez de compensação automática:** transformar `micros.js` de swaps automáticos para alertas visuais no builder.
+
+---
+
+*Última atualização: 30 de Maio de 2026 — Claude (VS Code) — Gerador V2 Fases 0+A deployadas*
