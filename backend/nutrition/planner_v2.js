@@ -17,6 +17,7 @@
 const planner  = require('./planner');
 const { resolveProtocols } = require('./protocols');
 const formulas = require('./formulas');
+const macros   = require('./macros');   // Fase D: macros clínicos por g/kg
 
 const round = n => Math.round(n);
 
@@ -172,18 +173,23 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
     });
   }
 
-  // ── 6. Macros ─────────────────────────────────────────────────────────────
-  // Splits terapêuticos (sobrepõem o padrão quando há protocolo ativo)
-  let macroSplit = overrides.macroSplit || planner.MACRO_SPLITS[objetivo] || planner.MACRO_SPLITS.maintain;
-  if (protocols.ids.includes('baixo_ig') || protocols.ids.includes('renal')) {
-    // diabetes/renal: proteína mais alta, carbo moderado
-    macroSplit = { protein: 0.30, carbs: 0.40, fat: 0.30 };
+  // ── 6. Macros (clínico por g/kg de peso — Fase D) ─────────────────────────
+  // Proteína/gordura por g/kg conforme objetivo + protocolos (renal limita
+  // proteína, diabetes controla carbo, atleta/idoso reforça proteína).
+  let macroSplit = null;
+  let macroTargets, macroBasis;
+  if (overrides.macroSplit) {
+    macroSplit = overrides.macroSplit;
+    macroTargets = planner.macroTargetsFromKcal(finalKcal, macroSplit);
+    macroBasis = 'split manual';
+  } else {
+    const mac = macros.resolveMacros({
+      weight: profile.weight, age: profile.age, activity: profile.activity,
+      objetivo, protocolIds: protocols.ids, kcal: finalKcal,
+    });
+    macroTargets = { protein_g: mac.protein_g, carbs_g: mac.carbs_g, fat_g: mac.fat_g };
+    macroBasis = mac.basis;
   }
-  if (protocols.ids.includes('renal')) {
-    // renal: limitar proteína (usa peso ideal se disponível)
-    macroSplit = { protein: 0.20, carbs: 0.50, fat: 0.30 };
-  }
-  const macroTargets = planner.macroTargetsFromKcal(finalKcal, macroSplit);
 
   // ── 7. Distribuição de refeições ──────────────────────────────────────────
   const mealCount = anamnesis && anamnesis.meal_count
@@ -263,6 +269,7 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
     kcalTmb:       round(tmb),
     macroSplit,
     macroTargets,
+    macroBasis,
     mealCount,
     mealDistribution,
     perMeal,
