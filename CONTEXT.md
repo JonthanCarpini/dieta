@@ -68,12 +68,13 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 
 ## 🚀 Próximos Passos (Pendências)
 
-### Alta prioridade
-- **Fase 0 — Anamnese obrigatória no APK (Expo/React Native):**
-  - Criar 5 telas de onboarding obrigatórias após cadastro (antes de acessar o plano).
-  - Etapa 1: biometria (já existe — integrar). Etapa 2: estrutura alimentar (nº refeições, horários, culinária). Etapa 3: checklist de condições de saúde. Etapa 4: restrições/preferências. Etapa 5: upload de exame (já existe em `app/exams.tsx`) ou 4 perguntas proxy.
-  - Gravar em `patient_anamnesis` + `patient_exam_proxy` (tabelas já criadas no backend).
-  - **Atenção Gemini:** Não modificar `app/exams.tsx` — apenas reutilizar o fluxo de upload existente dentro do onboarding.
+### Fase 0 — Anamnese obrigatória no APK ✅ CONCLUÍDA
+- `app/onboarding.tsx` criado: 5 etapas obrigatórias com barra de progresso. Etapa 1: confirmação biometria. Etapa 2: estrutura alimentar (meal_count, eats_out, cooking_level). Etapa 3: checklist 14 condições de saúde. Etapa 4: restrições/preferências/medicamentos (texto livre). Etapa 5: upload exame (reusa `exams.tsx`) ou 4 perguntas proxy que ativam os mesmos protocolos que marcadores laboratoriais.
+- `_layout.tsx`: AuthGuard checa `/user/anamnesis/status` ao entrar do grupo `(auth)` → redireciona para `/onboarding` se incompleta. `gestureEnabled: false` (não pode voltar com swipe).
+- `register.tsx`: redireciona para `/onboarding` após cadastro.
+- **Tabelas criadas:** `patient_anamnesis` + `patient_exam_proxy`
+- **Backend:** `GET /user/anamnesis/status`, `GET /user/anamnesis`, `POST /user/anamnesis`, `POST /user/exam-proxy`
+- **Atenção Gemini:** `app/exams.tsx` não foi modificado. `app/onboarding.tsx` é arquivo novo.
 
 ### Média prioridade
 - **Fase B — Recipe-first:** receita como átomo primário no gerador (nome = ingredientes = preparo). Archetypes como fallback.
