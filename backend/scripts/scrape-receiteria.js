@@ -302,6 +302,34 @@ function srcNutr(r) {
   return { kcal: num(n.calories), ptn: num(n.proteinContent), cho: num(n.carbohydrateContent), lip: num(n.fatContent) };
 }
 
+// Extrai o NOME DO AUTOR do JSON-LD (schema.org Person ou Organization)
+function srcAuthor(r) {
+  const a = r.author;
+  if (!a) return null;
+  const first = Array.isArray(a) ? a[0] : a;
+  return (first && (first.name || first['@name'])) || null;
+}
+
+// Extrai o PREPARO ORIGINAL como texto numerado, sem parafrasear.
+// recipeInstructions pode ser: string | string[] | HowToStep[] | HowToSection[]
+function srcPreparo(r) {
+  const ins = r.recipeInstructions;
+  if (!ins) return null;
+  if (typeof ins === 'string') return ins.trim();
+  const steps = [];
+  let n = 1;
+  const addStep = t => { const s = (t || '').replace(/\s+/g, ' ').trim(); if (s) steps.push(`${n++}. ${s}`); };
+  for (const item of (Array.isArray(ins) ? ins : [ins])) {
+    if (typeof item === 'string') { addStep(item); continue; }
+    if (item['@type'] === 'HowToStep') { addStep(item.text); continue; }
+    // HowToSection — contém itemListElement[]
+    if (item['@type'] === 'HowToSection' && Array.isArray(item.itemListElement)) {
+      for (const s of item.itemListElement) addStep(typeof s === 'string' ? s : s.text);
+    }
+  }
+  return steps.length ? steps.join('\n') : null;
+}
+
 async function ingestOne(src) {
   const html = await getText(src.url);
   if (!html) return { status: 'failed' };
@@ -364,20 +392,23 @@ async function ingestOne(src) {
   // kcal/100g bater ±20% com o do site. Sem isto, nutrição errada poluiria o gerador.
   const dev = sn.kcal ? Math.abs(per100.kcal - sn.kcal) / sn.kcal : 1;
   const trustworthy = coverage >= 0.7 && sn.kcal > 0 && dev <= 0.20;
-  const active = trustworthy;            // só receitas confiáveis ficam usáveis
+  const active  = trustworthy;
   const healthy = trustworthy && isHealthy(r.name, per100, rows.map(x => x.matched_name));
+  const author  = srcAuthor(r);
+  const preparo = srcPreparo(r);   // texto original — nunca parafrasear
 
   if (DRY) {
-    console.log(`\n• ${r.name}  [cov ${(coverage*100|0)}%]  ${per100.kcal}kcal/100g vs ${sn.kcal||'?'} (dev ${(dev*100|0)}%)  ${active ? (healthy ? '✓fit' : '○ok') : '✗reprovada'}`);
+    console.log(`\n• ${r.name}  [${author || '?'}]  [cov ${(coverage*100|0)}%]  ${per100.kcal}kcal/100g vs ${sn.kcal||'?'} (dev ${(dev*100|0)}%)  ${active ? (healthy ? '✓fit' : '○ok') : '✗reprovada'}`);
+    if (preparo) console.log(`  📝 Preparo (${preparo.split('\n').length} passos): ${preparo.slice(0,80)}...`);
     rows.forEach(x => console.log(`    ${x.llm ? '🤖' : '  '} ${x.grams != null ? (x.grams+'g').padEnd(7) : '   ?   '} ${x.matched_name ? '→ '+x.matched_name.slice(0,40) : '✗ '+x.raw.slice(0,40)}`));
     return { status: 'done', active, healthy };
   }
 
-  const cols = ['slug','url','name','category','meal','yield_servings','total_grams','coverage','healthy','active',
-    'kcal','ptn','cho','lip','fibras', ...MICRO_KEYS, 'src_kcal','src_ptn','src_cho','src_lip'];
-  const vals = [src.slug, src.url, r.name, src.category, src.meal, srcYield(r), Math.round(knownG), +coverage.toFixed(3), healthy, active,
+  const cols = ['slug','url','name','author_name','category','meal','yield_servings','total_grams','coverage','healthy','active',
+    'kcal','ptn','cho','lip','fibras', ...MICRO_KEYS, 'src_kcal','src_ptn','src_cho','src_lip','preparo'];
+  const vals = [src.slug, src.url, r.name, author, src.category, src.meal, srcYield(r), Math.round(knownG), +coverage.toFixed(3), healthy, active,
     per100.kcal, per100.ptn, per100.cho, per100.lip, per100.fibras, ...MICRO_KEYS.map(k => per100[k]),
-    sn.kcal, sn.ptn, sn.cho, sn.lip];
+    sn.kcal, sn.ptn, sn.cho, sn.lip, preparo];
   const ph = vals.map((_, i) => `$${i + 1}`).join(',');
   const up = cols.slice(2).map(c => `${c}=EXCLUDED.${c}`).join(',');
   const ins = await db.query(
@@ -431,7 +462,8 @@ async function ensureSchema() {
       kcal NUMERIC, ptn NUMERIC, cho NUMERIC, lip NUMERIC, fibras NUMERIC, ${microCols},
       src_kcal NUMERIC, src_ptn NUMERIC, src_cho NUMERIC, src_lip NUMERIC,
       created_at TIMESTAMPTZ DEFAULT NOW())`);
-  await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS preparo TEXT`);   // modo de preparo (gerado por nós via LLM)
+  await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS preparo TEXT`);
+  await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS author_name TEXT`);   // autor original (Receiteria)
   await db.query(`
     CREATE TABLE IF NOT EXISTS recipe_ingredients (
       id SERIAL PRIMARY KEY, recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
@@ -460,6 +492,34 @@ async function reclassify() {
 
 // Gera MODO DE PREPARO próprio (LLM) a partir do nome + ingredientes decompostos.
 // Texto original nosso (não copiamos o preparo do site). Default: só as fit (que o gerador usa).
+// update-preparo: re-fetcha receitas ativas para coletar AUTOR + PREPARO ORIGINAL
+// do JSON-LD, sem re-decompor ingredientes. Respeita o autor — não parafraseia.
+async function updatePreparo() {
+  await ensureSchema();
+  const onlyFit = !args.includes('--all');
+  const { rows } = await db.query(
+    `SELECT id, slug, url FROM recipes WHERE active ${onlyFit ? 'AND healthy' : ''} ORDER BY id LIMIT $1`,
+    [MAX === Infinity ? 100000 : MAX]);
+  console.log(`\n✏️  update-preparo: ${rows.length} receitas ${onlyFit ? '(fit)' : '(todas ativas)'}\n`);
+  let ok = 0, noAuthor = 0, noPreparo = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const rec = rows[i];
+    const html = await getText(rec.url);
+    if (!html) { console.log(`  ✗ ${rec.slug}`); continue; }
+    const r = extractRecipe(html);
+    if (!r) { console.log(`  ✗ ${rec.slug} — sem JSON-LD`); continue; }
+    const author  = srcAuthor(r);
+    const preparo = srcPreparo(r);
+    if (!author)  noAuthor++;
+    if (!preparo) noPreparo++;
+    await db.query(`UPDATE recipes SET author_name=$2, preparo=$3 WHERE id=$1`, [rec.id, author, preparo]);
+    ok++;
+    if ((i + 1) % 10 === 0) console.log(`  ...${i+1}/${rows.length}  (ok ${ok}, sem autor ${noAuthor}, sem preparo ${noPreparo})`);
+    await sleep(DELAY);
+  }
+  console.log(`\n✓ atualizadas: ${ok} | sem autor: ${noAuthor} | sem preparo: ${noPreparo}`);
+}
+
 async function prep() {
   await ensureSchema();
   _cfg = _cfg || await ai.getLLMConfig();
@@ -502,7 +562,8 @@ async function stats() {
     if (CMD === 'collect') await collect();
     else if (CMD === 'ingest') await ingest();
     else if (CMD === 'reclassify') await reclassify();
-    else if (CMD === 'prep') await prep();
+    else if (CMD === 'update-preparo') await updatePreparo();
+    else if (CMD === 'prep') await prep();   // deprecated: gerava via LLM; preferir update-preparo
     else await stats();
   } catch (e) { console.error(e); process.exitCode = 1; }
   finally { try { await db.pool.end(); } catch {} }

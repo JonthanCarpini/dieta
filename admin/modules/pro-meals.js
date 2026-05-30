@@ -722,7 +722,7 @@ function renderMealRow(dow, meal) {
     <div class="wd-meal-row" data-dow="${dow}" data-meal-type="${meal.type}">
         <div class="wd-meal-row-bar">
             <span class="wd-meal-time">${meal.time}</span>
-            <span class="wd-meal-label">${meal.label}${meal.archetype ? `<span class="wd-meal-dish">🍽️ ${meal.archetype}</span>` : ''}</span>
+            <span class="wd-meal-label">${meal.label}${meal.archetype ? `<span class="wd-meal-dish">🍽️ ${meal.archetype}${meal.author ? `<span class="wd-meal-author"> · ${meal.author}</span>` : ''}</span>` : ''}</span>
             <div class="wd-meal-macro-chips">
                 <span class="wd-chip ptn" title="Proteínas">• ${rnd(tot.protein || 0)}g</span>
                 <span class="wd-chip lip" title="Lipídios">• ${rnd(tot.fat || 0)}g</span>

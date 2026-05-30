@@ -182,7 +182,7 @@ async function fetchRecipePool(db, exclusions) {
   let rows;
   try {
     rows = (await db.query(`
-      SELECT r.id, r.name, r.meal, r.yield_servings, r.preparo,
+      SELECT r.id, r.name, r.meal, r.yield_servings, r.preparo, r.author_name, r.url AS source_url,
              ri.alimento_id, ri.grams, a.nome, a.kcal, a.ptn, a.cho, a.lip, a.fibras, ${cols}
       FROM recipes r
       JOIN recipe_ingredients ri ON ri.recipe_id = r.id AND ri.alimento_id IS NOT NULL AND ri.grams > 0
@@ -193,7 +193,7 @@ async function fetchRecipePool(db, exclusions) {
   const map = new Map();
   for (const r of rows) {
     let rc = map.get(r.id);
-    if (!rc) { rc = { id: r.id, name: r.name, meal: r.meal, servings: Number(r.yield_servings) || 1, preparo: r.preparo || '', ingredients: [], totalKcal: 0, excluded: false }; map.set(r.id, rc); }
+    if (!rc) { rc = { id: r.id, name: r.name, meal: r.meal, servings: Number(r.yield_servings) || 1, preparo: r.preparo || '', author: r.author_name || null, sourceUrl: r.source_url || null, ingredients: [], totalKcal: 0, excluded: false }; map.set(r.id, rc); }
     if (planner.isExcluded({ nome: r.nome, grupo: '' }, exclusions)) rc.excluded = true;
     const per100 = { calories: +r.kcal || 0, protein: +r.ptn || 0, carbs: +r.cho || 0, fat: +r.lip || 0, fiber: +r.fibras || 0 };
     MICRO_KEYS.forEach(k => { per100[k] = +r[k] || 0; });
@@ -427,7 +427,9 @@ function generatePlan(pool, config) {
       const rec = useRec ? nextRecipe(mealType) : null;
       if (rec) {
         const items = buildRecipeMeal(rec, mt);
-        meals.push({ type: mealType, label: mt.label, time: mt.time, archetype: rec.name, recipe_id: rec.id, items, instructions: rec.preparo || '', total: sumTotals(items) });
+        const credit = rec.author ? `Receita de ${rec.author}` + (rec.sourceUrl ? ` — ${rec.sourceUrl}` : '') : null;
+        const preparoFull = [rec.preparo, credit].filter(Boolean).join('\n\n');
+        meals.push({ type: mealType, label: mt.label, time: mt.time, archetype: rec.name, recipe_id: rec.id, author: rec.author, source_url: rec.sourceUrl, items, instructions: preparoFull, total: sumTotals(items) });
         continue;
       }
       const arch = nextArchetype(mealType);
