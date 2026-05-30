@@ -180,8 +180,55 @@ export default function OnboardingScreen() {
 
   // Etapa 2 — estrutura alimentar
   const [mealCount, setMealCount] = useState<number>(5);
+  const [selectedMeals, setSelectedMeals] = useState<Set<string>>(
+    new Set(['cafe_da_manha', 'lanche_manha', 'almoco', 'lanche_tarde', 'jantar'])
+  );
   const [eatsOut, setEatsOut] = useState<string>('');
   const [cookingLevel, setCookingLevel] = useState<string>('');
+
+  const MEAL_LABELS_PT: Record<string, string> = {
+    cafe_da_manha: 'Café da manhã',
+    lanche_manha: 'Lanche da manhã',
+    almoco: 'Almoço',
+    lanche_tarde: 'Lanche da tarde',
+    jantar: 'Jantar',
+    ceia: 'Ceia',
+  };
+
+  const handleMealCountChange = (count: number) => {
+    setMealCount(count);
+    const newSet = new Set<string>();
+    if (count === 3) {
+      newSet.add('cafe_da_manha').add('almoco').add('jantar');
+    } else if (count === 4) {
+      newSet.add('cafe_da_manha').add('almoco').add('lanche_tarde').add('jantar');
+    } else if (count === 5) {
+      newSet.add('cafe_da_manha').add('lanche_manha').add('almoco').add('lanche_tarde').add('jantar');
+    } else {
+      newSet.add('cafe_da_manha').add('lanche_manha').add('almoco').add('lanche_tarde').add('jantar').add('ceia');
+    }
+    setSelectedMeals(newSet);
+  };
+
+  const toggleMealSelection = (mealKey: string) => {
+    setSelectedMeals(prev => {
+      const next = new Set(prev);
+      if (next.has(mealKey)) {
+        if (next.size <= 1) return prev;
+        next.delete(mealKey);
+      } else {
+        if (next.size >= mealCount) {
+          Alert.alert(
+            'Limite de refeições',
+            `Você escolheu fazer ${mealCount} refeições por dia. Desmarque uma das refeições antes de escolher outra.`
+          );
+          return prev;
+        }
+        next.add(mealKey);
+      }
+      return next;
+    });
+  };
 
   // Etapa 3 — condições de saúde
   const [conditions, setConditions] = useState<Set<string>>(new Set());
@@ -259,7 +306,7 @@ export default function OnboardingScreen() {
 
   const canAdvance = () => {
     if (step === 0) return !!gender && birthdateValid() && !!weight && !!height && !!goal && !!activity && (!needsSpeed || !!speed);
-    if (step === 1) return mealCount > 0 && eatsOut && cookingLevel;
+    if (step === 1) return mealCount > 0 && selectedMeals.size === mealCount && eatsOut && cookingLevel;
     if (step === 2) return conditions.size > 0;
     if (step === 4) return hasExams !== null && (hasExams ? examUploaded : true);
     return true;
@@ -316,11 +363,28 @@ export default function OnboardingScreen() {
         health_goals:         goalLabels[goal] || goal,
       });
 
+      // Constrói objeto de horários de refeição a partir da seleção
+      const mealTimesObj: Record<string, string> = {};
+      const defaultTimes: Record<string, string> = {
+        cafe_da_manha: '06:00', lanche_manha: '09:00', almoco: '12:00',
+        lanche_tarde: '15:00', jantar: '18:00', ceia: '21:00',
+      };
+      selectedMeals.forEach(meal => {
+        mealTimesObj[meal] = defaultTimes[meal] || '12:00';
+      });
+
       // Salva anamnese (Etapas 2-5)
       await api.post('/user/anamnesis', {
-        meal_count: mealCount, eats_out: eatsOut, cooking_level: cookingLevel,
-        conditions: [...conditions], restrictions: [...restrictions],
-        avoids_text: avoidsText, prefers_text: prefersText, medications, complete: true,
+        meal_count: mealCount,
+        meal_times: mealTimesObj,
+        eats_out: eatsOut,
+        cooking_level: cookingLevel,
+        conditions: [...conditions],
+        restrictions: [...restrictions],
+        avoids_text: avoidsText,
+        prefers_text: prefersText,
+        medications,
+        complete: true,
       });
       if (!hasExams) await api.post('/user/exam-proxy', proxy);
       router.replace('/(tabs)');
@@ -571,9 +635,30 @@ export default function OnboardingScreen() {
               <Text style={s.sectionTitle}>Quantas refeições você faz por dia?</Text>
               <View style={s.rowGroup}>
                 {[3, 4, 5, 6].map(n => (
-                  <OptionBtn key={n} label={n === 6 ? '6 ou mais' : `${n}`} selected={mealCount === n} onPress={() => setMealCount(n)} />
+                  <OptionBtn key={n} label={n === 6 ? '6 ou mais' : `${n}`} selected={mealCount === n} onPress={() => handleMealCountChange(n)} />
                 ))}
               </View>
+
+              <Text style={[s.sectionTitle, { marginTop: spacing.md }]}>Quais refeições você faz?</Text>
+              <Text style={s.fieldHint}>
+                Marque exatamente as {mealCount} refeições do seu dia:
+              </Text>
+              {['cafe_da_manha', 'lanche_manha', 'almoco', 'lanche_tarde', 'jantar', 'ceia'].map(mealKey => {
+                const checked = selectedMeals.has(mealKey);
+                return (
+                  <CheckItem
+                    key={mealKey}
+                    label={MEAL_LABELS_PT[mealKey]}
+                    checked={checked}
+                    onPress={() => toggleMealSelection(mealKey)}
+                  />
+                );
+              })}
+              {selectedMeals.size !== mealCount && (
+                <Text style={s.fieldError}>
+                  Selecione exatamente {mealCount} refeições (atualmente {selectedMeals.size} selecionadas).
+                </Text>
+              )}
 
               <Text style={[s.sectionTitle, { marginTop: spacing.md }]}>Você costuma comer fora de casa?</Text>
               {['never', 'sometimes', 'always'].map(v => (

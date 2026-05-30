@@ -85,7 +85,7 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 ## 🚀 Próximos Passos (Pendências)
 
 ### Fase 0 — Anamnese obrigatória no APK ✅ CONCLUÍDA
-- `app/onboarding.tsx` criado: 5 etapas obrigatórias com barra de progresso. Etapa 1: confirmação biometria. Etapa 2: estrutura alimentar (meal_count, eats_out, cooking_level). Etapa 3: checklist 14 condições de saúde. Etapa 4: restrições/preferências/medicamentos (texto livre). Etapa 5: upload exame (reusa `exams.tsx`) ou 4 perguntas proxy que ativam os mesmos protocolos que marcadores laboratoriais.
+- `app/onboarding.tsx` criado: 5 etapas obrigatórias com barra de progresso. Etapa 1: confirmação biometria. Etapa 2: estrutura alimentar (meal_count, eats_out, cooking_level) com checklist de seleção obrigatória e exata das refeições diárias (Café, Lanche da manhã, Almoço, Lanche da tarde, Jantar, Ceia). Etapa 3: checklist 14 condições de saúde. Etapa 4: restrições/preferências/medicamentos (texto livre). Etapa 5: upload exame (reusa `exams.tsx`) ou 4 perguntas proxy que ativam os mesmos protocolos que marcadores laboratoriais.
 - `_layout.tsx`: AuthGuard checa `/user/anamnesis/status` ao entrar do grupo `(auth)` → redireciona para `/onboarding` se incompleta. `gestureEnabled: false` (não pode voltar com swipe).
 - `register.tsx`: redireciona para `/onboarding` após cadastro.
 - **Tabelas criadas:** `patient_anamnesis` + `patient_exam_proxy`
