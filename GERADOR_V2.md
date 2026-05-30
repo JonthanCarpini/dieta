@@ -409,7 +409,7 @@ CREATE TABLE patient_exam_proxy (
 ### Fase B — Recipe-first
 9. Receitas como primário (nome = ingredientes = preparo), archetypes como fallback
 10. Atributos clínicos em receitas (low_purina, low_tg, low_ig, low_na)
-11. Crédito: `author_name` + `source_url` + texto original de preparo com atribuição
+11. ✅ Crédito: `author_name` + `source_url` coletados do JSON-LD; `srcAuthor()` + `srcPreparo()` no scraper; `update-preparo` re-fetcha sem re-decompor; gerador injeta "Receita de [autor] — [url]" nas `instructions`; builder mostra `.wd-meal-author`. 38/45 receitas fit com autor+preparo original coletados.
 
 ### Fase C — Alertas clínicos
 12. Transformar `micros.js` de compensação automática → alertas visuais
