@@ -793,6 +793,7 @@ router.post('/patients/:id/generate-plan', verifyPatientAccess, async (req, res)
     });
 
     const pool = await generator.fetchFoodPool(db, config.exclusions);
+    pool._recipes = await generator.fetchRecipePool(db, config.exclusions);   // Fase 9c — receitas
     const { plan_data, summary } = generator.generatePlan(pool, config);
 
     // Fase 3 — compensação semanal de micronutrientes (pode desligar com micro=false)

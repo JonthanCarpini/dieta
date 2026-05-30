@@ -163,6 +163,44 @@ function toFood(r) {
   return { id: r.id, nome: r.nome, grupo: r.grupo, per100 };
 }
 
+// ── Pool de RECEITAS (Fase 9c) — biblioteca decomposta na TACO ─────────────────
+// Mapa do `meal` da receita → tipos de refeição do gerador.
+const RECIPE_MEAL_MAP = {
+  almoco_jantar:      ['almoco', 'jantar'],
+  cafe_almoco_jantar: ['cafe_da_manha', 'almoco', 'jantar'],
+  cafe_lanche:        ['cafe_da_manha', 'lanche_manha', 'lanche_tarde'],
+  lanche:             ['lanche_manha', 'lanche_tarde'],
+  ceia:               ['ceia'],
+};
+// Carrega receitas confiáveis (active+healthy) com ingredientes já casados na TACO.
+// Cada receita traz ingredientes {food:{id,nome,per100}, grams} → escalável e com micros.
+async function fetchRecipePool(db, exclusions) {
+  const cols = MICRO_KEYS.map(k => 'a.' + k).join(', ');
+  let rows;
+  try {
+    rows = (await db.query(`
+      SELECT r.id, r.name, r.meal, r.yield_servings,
+             ri.alimento_id, ri.grams, a.nome, a.kcal, a.ptn, a.cho, a.lip, a.fibras, ${cols}
+      FROM recipes r
+      JOIN recipe_ingredients ri ON ri.recipe_id = r.id AND ri.alimento_id IS NOT NULL AND ri.grams > 0
+      JOIN alimentos a ON a.id = ri.alimento_id
+      WHERE r.active AND r.healthy
+      ORDER BY r.id`)).rows;
+  } catch (_) { return []; }
+  const map = new Map();
+  for (const r of rows) {
+    let rc = map.get(r.id);
+    if (!rc) { rc = { id: r.id, name: r.name, meal: r.meal, servings: Number(r.yield_servings) || 1, ingredients: [], totalKcal: 0, excluded: false }; map.set(r.id, rc); }
+    if (planner.isExcluded({ nome: r.nome, grupo: '' }, exclusions)) rc.excluded = true;
+    const per100 = { calories: +r.kcal || 0, protein: +r.ptn || 0, carbs: +r.cho || 0, fat: +r.lip || 0, fiber: +r.fibras || 0 };
+    MICRO_KEYS.forEach(k => { per100[k] = +r[k] || 0; });
+    const grams = Number(r.grams) || 0;
+    rc.ingredients.push({ food: { id: r.alimento_id, nome: r.nome, per100 }, grams });
+    rc.totalKcal += per100.calories * grams / 100;
+  }
+  return [...map.values()].filter(rc => !rc.excluded && rc.ingredients.length);
+}
+
 // Escala um alimento para `grams` no formato EXATO de item do builder (pro-meals.js)
 function scaleItem(food, grams) {
   const f = grams / 100;
@@ -357,6 +395,19 @@ function generatePlan(pool, config) {
   };
   const bebidaAlmoco = buildBebidaAlmoco((config.kcal || 2000) + 23);
 
+  // ── Receitas (Fase 9c) — pool por refeição + cursor (modo híbrido) ───────────
+  const recipesByMeal = {}; MEAL_KEYS.forEach(m => { recipesByMeal[m] = []; });
+  for (const rc of (pool._recipes || [])) (RECIPE_MEAL_MAP[rc.meal] || []).forEach(mk => { if (recipesByMeal[mk]) recipesByMeal[mk].push(rc); });
+  const recShuf = {}; const recCur = {};
+  MEAL_KEYS.forEach((m, i) => { recShuf[m] = shuffle(recipesByMeal[m], (config.kcal || 2000) + i * 13 + 5); recCur[m] = 0; });
+  const nextRecipe = m => { const l = recShuf[m]; if (!l || !l.length) return null; const r = l[recCur[m] % l.length]; recCur[m]++; return r; };
+  // escala a receita inteira para bater a kcal da refeição (fator limitado p/ não distorcer)
+  const buildRecipeMeal = (rc, mt) => {
+    let f = rc.totalKcal > 0 ? mt.kcal / rc.totalKcal : 1;
+    f = Math.max(0.3, Math.min(2.5, f));
+    return rc.ingredients.map(ing => scaleItem(ing.food, Math.max(5, Math.round((ing.grams * f) / 5) * 5)));
+  };
+
   const days = [];
   const summary = [];
   let di = -1;
@@ -364,6 +415,16 @@ function generatePlan(pool, config) {
     di++;
     const meals = [];
     for (const [mealType, mt] of Object.entries(config.perMeal)) {
+      // MODO HÍBRIDO: em ~metade dos dias usa uma RECEITA inteira da biblioteca
+      // (escalada p/ a kcal da refeição); na outra metade monta pelo archetype.
+      const useRec = recShuf[mealType] && recShuf[mealType].length &&
+                     ((di + MEAL_KEYS.indexOf(mealType)) % 2 === 0);
+      const rec = useRec ? nextRecipe(mealType) : null;
+      if (rec) {
+        const items = buildRecipeMeal(rec, mt);
+        meals.push({ type: mealType, label: mt.label, time: mt.time, archetype: rec.name, recipe_id: rec.id, items, instructions: '', total: sumTotals(items) });
+        continue;
+      }
       const arch = nextArchetype(mealType);
       // monta os picks a partir dos slots do arquétipo (fallback: template legado)
       const slots = arch ? arch.slots : (MEAL_TEMPLATES[mealType] || []).map(role => ({ role }));
@@ -402,4 +463,4 @@ function generatePlan(pool, config) {
   return { plan_data: { days }, summary };
 }
 
-module.exports = { fetchFoodPool, generatePlan, MEAL_TEMPLATES, ROLE_GROUPS, MICRO_KEYS, scaleItem, sumTotals, CLAMP };
+module.exports = { fetchFoodPool, fetchRecipePool, generatePlan, MEAL_TEMPLATES, ROLE_GROUPS, MICRO_KEYS, scaleItem, sumTotals, CLAMP };
