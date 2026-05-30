@@ -290,8 +290,10 @@ const RAW_SERVE = /fruta|maçã|maca|banana|mamão|mamao|melão|melao|melancia|p
 // Condimentos/temperos/líquidos de cozimento — quando escalam para quantidade
 // irrisória numa porção (ex: 10ml de água de coco, 5g de louro), não fazem
 // sentido como item do cardápio. Já estão descritos no preparo da receita.
-const CONDIMENT = /\b(sal|alho|cebola|cebolinha|salsa|salsinha|coentro|cheiro.?verde|louro|colorau|color[íi]fico|p[áa]prica|or[ée]gano|manjeric[ãa]o|alecrim|tomilho|cominho|a[çc]afr[ãa]o|noz.?moscada|gengibre|shoyu|molho de soja|molho de pimenta|pimenta|vinagre|vinho|mostarda|caldo|curry|cravo|canela|gergelim|extrato de tomate|água de coco|agua de coco|raspas|essência|essencia|fermento|bicarbonato)\b/i;
-const isCondiment = (nome, grams) => CONDIMENT.test((nome || '').toLowerCase()) && grams < 20;
+// padrões SEM acento (o nome é normalizado antes do teste para o \b funcionar)
+const CONDIMENT = /\b(sal|alho|cebola|cebolinha|salsa|salsinha|coentro|cheiro.?verde|louro|colorau|colorifico|paprica|oregano|manjericao|alecrim|tomilho|cominho|acafrao|noz.?moscada|gengibre|shoyu|molho de soja|molho de pimenta|pimenta|vinagre|vinho|mostarda|caldo|curry|cravo|canela|gergelim|extrato de tomate|agua de coco|raspas|essencia|fermento|bicarbonato)\b/i;
+const _noAccent = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const isCondiment = (nome, grams) => CONDIMENT.test(_noAccent(nome)) && grams < 20;
 
 function buildMealPreparo(items) {
   if (!items || !items.length) return '';
