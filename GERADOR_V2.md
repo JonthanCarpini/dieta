@@ -430,9 +430,22 @@ CREATE TABLE patient_exam_proxy (
 13. ✅ `buildMicroAlerts()`: UL ultrapassado (sódio) = **erro**; micro <70% da meta semanal = **warning com sugestão de alimentos-fonte** (`MICRO_FOOD_SOURCES`); piso diário hidrossolúvel consolidado num único alerta (dedupe). Mesclado em `alerts[]` e exibido no painel do builder junto com déficit/protocolos. Validado no Marcelo: 5 alertas acionáveis (fibra 43%, vit E 41%, folato 56%, B6 67%, piso hidrossolúvel).
 **Princípio**: o sistema NUNCA corrige sozinho — apenas alerta; o nutricionista decide (decisão clínica).
 
-### Fase D — Objetivos terapêuticos
-14. Perfis expandidos: diabetes, hipertensão, gota, renal, gestante, atleta
-15. Split de macro e restrições específicos por perfil
+### Fase D — Objetivos terapêuticos (✅ concluído)
+14. ✅ `macros.js` (`resolveMacros`): macros clínicos por **g/kg de peso** (não % fixo).
+    - Proteína: lose 1.8 / maintain 1.2 / gain 2.0 g/kg; +0.2 atleta (ativ≥1.725); piso idoso 1.2
+    - **Peso de referência ajustado** para obesos (IMC>30): ideal + 0.25×(atual−ideal) — evita superestimar proteína
+    - **Renal** limita proteína a 0.8 g/kg (domina o objetivo)
+    - **Diabetes** (baixo_ig): carbo ≤45% das kcal, + gordura boa
+    - **Colesterol/TG**: gordura total limitada; piso de gordura 0.8 g/kg (saúde hormonal)
+    - Carbo fecha o restante; piso ~1 g/kg (SNC)
+15. ✅ `planner_v2` usa `resolveMacros` + expõe `macroBasis`. Restrições por protocolo já cobertas em `protocols.js` (Fases A/B). Validado: 5 perfis (obeso, atleta, renal, diabético, eutrófico) com macros coerentes.
+
+---
+
+## ✅ V2 COMPLETO — todas as fases entregues (0, A, A+, B, C, D)
+O gerador agora conecta: anamnese → GET (fórmula por perfil) → meta segura (speed+pisos) →
+protocolos clínicos (exames/comorbidades) → macros por g/kg → receitas filtradas por
+objetivo+protocolo (com crédito ao autor) → alertas de micros. Tudo como rascunho revisável.
 
 ---
 

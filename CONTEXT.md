@@ -115,9 +115,10 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 - `GET /admin/users` com nutricionista vinculado + filtros; `GET /admin/professionals`; `POST /users/:id/assign-professional`; `POST/PUT/DELETE /users`.
 - Frontend: filtros (cargo/plano/nutricionista), coluna Nutricionista com atribuição inline, modal criar/editar, excluir. **Atenção Gemini:** `professional_links` (type='nutritionist') é a tabela de vínculo paciente↔nutri.
 
-### Próximo: Fase D — Objetivos terapêuticos
-- Perfis expandidos (diabetes, HAS, gota, renal, gestante, atleta) com splits de macro e restrições específicas por condição.
+### Fase D — Objetivos terapêuticos ✅ CONCLUÍDA
+- `backend/nutrition/macros.js` (`resolveMacros`): macros clínicos por **g/kg de peso** (não % fixo). Proteína: lose 1.8 / maintain 1.2 / gain 2.0 g/kg (+0.2 atleta, piso idoso 1.2). **Peso ajustado** para obesos (IMC>30) evita superestimar. Renal limita a 0.8 g/kg; diabetes controla carbo ≤45%; colesterol/TG limitam gordura. `planner_v2` usa e expõe `macroBasis`.
+- **V2 COMPLETO** (Fases 0, A, A+, B, C, D). Pronto para teste integrado de geração de cardápio.
 
 ---
 
-*Última atualização: 30 de Maio de 2026 — Antigravity (IDE Antigravity) — Correção no cálculo de metas calóricas no backend (`user.js` e `planner_v2.js`) permitindo déficit abaixo da TMB até `TMB * 0.7` no objetivo de emagrecimento para refletir corretamente as opções de velocidade de perda de peso (Muito Leve, Leve, Moderado, Intenso, Pesado) no Diário/Dashboard.*
+*Última atualização: 30 de Maio de 2026 — Claude (VS Code) — Fase D: macros clínicos por g/kg (macros.js). V2 completo.*
