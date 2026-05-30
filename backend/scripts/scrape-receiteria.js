@@ -186,7 +186,9 @@ function scoreRow(r, words) {
   if (PREPARED.test(n)) s -= 45;
   if (/\bcru\b|\bcrua\b/.test(n)) s -= 8;
   if (/ com /.test(n)) s -= 15;
-  s -= Math.min(28, n.split(/[ ,]+/).filter(Boolean).length * 3);
+  // penalidade leve por verbosidade — a TACO usa nomes longos ("Frango, peito, sem
+  // pele, grelhado"); penalizar forte demais rejeitava o alimento certo.
+  s -= Math.min(16, n.split(/[ ,]+/).filter(Boolean).length * 2);
   return s;
 }
 // Relaxamento progressivo: tenta AND de todas as palavras; se vazio, tenta subconjuntos
@@ -205,7 +207,7 @@ async function matchTaco(line) {
     for (const r of rows) { const sc = scoreRow(r, words); if (sc > bestSc) { bestSc = sc; best = r; } }
     if (best && bestSc >= 25) break;                   // já é um bom match — para
   }
-  if (!best || bestSc < 8) return null;                // abaixo do limiar → não-casado
+  if (!best || bestSc < 4) return null;                // abaixo do limiar → não-casado
   return { row: best, score: bestSc };
 }
 
@@ -319,9 +321,12 @@ async function ingestOne(src) {
 
 async function ingest() {
   await ensureSchema();
+  const catF = flag('--cat');
+  const lim = MAX === Infinity ? 100000 : MAX;
   const { rows } = await db.query(
-    `SELECT url, slug, category, meal FROM recipe_sources WHERE status='pending' ORDER BY id LIMIT $1`,
-    [MAX === Infinity ? 100000 : MAX]);
+    `SELECT url, slug, category, meal FROM recipe_sources
+     WHERE status='pending' ${catF ? 'AND category=$2' : ''} ORDER BY id LIMIT $1`,
+    catF ? [lim, catF] : [lim]);
   console.log(`\n🍳 ingest ${rows.length} receitas ${DRY ? '(DRY)' : ''}\n`);
   const st = { done: 0, kept: 0, healthy: 0, skipped: 0, failed: 0 };
   let i = 0;
