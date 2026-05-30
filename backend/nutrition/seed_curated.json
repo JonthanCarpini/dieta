@@ -39,7 +39,7 @@
   { "name": "Merluza cozida",             "q": "merluza",              "role": "protein",   "meals": ["almoco","jantar"],      "portion": 120 },
   { "name": "Sardinha",                   "q": "sardinha",             "role": "protein",   "meals": ["almoco","jantar"],      "portion": 80 },
   { "name": "Pescada",                    "q": "pescada",              "role": "protein",   "meals": ["almoco","jantar"],      "portion": 120 },
-  { "name": "Ovo de galinha cozido",      "q": "ovo de galinha",       "role": "protein",   "meals": ["cafe","lanche","almoco","jantar"],"portion": 50 },
+  { "name": "Ovo de galinha cozido",      "q": "ovo inteiro cozido", "id": 336, "role": "protein",   "meals": ["cafe","lanche","almoco","jantar"],"portion": 50 },
   { "name": "Carne seca",                 "q": "carne seca",           "role": "protein",   "meals": ["almoco","jantar"],      "portion": 80 },
 
   { "name": "Feijão carioca cozido",      "q": "feijão carioca",       "role": "legume",    "meals": ["almoco","jantar"],      "portion": 80 },
