@@ -33,6 +33,15 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
   - Histórico diário de passos integrado com o `stepTrackerStore.ts` ativo em segundo plano.
 - **Perfil:**
   - Correção aplicada no fluxo de registro e atualização de peso.
+  - Tela redesenhada para permitir a edição de todos os dados da conta e biometria (Nome, E-mail, Telefone com máscara, Nascimento com máscara, Altura, Peso, Sexo biológico, Objetivo e Nível de Atividade física).
+  - Exibição da foto real do usuário carregada em base64 no círculo do avatar com iniciais como fallback.
+- **Cadastro & Foto de Perfil (`app/(auth)/register.tsx`):**
+  - Adicionado campo de Telefone obrigatório com máscara e validação no formato `(xx)xxxxx-xxxx`.
+  - Seletor de imagem (via `expo-image-picker`) integrado diretamente no topo do cadastro para definir a foto de perfil inicial.
+- **Anamnese - Trava Calórica de Segurança (`app/onboarding.tsx`):**
+  - Adicionada trava de segurança na seleção de velocidade de perda de peso: se a velocidade selecionada resultar em calorias diárias abaixo do limite metabólico seguro (BMR ou 1200 kcal fêmea / 1500 kcal macho), o botão é desabilitado/bloqueado com cadeado 🔒 e exibe mensagem de alerta informando a calorimetria estimada.
+- **Rebuild do APK:**
+  - APK reconstruído com sucesso e assinado em modo de release (`gradlew assembleRelease`).
 - **Meus Exames (`app/exams.tsx`):**
   - Rota corrigida de `/profile/exams` para a rota real `/user/exams`.
   - Mapeamento de upload unificado e tipos de dados de arquivos (PDF e imagens) suportados com sucesso.
@@ -46,6 +55,11 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 - **Deploy:** Deploy das modificações do frontend e backend efetuado com sucesso na VPS (https://nutrir.online).
 
 ### 3. Backend e Banco de Dados (`backend`)
+- **Cadastro, Login e Perfil do Usuário**:
+  - Migração adicionada na inicialização do servidor para criar colunas `phone` (VARCHAR) e `profile_image` (TEXT, armazenando base64) na tabela `users`.
+  - Atualização do middleware de token e das rotas de autenticação (`routes/auth.js`) para salvar e expor `phone` e `profile_image` nas respostas da API.
+  - Rota de atualização do perfil (`saveProfileHandler` em `routes/user.js`) expandida para atualizar simultaneamente as tabelas `profiles` e `users` (nome, e-mail com verificação única, telefone e foto).
+  - Adicionado endpoint `POST /user/avatar` para salvar atualizações de foto de perfil via aplicativo.
 - **Rotas de Agenda:** `/api/user/appointments/available` ativa para filtragem inteligente de horários disponíveis dos nutricionistas em português.
 - **Rotas de Receitas:** Rotas para leitura de receitas individuais e plano semanal de IA ativas e persistidas no banco PostgreSQL.
 - **Rotas de Exames & Análise automática:**
@@ -104,4 +118,4 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 
 ---
 
-*Última atualização: 30 de Maio de 2026 — Claude (VS Code) — Fórmulas energéticas + goals[] + crédito receitas*
+*Última atualização: 30 de Maio de 2026 — Antigravity (IDE Antigravity) — Cadastro com telefone/foto, edição total do perfil no APK, trava calórica na anamnese e rebuild do APK*
