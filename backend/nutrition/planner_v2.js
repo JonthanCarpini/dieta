@@ -14,26 +14,28 @@
  * com campos adicionais: protocols, alerts, clinicalSource.
  */
 
-const planner = require('./planner');
+const planner  = require('./planner');
 const { resolveProtocols } = require('./protocols');
+const formulas = require('./formulas');
 
 const round = n => Math.round(n);
 
-// ── Harris-Benedict revisada (1984) ───────────────────────────────────────────
-// Fórmula padrão do sistema. Usada automaticamente quando não há registro em
-// energy_calculations — mesmo resultado que o nutricionista obteria manualmente.
-// Homem: 88.362 + 13.397×P + 4.799×A - 5.677×I
-// Mulher: 447.593 + 9.247×P + 3.098×A - 4.330×I
-function harrisBenedict1984(profile) {
+// Seleção automática da fórmula mais indicada por perfil (via formulas.js)
+// — Mifflin para sobrepeso/obesos (IMC ≥ 25)
+// — Cunningham/Tinsley para atletas
+// — Harris-Benedict revisada para eutróficos
+// Elimina o viés de usar sempre Harris-Benedict independente do perfil.
+function calcAuto(profile) {
+  const res = formulas.autoCalc(profile);
+  if (res) return res;
+  // fallback absoluto (dados insuficientes)
   const w   = Number(profile.weight)   || 70;
   const h   = Number(profile.height)   || 170;
   const age = Number(profile.age)      || 30;
   const act = Number(profile.activity) || 1.375;
-  const male = profile.gender === 'male';
-  const tmb = male
-    ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * age
-    : 447.593 + 9.247 * w + 3.098 * h - 4.330 * age;
-  return { tmb: round(tmb), get: round(tmb * act) };
+  const male = profile.gender === 'male' || profile.gender === 'M';
+  const tmb = male ? 88.362 + 13.397*w + 4.799*h - 5.677*age : 447.593 + 9.247*w + 3.098*h - 4.330*age;
+  return { formula_id: 2, formula_name: 'Harris-Benedict revisada (1984)', tmb: round(tmb), get: round(tmb * act) };
 }
 
 // ── Limites mínimos absolutos de kcal (segurança) ────────────────────────────
@@ -94,20 +96,21 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
   const anamnesis  = anamnesisRes.rows[0] || null;
   const proxy      = proxyRes.rows[0]     || null;
 
-  // ── 2. GET real — prioridade: cálculo salvo → Harris-Benedict automático ──
-  // Para pacientes sem cálculo manual: usa Harris-Benedict 1984 diretamente,
-  // mesma fórmula que o nutricionista usaria — resultado idêntico, não é uma
-  // aproximação grosseira como o Mifflin que era usado antes.
-  const hb = harrisBenedict1984(profile);
+  // ── 2. GET real — prioridade: cálculo salvo → fórmula automática ────────
+  // Quando não há cálculo manual: seleciona a fórmula mais indicada pelo perfil
+  // (Mifflin para sobrepeso, Cunningham/Tinsley para atletas, H-B revisada para
+  // eutróficos). Elimina o viés de aplicar sempre Harris-Benedict a todos.
+  const auto = calcAuto(profile);
   const get = energyCalc && Number(energyCalc.get_value) > 0
     ? Number(energyCalc.get_value)
-    : hb.get;
+    : auto.get;
   const tmb = energyCalc && Number(energyCalc.tmb) > 0
     ? Number(energyCalc.tmb)
-    : hb.tmb;
+    : auto.tmb;
+  const autoFormula = energyCalc ? null : auto;
   const getSource = energyCalc
     ? `${energyCalc.formula_name || 'Cálculo salvo'} (${new Date(energyCalc.calculated_at).toLocaleDateString('pt-BR')})`
-    : 'Harris-Benedict 1984 (automático — preencha o cálculo energético para salvar)';
+    : `${auto.formula_name} (automático — salve no Cálculo Energético para fixar)`;
 
   const objetivo = overrides.objetivo || profile.goal || 'maintain';
 
@@ -265,7 +268,8 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
     alerts,
     anamnesisStatus,
     clinicalSource: {
-      get:      getSource,
+      get:         getSource,
+    autoFormula: autoFormula ? `${autoFormula.formula_name} (IMC ${Math.round((Number(profile.weight)||70)/((Number(profile.height)||170)/100)**2 * 10)/10})` : null,
       markers:  markers.length > 0 ? `${markers.length} marcadores de exames` : (proxy ? 'respostas proxy' : 'nenhum'),
       anamnese: anamnesisStatus,
     },

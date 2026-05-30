@@ -42,8 +42,11 @@ router.get('/profile', async (req, res) => {
   }
 });
 
-// Harris-Benedict 1984: calcula TMB/GET e todos os alvos nutricionais
-function calcNutritionTargets({ gender, age, weight, height, activity, goal, speed }) {
+// Calcula TMB/GET e todos os alvos nutricionais usando a fórmula mais indicada
+// para o perfil do paciente (via formulas.autoCalc — Mifflin para sobrepeso,
+// Cunningham/Tinsley para atletas, Harris-Benedict revisada para eutróficos).
+const { autoCalc: _autoCalc } = require('../nutrition/formulas');
+function calcNutritionTargets({ gender, age, weight, height, activity, goal, speed, mlg }) {
   const w   = Number(weight)   || 0;
   const h   = Number(height)   || 0;
   const a   = Number(age)      || 0;
@@ -51,10 +54,10 @@ function calcNutritionTargets({ gender, age, weight, height, activity, goal, spe
   const spd = Number(speed)    || 0;
   if (!w || !h || !a) return null;   // dados insuficientes — não sobrescreve
 
-  const tmb = gender === 'male'
-    ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * a
-    : 447.593 + 9.247 * w + 3.098 * h - 4.330 * a;
-  const get = tmb * act;
+  const energyResult = _autoCalc({ weight: w, height: h, age: a, gender, activity: act, mlg: mlg || null });
+  if (!energyResult) return null;
+  const tmb = energyResult.tmb;
+  const get = energyResult.get;
 
   // Meta calórica: speed (kg/sem × 7700 kcal / 7 dias) ou fator percentual
   let kcal;
