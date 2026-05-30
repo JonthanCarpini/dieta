@@ -47,7 +47,7 @@ export default function RegisterScreen() {
         password,
       });
       await login(data.token, data.user);
-      router.replace('/(tabs)');
+      router.replace('/onboarding' as never);   // anamnese obrigatória antes do app
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
       setError(err.response?.data?.error ?? 'Erro ao criar conta. Tente novamente.');

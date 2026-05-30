@@ -1,10 +1,25 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import type { Router } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../src/store/authStore';
+import api from '../src/api/client';
+
+async function checkAnamnesisAndRedirect(router: Router) {
+  try {
+    const { data } = await api.get('/user/anamnesis/status');
+    if (data.completed) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/onboarding' as never);
+    }
+  } catch {
+    router.replace('/(tabs)');   // se falhar, deixa entrar normalmente
+  }
+}
 import { colors } from '../src/constants/theme';
 import AppDrawer from '../src/components/AppDrawer';
 
@@ -22,12 +37,16 @@ function AuthGuard() {
   useEffect(() => {
     if (!isReady) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const inAuthGroup  = segments[0] === '(auth)';
+    const inOnboarding = segments[0] === 'onboarding';
 
     if (!token && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (token && inAuthGroup) {
-      router.replace('/(tabs)');
+      // Após login/registro, verifica se anamnese está completa
+      checkAnamnesisAndRedirect(router);
+    } else if (token && !inAuthGroup && !inOnboarding) {
+      // Usuário já logado navegando — não re-checa para não interromper
     }
   }, [token, isReady, segments]);
 
@@ -52,6 +71,7 @@ function AuthGuard() {
       <Stack.Screen name="recipe-detail" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="perfil" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="exams" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right', gestureEnabled: false }} />
       <Stack.Screen name="schedule-appointment" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="video-call" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
     </Stack>

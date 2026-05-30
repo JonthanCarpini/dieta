@@ -1641,5 +1641,97 @@ router.delete('/activity/exercise/:index', async (req, res) => {
   }
 });
 
+// ==========================================
+// ANAMNESE (Onboarding obrigatório — V2)
+// ==========================================
+
+// GET /user/anamnesis/status — verifica se onboarding está completo
+router.get('/anamnesis/status', async (req, res) => {
+  try {
+    await db.query(`CREATE TABLE IF NOT EXISTS patient_anamnesis (
+      patient_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      meal_count INTEGER DEFAULT 5, meal_times JSONB, eats_out VARCHAR(20),
+      cooking_level VARCHAR(20), conditions TEXT[], restrictions TEXT[],
+      avoids_text TEXT, prefers_text TEXT, medications TEXT,
+      completed_at TIMESTAMPTZ, updated_at TIMESTAMPTZ DEFAULT NOW())`).catch(() => {});
+    await db.query(`CREATE TABLE IF NOT EXISTS patient_exam_proxy (
+      patient_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      cholesterol_high BOOLEAN, uric_acid_high BOOLEAN,
+      glucose_high BOOLEAN, kidney_stones BOOLEAN,
+      answered_at TIMESTAMPTZ DEFAULT NOW())`).catch(() => {});
+
+    const [ana, proxy, markers] = await Promise.all([
+      db.query('SELECT completed_at FROM patient_anamnesis WHERE patient_id=$1', [req.user.id]),
+      db.query('SELECT answered_at FROM patient_exam_proxy WHERE patient_id=$1', [req.user.id]),
+      db.query('SELECT COUNT(*) cnt FROM patient_exam_markers WHERE patient_id=$1', [req.user.id]).catch(() => ({ rows: [{ cnt: 0 }] })),
+    ]);
+    const completed = !!(ana.rows[0]?.completed_at);
+    const hasProxy  = !!proxy.rows[0];
+    const hasExams  = Number(markers.rows[0]?.cnt) > 0;
+    res.json({ completed, hasProxy, hasExams,
+      status: completed ? (hasExams ? 'completa_com_exames' : hasProxy ? 'completa_proxy' : 'completa_sem_exames') : 'incompleta' });
+  } catch (err) {
+    console.error('anamnesis/status:', err);
+    res.status(500).json({ error: 'Erro ao verificar anamnese.' });
+  }
+});
+
+// GET /user/anamnesis — dados completos
+router.get('/anamnesis', async (req, res) => {
+  try {
+    const [ana, proxy] = await Promise.all([
+      db.query('SELECT * FROM patient_anamnesis WHERE patient_id=$1', [req.user.id]).catch(() => ({ rows: [] })),
+      db.query('SELECT * FROM patient_exam_proxy WHERE patient_id=$1', [req.user.id]).catch(() => ({ rows: [] })),
+    ]);
+    res.json({ anamnesis: ana.rows[0] || null, proxy: proxy.rows[0] || null });
+  } catch (err) {
+    console.error('anamnesis GET:', err);
+    res.status(500).json({ error: 'Erro ao buscar anamnese.' });
+  }
+});
+
+// POST /user/anamnesis — salva ou atualiza anamnese completa
+router.post('/anamnesis', async (req, res) => {
+  const { meal_count, meal_times, eats_out, cooking_level, conditions, restrictions,
+          avoids_text, prefers_text, medications, complete } = req.body;
+  try {
+    const completed_at = complete ? new Date() : null;
+    await db.query(`
+      INSERT INTO patient_anamnesis
+        (patient_id, meal_count, meal_times, eats_out, cooking_level, conditions, restrictions,
+         avoids_text, prefers_text, medications, completed_at, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+      ON CONFLICT (patient_id) DO UPDATE SET
+        meal_count=$2, meal_times=$3, eats_out=$4, cooking_level=$5,
+        conditions=$6, restrictions=$7, avoids_text=$8, prefers_text=$9,
+        medications=$10, completed_at=COALESCE($11, patient_anamnesis.completed_at),
+        updated_at=NOW()`,
+      [req.user.id, meal_count||5, meal_times||{}, eats_out||null, cooking_level||null,
+       conditions||[], restrictions||[], avoids_text||null, prefers_text||null,
+       medications||null, completed_at]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('anamnesis POST:', err);
+    res.status(500).json({ error: 'Erro ao salvar anamnese.' });
+  }
+});
+
+// POST /user/exam-proxy — salva respostas substitutas de exame
+router.post('/exam-proxy', async (req, res) => {
+  const { cholesterol_high, uric_acid_high, glucose_high, kidney_stones } = req.body;
+  try {
+    await db.query(`
+      INSERT INTO patient_exam_proxy (patient_id, cholesterol_high, uric_acid_high, glucose_high, kidney_stones)
+      VALUES ($1,$2,$3,$4,$5)
+      ON CONFLICT (patient_id) DO UPDATE SET
+        cholesterol_high=$2, uric_acid_high=$3, glucose_high=$4, kidney_stones=$5, answered_at=NOW()`,
+      [req.user.id, !!cholesterol_high, !!uric_acid_high, !!glucose_high, !!kidney_stones]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('exam-proxy POST:', err);
+    res.status(500).json({ error: 'Erro ao salvar proxy.' });
+  }
+});
+
 router.generateClinicalSummary = generateClinicalSummary;
 module.exports = router;
