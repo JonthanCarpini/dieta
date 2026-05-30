@@ -425,9 +425,10 @@ CREATE TABLE patient_exam_proxy (
   do Marcelo (limitado à TMB Mifflin = 2162, em vez de 945).
 - Validado: Marcelo (IMC 31.7)→Mifflin, Nathila (23.9)→H-B, atleta→Tinsley/Cunningham.
 
-### Fase C — Alertas clínicos
-12. Transformar `micros.js` de compensação automática → alertas visuais
-13. Painel de alertas no builder (déficit, micros críticos, protocolos ativos)
+### Fase C — Alertas clínicos (✅ concluído)
+12. ✅ `micros.js` não compensa mais automaticamente — endpoint só gera relatório + alertas.
+13. ✅ `buildMicroAlerts()`: UL ultrapassado (sódio) = **erro**; micro <70% da meta semanal = **warning com sugestão de alimentos-fonte** (`MICRO_FOOD_SOURCES`); piso diário hidrossolúvel consolidado num único alerta (dedupe). Mesclado em `alerts[]` e exibido no painel do builder junto com déficit/protocolos. Validado no Marcelo: 5 alertas acionáveis (fibra 43%, vit E 41%, folato 56%, B6 67%, piso hidrossolúvel).
+**Princípio**: o sistema NUNCA corrige sozinho — apenas alerta; o nutricionista decide (decisão clínica).
 
 ### Fase D — Objetivos terapêuticos
 14. Perfis expandidos: diabetes, hipertensão, gota, renal, gestante, atleta

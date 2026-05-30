@@ -91,8 +91,16 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 - **goals[] (concluído):** `recipes.goals` (lose/maintain/gain) derivado de macros via `computeGoals()`. Substitui o binário `healthy`. Gerador filtra por objetivo do paciente. Acervo: **465 receitas** (lose 99, maintain 298, gain 144). +12 categorias scrapadas (alta-proteina, baixa-caloria, low-carb, etc.).
 - **clinical_tags (concluído):** `recipes.clinical_tags` lista os protocolos que a receita RESPEITA, via `protocols.clinicalTagsFor()` com match por **palavra inteira** (`wordHit` — corrige falso positivo "nata"≠"natural"). Gerador filtra `clinical_tags @> protocolIds`. Restrições do paciente separadas em `exclusions.patientKeywords`. Acervo (de 465 ativas): baixa_purina 254, baixo_tg 345, baixo_ig 342, baixo_na 216, renal 460, baixo_colesterol 225. Validado: Marcelo (Gota) → 77 receitas, sem camarão/sardinha, com escondidinho de frango.
 
-### Fase C — Alertas clínicos (pendente)
-- Transformar `micros.js` de compensação automática para alertas visuais no builder.
+### Fase C — Alertas clínicos ✅ CONCLUÍDA
+- `micros.buildMicroAlerts()`: UL sódio = erro; micro <70% da meta = warning com sugestão de alimentos (`MICRO_FOOD_SOURCES`); piso hidrossolúvel consolidado. Sem compensação automática — só alerta, nutricionista decide.
+- Endpoint `generate-plan` mescla microAlerts em `alerts[]`; builder exibe no painel.
+
+### Painel ADMIN — CRUD de Usuários ✅ CONCLUÍDA
+- `GET /admin/users` com nutricionista vinculado + filtros; `GET /admin/professionals`; `POST /users/:id/assign-professional`; `POST/PUT/DELETE /users`.
+- Frontend: filtros (cargo/plano/nutricionista), coluna Nutricionista com atribuição inline, modal criar/editar, excluir. **Atenção Gemini:** `professional_links` (type='nutritionist') é a tabela de vínculo paciente↔nutri.
+
+### Próximo: Fase D — Objetivos terapêuticos
+- Perfis expandidos (diabetes, HAS, gota, renal, gestante, atleta) com splits de macro e restrições específicas por condição.
 
 ---
 
