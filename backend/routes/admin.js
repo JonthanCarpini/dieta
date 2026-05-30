@@ -477,16 +477,134 @@ router.use(requireRole(['admin']));
 // 1. LISTAR TODOS OS USUÁRIOS DO SISTEMA
 // ==========================================
 router.get('/users', async (req, res) => {
+  // Filtros opcionais via query: ?search= &role= &plan= &professional_id= (ou 'none')
+  const { search, role, plan, professional_id } = req.query;
+  const conds = [];
+  const params = [];
+  if (search) { params.push(`%${search.toLowerCase()}%`); conds.push(`(LOWER(u.name) LIKE $${params.length} OR LOWER(u.email) LIKE $${params.length})`); }
+  if (role)   { params.push(role); conds.push(`u.role = $${params.length}`); }
+  if (plan)   { params.push(plan); conds.push(`u.plan = $${params.length}`); }
+  if (professional_id === 'none') {
+    conds.push(`pl.professional_id IS NULL`);
+  } else if (professional_id) {
+    params.push(parseInt(professional_id)); conds.push(`pl.professional_id = $${params.length}`);
+  }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   try {
     const usersRes = await db.query(
-      `SELECT id, email, name, role, plan, trial_expires_at, premium_expires_at, commission_percentage, created_at 
-       FROM users 
-       ORDER BY created_at DESC`
+      `SELECT u.id, u.email, u.name, u.role, u.plan, u.trial_expires_at, u.premium_expires_at,
+              u.commission_percentage, u.created_at,
+              pl.professional_id, pro.name AS professional_name
+       FROM users u
+       LEFT JOIN professional_links pl ON pl.user_id = u.id AND pl.type = 'nutritionist'
+       LEFT JOIN users pro ON pro.id = pl.professional_id
+       ${where}
+       ORDER BY u.created_at DESC`,
+      params
     );
     res.json(usersRes.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar lista de usuários.' });
+  }
+});
+
+// Lista profissionais (nutricionistas/trainers) — para dropdowns de atribuição
+router.get('/professionals', async (req, res) => {
+  try {
+    const r = await db.query(
+      `SELECT id, name, email, role,
+              (SELECT COUNT(*) FROM professional_links pl WHERE pl.professional_id = u.id AND pl.type='nutritionist') AS patient_count
+       FROM users u WHERE role IN ('nutritionist','trainer') ORDER BY name`
+    );
+    res.json(r.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao listar profissionais.' });
+  }
+});
+
+// Atribuir / desvincular nutricionista de um paciente
+router.post('/users/:id/assign-professional', async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const { professional_id } = req.body;   // null/0 → desvincula
+  try {
+    if (!professional_id) {
+      await db.query(`DELETE FROM professional_links WHERE user_id=$1 AND type='nutritionist'`, [userId]);
+      return res.json({ message: 'Nutricionista desvinculado.' });
+    }
+    const pro = await db.query(`SELECT id, name, role FROM users WHERE id=$1`, [professional_id]);
+    if (!pro.rows.length || !['nutritionist','trainer'].includes(pro.rows[0].role)) {
+      return res.status(400).json({ error: 'Profissional inválido.' });
+    }
+    await db.query(
+      `INSERT INTO professional_links (user_id, professional_id, type)
+       VALUES ($1, $2, 'nutritionist')
+       ON CONFLICT (user_id, type) DO UPDATE SET professional_id = EXCLUDED.professional_id, created_at = NOW()`,
+      [userId, professional_id]
+    );
+    res.json({ message: `Vinculado a ${pro.rows[0].name}.`, professional_name: pro.rows[0].name });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atribuir nutricionista.' });
+  }
+});
+
+// Criar usuário (CRUD — create)
+router.post('/users', async (req, res) => {
+  const { name, email, password, role, plan } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'Nome, e-mail e senha são obrigatórios.' });
+  try {
+    const exists = await db.query('SELECT id FROM users WHERE email=$1', [email.toLowerCase().trim()]);
+    if (exists.rows.length) return res.status(400).json({ error: 'E-mail já cadastrado.' });
+    const passwordHash = await bcrypt.hash(password, await bcrypt.genSalt(10));
+    const r = await db.query(
+      `INSERT INTO users (email, password_hash, name, role, plan, trial_expires_at)
+       VALUES ($1,$2,$3,$4,$5, NOW() + INTERVAL '7 days')
+       RETURNING id, email, name, role, plan`,
+      [email.toLowerCase().trim(), passwordHash, name.trim(), role || 'user', plan || 'trial']
+    );
+    res.status(201).json({ message: 'Usuário criado.', user: r.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao criar usuário.' });
+  }
+});
+
+// Editar usuário (CRUD — update: nome, email, senha opcional)
+router.put('/users/:id', async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const { name, email, password } = req.body;
+  if (!name || !email) return res.status(400).json({ error: 'Nome e e-mail são obrigatórios.' });
+  try {
+    const dup = await db.query('SELECT id FROM users WHERE email=$1 AND id<>$2', [email.toLowerCase().trim(), userId]);
+    if (dup.rows.length) return res.status(400).json({ error: 'E-mail já usado por outra conta.' });
+    if (password && password.length >= 6) {
+      const hash = await bcrypt.hash(password, await bcrypt.genSalt(10));
+      await db.query('UPDATE users SET name=$1, email=$2, password_hash=$3 WHERE id=$4', [name.trim(), email.toLowerCase().trim(), hash, userId]);
+    } else {
+      await db.query('UPDATE users SET name=$1, email=$2 WHERE id=$3', [name.trim(), email.toLowerCase().trim(), userId]);
+    }
+    const r = await db.query('SELECT id, email, name, role, plan FROM users WHERE id=$1', [userId]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    res.json({ message: 'Usuário atualizado.', user: r.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar usuário.' });
+  }
+});
+
+// Excluir usuário (CRUD — delete)
+router.delete('/users/:id', async (req, res) => {
+  const userId = parseInt(req.params.id);
+  if (userId === req.user.id) return res.status(400).json({ error: 'Você não pode excluir sua própria conta.' });
+  try {
+    const r = await db.query('DELETE FROM users WHERE id=$1 RETURNING id, name', [userId]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    res.json({ message: `Usuário ${r.rows[0].name} excluído.` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir usuário.' });
   }
 });
 

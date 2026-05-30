@@ -156,104 +156,206 @@ export async function loadProOverviewData() {
 // ── USERS ──
 export async function loadUsersData() {
     try {
-        const plansRes = await fetch(`${API_URL}/admin/plans`, {
-            headers: { 'Authorization': `Bearer ${adminState.token}` }
-        });
-        if (plansRes.ok) {
-            adminState.plans = await plansRes.json();
-        }
+        const [plansRes, prosRes, usersRes] = await Promise.all([
+            fetch(`${API_URL}/admin/plans`,         { headers: { 'Authorization': `Bearer ${adminState.token}` } }),
+            fetch(`${API_URL}/admin/professionals`, { headers: { 'Authorization': `Bearer ${adminState.token}` } }),
+            fetch(`${API_URL}/admin/users`,         { headers: { 'Authorization': `Bearer ${adminState.token}` } }),
+        ]);
+        if (plansRes.ok) adminState.plans = await plansRes.json();
+        adminState.professionals = prosRes.ok ? await prosRes.json() : [];
+        if (!usersRes.ok) throw new Error('Não foi possível carregar os usuários.');
+        adminState.users = await usersRes.json();
 
-        const res = await fetch(`${API_URL}/admin/users`, {
-            headers: { 'Authorization': `Bearer ${adminState.token}` }
-        });
-        if (!res.ok) throw new Error('Não foi possível carregar os usuários.');
-        adminState.users = await res.json();
-        
+        _populateUserFilters();
+        _initUsersUI();
         renderUsersTable();
     } catch (err) {
         alert(err.message);
     }
 }
 
-export function renderUsersTable(filter = '') {
+// Popula selects de filtro (plano + nutricionista) uma vez
+function _populateUserFilters() {
+    const planSel = document.getElementById('user-filter-plan');
+    if (planSel && adminState.plans) {
+        planSel.innerHTML = '<option value="">Todos os planos</option>' +
+            adminState.plans.map(p => `<option value="${p.name}">${p.display_name}</option>`).join('');
+    }
+    const proSel = document.getElementById('user-filter-pro');
+    if (proSel && adminState.professionals) {
+        proSel.innerHTML = '<option value="">Qualquer nutricionista</option><option value="none">Sem nutricionista</option>' +
+            adminState.professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    }
+}
+
+let _usersUIBound = false;
+function _initUsersUI() {
+    if (_usersUIBound) return;
+    _usersUIBound = true;
+    const rerender = () => renderUsersTable();
+    document.getElementById('user-filter-role')?.addEventListener('change', rerender);
+    document.getElementById('user-filter-plan')?.addEventListener('change', rerender);
+    document.getElementById('user-filter-pro')?.addEventListener('change', rerender);
+    document.getElementById('btn-new-user')?.addEventListener('click', () => openUserModal(null));
+    document.getElementById('user-modal-cancel')?.addEventListener('click', closeUserModal);
+    document.getElementById('user-modal-save')?.addEventListener('click', saveUserModal);
+}
+
+const ROLE_LABELS = { admin: 'Admin', nutritionist: 'Nutricionista', trainer: 'Personal Trainer', user: 'Usuário' };
+
+export function renderUsersTable(filterArg) {
     const tbody = document.getElementById('users-table-body');
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const filteredUsers = adminState.users.filter(u => {
-        const query = filter.toLowerCase();
-        return u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query);
+    // filtros (search vem do arg quando chamado pelo input; senão lê do campo)
+    const search = (filterArg !== undefined ? filterArg : (document.getElementById('user-search-input')?.value || '')).toLowerCase().trim();
+    const fRole = document.getElementById('user-filter-role')?.value || '';
+    const fPlan = document.getElementById('user-filter-plan')?.value || '';
+    const fPro  = document.getElementById('user-filter-pro')?.value || '';
+
+    const filtered = adminState.users.filter(u => {
+        if (search && !(u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search))) return false;
+        if (fRole && u.role !== fRole) return false;
+        if (fPlan && u.plan !== fPlan) return false;
+        if (fPro === 'none' && u.professional_id) return false;
+        if (fPro && fPro !== 'none' && String(u.professional_id || '') !== fPro) return false;
+        return true;
     });
 
-    if (filteredUsers.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-text-muted);">Nenhum usuário correspondente encontrado.</td></tr>`;
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--color-text-muted);padding:20px;">Nenhum usuário encontrado.</td></tr>`;
+        if (window.lucide) window.lucide.createIcons();
         return;
     }
 
-    filteredUsers.forEach(u => {
+    filtered.forEach(u => {
         const tr = document.createElement('tr');
-
-        const roleLabels = { admin: 'Admin', nutritionist: 'Nutricionista', trainer: 'Personal Trainer', user: 'Usuário' };
-        const roleBadgeClass = u.role;
-
         const isPremium = u.plan && u.plan !== 'trial';
-        const planBadgeClass = isPremium ? 'premium' : 'trial';
         const planLabel = adminState.plans.find(p => p.name === u.plan)?.display_name || u.plan;
-
         let expiryStr = 'Nunca';
-        if (u.plan === 'trial' && u.trial_expires_at) {
-            expiryStr = new Date(u.trial_expires_at).toLocaleDateString('pt-BR');
-        } else if (u.premium_expires_at) {
-            expiryStr = new Date(u.premium_expires_at).toLocaleDateString('pt-BR');
-        }
+        if (u.plan === 'trial' && u.trial_expires_at) expiryStr = new Date(u.trial_expires_at).toLocaleDateString('pt-BR');
+        else if (u.premium_expires_at) expiryStr = new Date(u.premium_expires_at).toLocaleDateString('pt-BR');
 
-        const roleOptions = Object.entries(roleLabels).map(([val, label]) => `
-            <option value="${val}" ${u.role === val ? 'selected' : ''}>${label}</option>
-        `).join('');
-
-        const planOptions = adminState.plans.map(p => `
-            <option value="${p.name}" ${u.plan === p.name ? 'selected' : ''}>${p.display_name}</option>
-        `).join('');
+        const roleOptions = Object.entries(ROLE_LABELS).map(([val, label]) =>
+            `<option value="${val}" ${u.role === val ? 'selected' : ''}>${label}</option>`).join('');
+        const planOptions = adminState.plans.map(p =>
+            `<option value="${p.name}" ${u.plan === p.name ? 'selected' : ''}>${p.display_name}</option>`).join('');
+        // dropdown de atribuição de nutricionista (só relevante para pacientes)
+        const proOptions = `<option value="">— sem nutri —</option>` + adminState.professionals
+            .filter(p => p.role === 'nutritionist' || p.role === 'trainer')
+            .map(p => `<option value="${p.id}" ${String(u.professional_id||'') === String(p.id) ? 'selected' : ''}>${p.name}</option>`).join('');
 
         tr.innerHTML = `
             <td><strong>${u.name}</strong></td>
             <td>${u.email}</td>
+            <td><span class="badge-role ${u.role}">${ROLE_LABELS[u.role] || u.role}</span></td>
+            <td><span class="badge-plan ${isPremium ? 'premium' : 'trial'}">${planLabel}</span></td>
             <td>
-                <span class="badge-role ${roleBadgeClass}">${roleLabels[u.role] || u.role}</span>
-            </td>
-            <td>
-                <span class="badge-plan ${planBadgeClass}">${planLabel}</span>
+                <select class="table-select assign-pro-select" data-user-id="${u.id}">${proOptions}</select>
             </td>
             <td>${expiryStr}</td>
             <td>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <select class="table-select change-role-select" data-user-id="${u.id}">
-                        ${roleOptions}
-                    </select>
-                    <select class="table-select change-plan-select" data-user-id="${u.id}">
-                        ${planOptions}
-                    </select>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <select class="table-select change-role-select" data-user-id="${u.id}" title="Cargo">${roleOptions}</select>
+                    <select class="table-select change-plan-select" data-user-id="${u.id}" title="Plano">${planOptions}</select>
+                    <button class="user-action-btn btn-edit-user" data-user-id="${u.id}" title="Editar"><i data-lucide="pencil" style="width:14px;height:14px;"></i></button>
+                    <button class="user-action-btn danger btn-delete-user" data-user-id="${u.id}" title="Excluir"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
                 </div>
-            </td>
-        `;
+            </td>`;
 
-        tr.querySelector('.change-role-select').addEventListener('change', async (e) => {
+        tr.querySelector('.assign-pro-select').addEventListener('change', e => assignProfessional(u.id, e.target.value));
+        tr.querySelector('.change-role-select').addEventListener('change', async e => {
             const newRole = e.target.value;
             if (u.id === adminState.user.id && newRole !== 'admin') {
                 alert('Por segurança, você não pode revogar suas próprias permissões de administrador.');
-                e.target.value = 'admin';
-                return;
+                e.target.value = 'admin'; return;
             }
             await updateUserRole(u.id, newRole);
         });
-
-        tr.querySelector('.change-plan-select').addEventListener('change', async (e) => {
-            const newPlan = e.target.value;
-            await updateUserPlan(u.id, newPlan);
-        });
-
+        tr.querySelector('.change-plan-select').addEventListener('change', e => updateUserPlan(u.id, e.target.value));
+        tr.querySelector('.btn-edit-user').addEventListener('click', () => openUserModal(u));
+        tr.querySelector('.btn-delete-user').addEventListener('click', () => deleteUser(u));
         tbody.appendChild(tr);
     });
+    if (window.lucide) window.lucide.createIcons();
+}
+
+// ── Atribuir nutricionista ────────────────────────────────────────────────────
+export async function assignProfessional(userId, professionalId) {
+    try {
+        const res = await fetch(`${API_URL}/admin/users/${userId}/assign-professional`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+            body: JSON.stringify({ professional_id: professionalId ? parseInt(professionalId) : null }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao atribuir nutricionista.');
+        const idx = adminState.users.findIndex(x => x.id === userId);
+        if (idx !== -1) {
+            adminState.users[idx].professional_id = professionalId ? parseInt(professionalId) : null;
+            adminState.users[idx].professional_name = professionalId ? (adminState.professionals.find(p => p.id === parseInt(professionalId))?.name || null) : null;
+        }
+    } catch (err) { alert(err.message); await loadUsersData(); }
+}
+
+// ── Excluir usuário ─────────────────────────────────────────────────────────
+export async function deleteUser(u) {
+    if (!confirm(`Excluir o usuário "${u.name}" (${u.email})?\n\nEsta ação é permanente e remove todos os dados associados.`)) return;
+    try {
+        const res = await fetch(`${API_URL}/admin/users/${u.id}`, {
+            method: 'DELETE', headers: { 'Authorization': `Bearer ${adminState.token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao excluir.');
+        adminState.users = adminState.users.filter(x => x.id !== u.id);
+        renderUsersTable();
+    } catch (err) { alert(err.message); }
+}
+
+// ── Modal criar/editar ────────────────────────────────────────────────────────
+export function openUserModal(u) {
+    const modal = document.getElementById('user-modal');
+    if (!modal) return;
+    const isEdit = !!u;
+    document.getElementById('user-modal-title').textContent = isEdit ? 'Editar usuário' : 'Novo usuário';
+    document.getElementById('user-modal-id').value = isEdit ? u.id : '';
+    document.getElementById('user-modal-name').value = isEdit ? u.name : '';
+    document.getElementById('user-modal-email').value = isEdit ? u.email : '';
+    document.getElementById('user-modal-password').value = '';
+    document.getElementById('user-modal-pass-hint').textContent = isEdit ? '(deixe em branco para manter)' : '';
+    document.getElementById('user-modal-create-fields').style.display = isEdit ? 'none' : 'block';
+    const err = document.getElementById('user-modal-error'); err.style.display = 'none'; err.textContent = '';
+    modal.classList.remove('hidden');
+}
+export function closeUserModal() {
+    document.getElementById('user-modal')?.classList.add('hidden');
+}
+async function saveUserModal() {
+    const id = document.getElementById('user-modal-id').value;
+    const name = document.getElementById('user-modal-name').value.trim();
+    const email = document.getElementById('user-modal-email').value.trim();
+    const password = document.getElementById('user-modal-password').value;
+    const role = document.getElementById('user-modal-role').value;
+    const errEl = document.getElementById('user-modal-error');
+    const showErr = m => { errEl.textContent = m; errEl.style.display = 'block'; };
+
+    if (!name || !email) return showErr('Nome e e-mail são obrigatórios.');
+    if (!id && (!password || password.length < 6)) return showErr('Senha de no mínimo 6 caracteres.');
+
+    try {
+        const url = id ? `${API_URL}/admin/users/${id}` : `${API_URL}/admin/users`;
+        const method = id ? 'PUT' : 'POST';
+        const body = id ? { name, email, password } : { name, email, password, role };
+        const res = await fetch(url, {
+            method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminState.token}` },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) return showErr(data.error || 'Erro ao salvar.');
+        closeUserModal();
+        await loadUsersData();
+    } catch (err) { showErr(err.message); }
 }
 
 export async function updateUserRole(userId, role) {
