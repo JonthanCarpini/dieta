@@ -281,11 +281,11 @@ const PREPARO_RULES = [
   { re: /ovo|omelete/,                     step: g => `Prepare o ovo (${g}g) cozido, mexido ou em omelete, conforme preferir.` },
   { re: /tapioca/,                         step: g => `Hidrate a goma e prepare a tapioca (${g}g) na frigideira.` },
   { re: /panqueca|crepioca|mingau|aveia/,  step: g => `Misture e prepare na frigideira/panela (${g}g).` },
-  { re: /legume|abóbora|abobora|cenoura|brócolis|brocolis|couve|abobrinha|chuchu|berinjela|batata|mandioca/, step: g => `Cozinhe/refogue os legumes (${g}g) temperados a gosto.` },
+  { re: /legume|abóbora|abobora|cenoura|brócolis|brocolis|couve|abobrinha|chuchu|berinjela|batata|mandioca|cogumelo|champignon|palmito|milho|quiabo|vagem|ervilha/, step: g => `Cozinhe/refogue os legumes (${g}g) temperados a gosto.` },
   { re: /salada|alface|rúcula|rucula|tomate|pepino|agrião|agriao|escarola|acelga/, step: g => `Lave e corte os vegetais da salada (${g}g); tempere com azeite, limão e sal.` },
   { re: /azeite|óleo|oleo/,                step: () => null },   // tempero — não vira passo isolado
 ];
-const RAW_SERVE = /fruta|maçã|maca|banana|mamão|mamao|melão|melao|melancia|pera|laranja|abacaxi|uva|manga|iogurte|leite|queijo|requeij|castanha|amêndoa|amendoa|noz|pão|pao|biscoito|granola|mel\b|café|cafe|chá|cha|suco|água de coco|agua de coco|refrigerante/;
+const RAW_SERVE = /fruta|maçã|maca|banana|mamão|mamao|melão|melao|melancia|pera|laranja|abacaxi|uva|manga|goiaba|acerola|caqui|pêssego|pessego|ameixa|kiwi|morango|iogurte|leite|queijo|requeij|ricota|cottage|muçarela|mussarela|castanha|amêndoa|amendoa|noz|abacate|pão|pao|biscoito|granola|mel\b|café|cafe|chá|cha|suco|água de coco|agua de coco|refrigerante|vitamina/;
 
 function buildMealPreparo(items) {
   if (!items || !items.length) return '';
