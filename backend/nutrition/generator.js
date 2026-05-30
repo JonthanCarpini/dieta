@@ -168,6 +168,7 @@ function toFood(r) {
 const RECIPE_MEAL_MAP = {
   almoco_jantar:      ['almoco', 'jantar'],
   cafe_almoco_jantar: ['almoco', 'jantar'],
+  jantar:             ['jantar'],            // sopas/caldos
   cafe_lanche:        ['lanche_manha', 'lanche_tarde'],
   lanche:             ['lanche_manha', 'lanche_tarde'],
 };

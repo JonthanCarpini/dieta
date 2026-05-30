@@ -203,6 +203,29 @@ function isHealthy(name, per100, ingNames) {
   return per100.kcal > 0 && per100.kcal <= 280 && per100.lip <= 20;
 }
 
+// ── Classificador de REFEIÇÃO por nome + ingredientes ─────────────────────────
+// A categoria do site é grosseira (jogava "Salada de frutas" no almoço). Aqui o tipo
+// vem do NOME do prato (sinal forte) + proteína nos ingredientes. Tags batem com o
+// RECIPE_MEAL_MAP do generator. café/ceia/bebida não são usados pelo gerador hoje.
+const MEAL_RX = {
+  bebida: /\bsuco\b|vitamina|smoothie|shake|milk\s?shake|\bch[áa]\b|limonada|frapp|\bdrink\b|caipi|batida|refresco/,
+  lanche: /salada de frutas?|pat[êe]\b|sandu[íi]ch|bolinho|croquete|chips|petisco|\bwrap\b|dadinho|enroladinho|pipoca|barrinha|\bsnack\b|biscoito|cookie|torrada|bruschetta/,
+  sopa:   /\bsopa\b|\bcaldo\b|\bcanja\b/,
+  cafe:   /panqueca|crepioca|tapioca|mingau|granola|\baveia\b|overnight|p[ãa]o de queijo|p[ãa]o integral|p[ãa]o caseiro|broa|ovos? mexid|omelete|crepe|waffle|cuscuz|bolo de caneca|iogurte|geleia/,
+};
+const MEAL_MAIN = /arroz|risoto|feij|galinha|galinhada|feijoada|escondidinho|strogonoff|estrogonofe|ensopad|assad|grelhad|refogad|cozid|\bfrango\b|carne|peixe|\bfil[ée]\b|\bbife\b|lombo|costela|camar[ãa]o|lasanha|nhoque|macarr[ãa]o|bob[óo]|moqueca|bai[ãa]o|virado|parmegian|\bisca\b|alm[ôo]nd|hamb[úu]rguer|kafta|quibe|picadinho|fricass|salpic|rosbife|maminha|cupim|vaca atolada|pizza/;
+const MEAL_PROT = /frango|carne|peixe|patinho|ac[ée]m|alcatra|coxa|sobrecoxa|til[áa]pia|merluza|sardinha|camar[ãa]o|bacalhau|lombo|m[úu]sculo|mo[íi]d|\bfil[ée]|contrafil|maminha|\batum\b|pernil|costela|salm[ãa]o/;
+function classifyMeal(name, ingNames) {
+  const n = (name || '').toLowerCase();
+  const ing = (ingNames || []).join(' | ').toLowerCase();
+  if (MEAL_RX.bebida.test(n)) return 'bebida';
+  if (MEAL_RX.lanche.test(n)) return 'lanche';
+  if (MEAL_RX.sopa.test(n)) return 'jantar';
+  if (MEAL_RX.cafe.test(n) && !MEAL_MAIN.test(n)) return 'cafe_lanche';
+  if (MEAL_MAIN.test(n) || MEAL_PROT.test(ing)) return 'almoco_jantar';
+  return 'lanche';                          // fallback leve — não joga duvidoso no prato principal
+}
+
 async function queryTaco(words) {
   if (!words.length) return [];
   const conds = words.map((_, i) => `nome ILIKE $${i + 1}`).join(' AND ');
@@ -425,8 +448,11 @@ async function reclassify() {
       `SELECT matched_name FROM recipe_ingredients WHERE recipe_id=$1 AND matched_name IS NOT NULL`, [r.id]
     )).rows.map(x => x.matched_name);
     const h = isHealthy(r.name, { kcal: +r.kcal, lip: +r.lip }, ing);
+    const meal = classifyMeal(r.name, ing);
     if (h) fit++;
-    const up = await db.query(`UPDATE recipes SET healthy=$2 WHERE id=$1 AND healthy IS DISTINCT FROM $2`, [r.id, h]);
+    const up = await db.query(
+      `UPDATE recipes SET healthy=$2, meal=$3 WHERE id=$1 AND (healthy IS DISTINCT FROM $2 OR meal IS DISTINCT FROM $3)`,
+      [r.id, h, meal]);
     changed += up.rowCount;
   }
   console.log(`✓ reclassificadas: ${changed} alteradas | fit agora = ${fit}/${rows.length}`);
