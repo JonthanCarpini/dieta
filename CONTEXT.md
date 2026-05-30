@@ -38,10 +38,12 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 - **Cadastro & Foto de Perfil (`app/(auth)/register.tsx`):**
   - Adicionado campo de Telefone obrigatório com máscara e validação no formato `(xx)xxxxx-xxxx`.
   - Seletor de imagem (via `expo-image-picker`) integrado diretamente no topo do cadastro para definir a foto de perfil inicial.
-- **Anamnese - Trava Calórica de Segurança (`app/onboarding.tsx`):**
-  - Adicionada trava de segurança na seleção de velocidade de perda de peso: se a velocidade selecionada resultar em calorias diárias abaixo do limite metabólico seguro (BMR ou 1200 kcal fêmea / 1500 kcal macho), o botão é desabilitado/bloqueado com cadeado 🔒 e exibe mensagem de alerta informando a calorimetria estimada.
+- **Anamnese - Trava Calórica de Segurança e Velocidades Dinâmicas (`app/onboarding.tsx`):**
+  - Adicionada trava de segurança na seleção de velocidade de perda de peso. O layout foi reorganizado para que o Nível de Atividade Física seja preenchido antes da Velocidade.
+  - A velocidade "Intenso" passou a ser calculada dinamicamente com base no limite seguro exato de calorias (GET - floor), e a velocidade "Pesado" passou a ser exatamente 20% acima do limite (bloqueada de forma segura com alerta e cadeado 🔒).
+  - Seletor de velocidade exibe opções filtradas por duplicidade e ordenadas de forma crescente. Se os dados biométricos não estiverem completos, exibe mensagem orientando o preenchimento prévio.
 - **Rebuild do APK:**
-  - APK reconstruído com sucesso e assinado em modo de release (`gradlew assembleRelease`).
+  - APK reconstruído com sucesso em modo de release (`npx expo run:android --variant release`).
 - **Meus Exames (`app/exams.tsx`):**
   - Rota corrigida de `/profile/exams` para a rota real `/user/exams`.
   - Mapeamento de upload unificado e tipos de dados de arquivos (PDF e imagens) suportados com sucesso.
@@ -118,4 +120,4 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 
 ---
 
-*Última atualização: 30 de Maio de 2026 — Antigravity (IDE Antigravity) — Cadastro com telefone/foto, edição total do perfil no APK, trava calórica na anamnese e rebuild do APK*
+*Última atualização: 30 de Maio de 2026 — Antigravity (IDE Antigravity) — Ajuste da ordem do layout de onboarding, velocidades de perda de peso calculadas de forma dinâmica (Intenso no limite seguro, Pesado 20% acima e travado) e rebuild do APK*

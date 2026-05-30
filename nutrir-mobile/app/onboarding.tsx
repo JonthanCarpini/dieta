@@ -160,11 +160,56 @@ export default function OnboardingScreen() {
     };
   };
 
+  const getMaxSafeSpeed = () => {
+    const w = parseFloat(weight);
+    const h = parseFloat(height);
+    const act = parseFloat(activity);
+    if (isNaN(w) || isNaN(h) || isNaN(act) || !gender || !birthdateValid()) {
+      return 1.0;
+    }
+
+    const [dd, mm, yyyy] = birthdate.split('/').map(Number);
+    const birth = new Date(yyyy, mm - 1, dd);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+
+    const imc = w / ((h / 100) ** 2);
+    const isAthlete = act >= 1.725;
+    let tmb = 0;
+    if (isAthlete) {
+      tmb = 24.8 * w + 10;
+    } else if (imc >= 25 || imc < 18.5) {
+      tmb = gender === 'male'
+        ? 9.99 * w + 6.25 * h - 4.92 * age + 5
+        : 9.99 * w + 6.25 * h - 4.92 * age - 161;
+    } else {
+      tmb = gender === 'male'
+        ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * age
+        : 447.593 + 9.247 * w + 3.098 * h - 4.330 * age;
+    }
+
+    const get = tmb * act;
+    const minAbsoluto = gender === 'male' ? 1500 : 1200;
+    const floor = Math.max(tmb, minAbsoluto);
+
+    return Math.max(0.1, (get - floor) / 1100);
+  };
+
+  const isBiometricsComplete = () => {
+    const w = parseFloat(weight);
+    const h = parseFloat(height);
+    const act = parseFloat(activity);
+    return !isNaN(w) && !isNaN(h) && !isNaN(act) && !!gender && birthdateValid();
+  };
+
   // Reseta velocidade de perda se ela se tornar perigosa após alteração de dados biométricos
   useEffect(() => {
     if (speed && goal === 'lose') {
+      const maxSafe = getMaxSafeSpeed();
       const safety = getSafetyInfo(speed);
-      if (safety.isBlocked) {
+      if (safety.isBlocked || parseFloat(speed) > maxSafe + 0.01) {
         setSpeed('');
       }
     }
@@ -420,6 +465,17 @@ export default function OnboardingScreen() {
               <OptionBtn label="Manter peso" selected={goal === 'maintain'} onPress={() => setGoal('maintain')} />
               <OptionBtn label="Ganhar massa muscular" selected={goal === 'gain'} onPress={() => setGoal('gain')} />
 
+              <Text style={[s.sectionTitle, { marginTop: spacing.sm }]}>Nível de atividade física</Text>
+              {[
+                { val: '1.2',  label: 'Sedentário — sem exercício' },
+                { val: '1.375', label: 'Levemente active — 1-3x / semana' },
+                { val: '1.55',  label: 'Moderadamente ativo — 3-5x / semana' },
+                { val: '1.725', label: 'Muito ativo — 6-7x / semana' },
+                { val: '1.9',  label: 'Extremamente ativo — atleta / trabalho físico' },
+              ].map(o => (
+                <OptionBtn key={o.val} label={o.label} selected={activity === o.val} onPress={() => setActivity(o.val)} />
+              ))}
+
               {/* Velocidade — só para emagrecer ou ganhar massa */}
               {needsSpeed && (
                 <>
@@ -431,69 +487,118 @@ export default function OnboardingScreen() {
                       ? 'Déficit calórico calculado automaticamente. Perdas acima de 1 kg/semana aumentam risco de perda muscular.'
                       : 'Superávit calórico calculado automaticamente. Ganhos acima de 0.5 kg/semana podem aumentar gordura.'}
                   </Text>
-                  {(goal === 'lose'
-                    ? [
-                        { val: '0.25', level: 'Muito leve',   label: '0,25 kg / semana', desc: '~275 kcal/dia de déficit' },
-                        { val: '0.5',  level: 'Leve',         label: '0,5 kg / semana',  desc: '~550 kcal/dia de déficit' },
-                        { val: '0.75', level: 'Moderado',     label: '0,75 kg / semana', desc: '~825 kcal/dia de déficit' },
-                        { val: '1.0',  level: 'Intenso',      label: '1 kg / semana',    desc: '~1.100 kcal/dia de déficit' },
-                        { val: '1.5',  level: 'Pesado ⚠️',    label: '1,5 kg / semana',  desc: '~1.650 kcal/dia de déficit · Limite seguro' },
-                      ]
-                    : [
-                        { val: '0.25', level: 'Leve',     label: '0,25 kg / semana', desc: '~275 kcal/dia de superávit' },
-                        { val: '0.5',  level: 'Moderado', label: '0,5 kg / semana',  desc: '~550 kcal/dia de superávit · Recomendado' },
-                      ]
-                  ).map(o => {
-                    const safety = getSafetyInfo(o.val);
-                    const isBlocked = goal === 'lose' && safety.isBlocked;
-                    return (
+                  {goal === 'lose' ? (
+                    !isBiometricsComplete() ? (
+                      <View style={s.infoBox}>
+                        <Text style={[s.infoText, { color: colors.textSecondary }]}>
+                          Preencha seus dados biométricos e nível de atividade física acima para calcular os limites seguros de perda de peso.
+                        </Text>
+                      </View>
+                    ) : (
+                      (() => {
+                        const maxSafe = getMaxSafeSpeed();
+                        const intenseSpeed = parseFloat(maxSafe.toFixed(2));
+                        const heavySpeed = parseFloat((maxSafe * 1.2).toFixed(2));
+
+                        const rawLoseOptions = [
+                          { val: '0.25', level: 'Muito leve',   label: '0,25 kg / semana', desc: '~275 kcal/dia de déficit', orderVal: 0.25 },
+                          { val: '0.5',  level: 'Leve',         label: '0,5 kg / semana',  desc: '~550 kcal/dia de déficit', orderVal: 0.5 },
+                          { val: '0.75', level: 'Moderado',     label: '0,75 kg / semana', desc: '~825 kcal/dia de déficit', orderVal: 0.75 },
+                          { val: intenseSpeed.toString(), level: 'Intenso',      label: `${intenseSpeed.toString().replace('.', ',')} kg / semana`,    desc: `~${Math.round(intenseSpeed * 1100)} kcal/dia de déficit · Limite seguro`, orderVal: intenseSpeed },
+                          { val: heavySpeed.toString(),  level: 'Pesado ⚠️',    label: `${heavySpeed.toString().replace('.', ',')} kg / semana`,  desc: `~${Math.round(heavySpeed * 1100)} kcal/dia de déficit`, orderVal: heavySpeed },
+                        ];
+
+                        const seen = new Set<number>();
+                        const uniqueLoseOptions: typeof rawLoseOptions = [];
+                        for (const item of rawLoseOptions) {
+                          const roundedVal = parseFloat(item.orderVal.toFixed(2));
+                          if (item.level === 'Intenso' || item.level === 'Pesado ⚠️') {
+                            const idx = uniqueLoseOptions.findIndex(x => Math.abs(x.orderVal - item.orderVal) < 0.06);
+                            if (idx !== -1) {
+                              uniqueLoseOptions.splice(idx, 1);
+                            }
+                            uniqueLoseOptions.push(item);
+                            seen.add(roundedVal);
+                          } else {
+                            if (![...seen].some(val => Math.abs(val - item.orderVal) < 0.06)) {
+                              uniqueLoseOptions.push(item);
+                              seen.add(roundedVal);
+                            }
+                          }
+                        }
+
+                        uniqueLoseOptions.sort((a, b) => a.orderVal - b.orderVal);
+
+                        return uniqueLoseOptions.map(o => {
+                          const safety = getSafetyInfo(o.val);
+                          const isBlocked = safety.isBlocked || parseFloat(o.val) > intenseSpeed + 0.01;
+                          return (
+                            <TouchableOpacity key={o.val}
+                              style={[
+                                ob.btn,
+                                speed === o.val && ob.sel,
+                                o.level.includes('Pesado') && speed !== o.val && ob.warn,
+                                isBlocked && { opacity: 0.35, borderColor: colors.border }
+                              ]}
+                              onPress={() => {
+                                if (isBlocked) {
+                                  Alert.alert(
+                                    'Bloqueio de Segurança',
+                                    `Esta opção reduziria seu consumo diário para ~${safety.expectedKcal} kcal, o que é abaixo do limite metabólico seguro de ${safety.floor} kcal para o seu perfil.\n\nPor favor, selecione uma velocidade de perda de peso mais lenta.`
+                                  );
+                                  return;
+                                }
+                                setSpeed(o.val);
+                              }}
+                              activeOpacity={isBlocked ? 1 : 0.8}>
+                              <View style={s.speedRow}>
+                                <Text style={[ob.text, speed === o.val && ob.selText, isBlocked && { textDecorationLine: 'line-through' }]}>
+                                  {o.label} {isBlocked && '🔒'}
+                                </Text>
+                                <View style={[s.levelBadge, speed === o.val && s.levelBadgeSel, isBlocked && { backgroundColor: '#333' }]}>
+                                  <Text style={[s.levelText, speed === o.val && s.levelTextSel, isBlocked && { color: colors.textMuted }]}>
+                                    {isBlocked ? 'Bloqueado' : o.level}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={[s.speedDesc, speed === o.val && { color: colors.accentGreen + 'CC' }]}>
+                                {isBlocked ? `Calorias estimadas (${safety.expectedKcal} kcal) ficariam abaixo do limite seguro de ${safety.floor} kcal.` : o.desc}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        });
+                      })()
+                    )
+                  ) : (
+                    [
+                      { val: '0.25', level: 'Leve',     label: '0,25 kg / semana', desc: '~275 kcal/dia de superávit' },
+                      { val: '0.5',  level: 'Moderado', label: '0,5 kg / semana',  desc: '~550 kcal/dia de superávit · Recomendado' },
+                    ].map(o => (
                       <TouchableOpacity key={o.val}
                         style={[
                           ob.btn,
-                          speed === o.val && ob.sel,
-                          o.val === '1.5' && speed !== '1.5' && ob.warn,
-                          isBlocked && { opacity: 0.35, borderColor: colors.border }
+                          speed === o.val && ob.sel
                         ]}
-                        onPress={() => {
-                          if (isBlocked) {
-                            Alert.alert(
-                              'Bloqueio de Segurança',
-                              `Esta opção reduziria seu consumo diário para ~${safety.expectedKcal} kcal, o que é abaixo do limite metabólico seguro de ${safety.floor} kcal para o seu perfil.\n\nPor favor, selecione uma velocidade de perda de peso mais lenta.`
-                            );
-                            return;
-                          }
-                          setSpeed(o.val);
-                        }}
-                        activeOpacity={isBlocked ? 1 : 0.8}>
+                        onPress={() => setSpeed(o.val)}
+                        activeOpacity={0.8}>
                         <View style={s.speedRow}>
-                          <Text style={[ob.text, speed === o.val && ob.selText, isBlocked && { textDecorationLine: 'line-through' }]}>
-                            {o.label} {isBlocked && '🔒'}
+                          <Text style={[ob.text, speed === o.val && ob.selText]}>
+                            {o.label}
                           </Text>
-                          <View style={[s.levelBadge, speed === o.val && s.levelBadgeSel, isBlocked && { backgroundColor: '#333' }]}>
-                            <Text style={[s.levelText, speed === o.val && s.levelTextSel, isBlocked && { color: colors.textMuted }]}>
-                              {isBlocked ? 'Bloqueado' : o.level}
+                          <View style={[s.levelBadge, speed === o.val && s.levelBadgeSel]}>
+                            <Text style={[s.levelText, speed === o.val && s.levelTextSel]}>
+                              {o.level}
                             </Text>
                           </View>
                         </View>
                         <Text style={[s.speedDesc, speed === o.val && { color: colors.accentGreen + 'CC' }]}>
-                          {isBlocked ? `Calorias estimadas (${safety.expectedKcal} kcal) ficariam abaixo do limite seguro de ${safety.floor} kcal.` : o.desc}
+                          {o.desc}
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
+                    ))
+                  )}
                 </>
               )}
-
-              <Text style={[s.sectionTitle, { marginTop: spacing.sm }]}>Nível de atividade física</Text>
-              {[
-                { val: '1.2',  label: 'Sedentário — sem exercício' },
-                { val: '1.375', label: 'Levemente ativo — 1-3x / semana' },
-                { val: '1.55',  label: 'Moderadamente ativo — 3-5x / semana' },
-                { val: '1.725', label: 'Muito ativo — 6-7x / semana' },
-                { val: '1.9',  label: 'Extremamente ativo — atleta / trabalho físico' },
-              ].map(o => (
-                <OptionBtn key={o.val} label={o.label} selected={activity === o.val} onPress={() => setActivity(o.val)} />
-              ))}
             </View>
           )}
 
