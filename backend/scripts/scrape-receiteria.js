@@ -59,22 +59,39 @@ const MICRO_KEYS = ['ca','mg','p','fe','na','k','co','zn','se','re','rea','tiami
 // Categorias a varrer (relevantes p/ refeições). Mapeadas à refeição do gerador.
 // Categorias inexistentes (404) são puladas em silêncio.
 const CATEGORIES = {
-  'frango':                    'almoco_jantar',
-  'carnes':                    'almoco_jantar',
-  'peixes-e-frutos-do-mar':    'almoco_jantar',
-  'arroz-e-risotos':           'almoco_jantar',
-  'massas':                    'almoco_jantar',
-  'saladas-e-acompanhamentos': 'almoco_jantar',
-  'sopas':                     'jantar',
-  'ovos':                      'cafe_almoco_jantar',
-  'lanches-e-salgados':        'lanche',
-  'entradas-e-petiscos':       'lanche',
-  'paes':                      'cafe_lanche',
-  'bolos':                     'cafe_lanche',
-  'doces':                     'ceia',
-  'sobremesas':                'ceia',
-  'bebidas':                   'bebida',
-  'vegetarianas':              'almoco_jantar',
+  // ── Categorias originais ──────────────────────────────────────────────────
+  'frango':                      'almoco_jantar',
+  'carnes':                      'almoco_jantar',
+  'peixes-e-frutos-do-mar':      'almoco_jantar',
+  'arroz-e-risotos':             'almoco_jantar',
+  'massas':                      'almoco_jantar',
+  'saladas-e-acompanhamentos':   'almoco_jantar',
+  'sopas':                       'jantar',
+  'sopas-e-caldos':              'jantar',
+  'ovos':                        'cafe_almoco_jantar',
+  'lanches-e-salgados':          'lanche',
+  'entradas-e-petiscos':         'lanche',
+  'molhos-e-pates':              'lanche',
+  'paes':                        'cafe_lanche',
+  'bolos':                       'cafe_lanche',
+  'doces':                       'ceia',
+  'sobremesas':                  'ceia',
+  'bebidas':                     'bebida',
+  'vegetarianas':                'almoco_jantar',
+
+  // ── Categorias por objetivo / perfil nutricional ──────────────────────────
+  'receitas-alta-proteina':       'almoco_jantar',   // ganho muscular
+  'receitas-baixa-caloria':       'almoco_jantar',   // emagrecimento
+  'receitas-low-carb':            'almoco_jantar',   // emagrecimento + diabetes
+  'receitas-rica-em-fibra':       'almoco_jantar',   // emagrecimento + saciedade
+  'receitas-baixo-acucar':        'almoco_jantar',   // diabetes
+  'receitas-de-lanches-fitness':  'lanche',          // todos os objetivos
+  'receitas-para-cafe-da-manha':  'cafe_lanche',     // todos os objetivos
+  'receitas-com-peito-de-frango': 'almoco_jantar',   // ganho muscular (alta proteína)
+  'receitas-com-frango':          'almoco_jantar',   // todos os objetivos
+  'receitas-para-airfryer':       'almoco_jantar',   // preparo saudável (todos)
+  'receitas-para-almoco':         'almoco_jantar',   // todos os objetivos
+  'receitas-de-jantar-simples':   'jantar',          // todos os objetivos
 };
 
 // ── HTTP ────────────────────────────────────────────────────────────────────
@@ -196,11 +213,30 @@ const esc = w => w.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
 // macarrão com creme de leite, arroz de Natal doce). Usamos os ingredientes casados.
 const BAD_ING = /creme de leite|catupiry|requeij|maionese|bacon|leite condensado|chantilly|batata palha|salsich|lingui[cç]|salame|\bpresunto\b|mortadela|\bnata\b|banha|toucinho|a[çc]úcar|doce de leite/i;
 const BAD_NAME = /parmegian|milanes|à dor[ée]?|\bnatal\b|\bdoce\b|brigadeir|brownie|pudim|mousse|sorvete|\bbolo\b|\btorta\b|frit|empanad|rechead|strogonoff|gratin|chantilly|cheesecake|brulee|p[ãa]o de mel|cocada|beijinho|sonho|churros/i;
+// isHealthy: mantido como alias de lose (retrocompatibilidade)
 function isHealthy(name, per100, ingNames) {
+  return computeGoals(name, per100, ingNames).includes('lose');
+}
+
+// computeGoals: deriva os objetivos para os quais a receita é adequada.
+// Uma receita pode servir a múltiplos objetivos.
+function computeGoals(name, per100, ingNames) {
   const nm = (name || '').toLowerCase();
-  if (BAD_NAME.test(nm)) return false;
-  if ((ingNames || []).some(n => BAD_ING.test(n || ''))) return false;
-  return per100.kcal > 0 && per100.kcal <= 280 && per100.lip <= 20;
+  const hasBadIng  = (ingNames || []).some(n => BAD_ING.test(n || ''));
+  const hasBadName = BAD_NAME.test(nm);
+  const kcal = per100.kcal || 0;
+  const lip  = per100.lip  || 0;
+  const ptn  = per100.ptn  || 0;
+  if (kcal <= 0) return [];
+
+  const goals = [];
+  // lose: baixa caloria, baixa gordura, sem ingredientes ruins
+  if (!hasBadIng && !hasBadName && kcal <= 280 && lip <= 18) goals.push('lose');
+  // maintain: moderado, sem junk food/sobremesas gordurosas
+  if (!hasBadName && kcal <= 350 && lip <= 25) goals.push('maintain');
+  // gain: proteína adequada, energia suficiente, sem junk food
+  if (!hasBadName && ptn >= 10 && kcal >= 80 && kcal <= 500) goals.push('gain');
+  return goals;
 }
 
 // ── Classificador de REFEIÇÃO por nome + ingredientes ─────────────────────────
@@ -393,22 +429,25 @@ async function ingestOne(src) {
   const dev = sn.kcal ? Math.abs(per100.kcal - sn.kcal) / sn.kcal : 1;
   const trustworthy = coverage >= 0.7 && sn.kcal > 0 && dev <= 0.20;
   const active  = trustworthy;
-  const healthy = trustworthy && isHealthy(r.name, per100, rows.map(x => x.matched_name));
+  const ingNames = rows.map(x => x.matched_name);
+  const goals   = trustworthy ? computeGoals(r.name, per100, ingNames) : [];
+  const healthy = goals.includes('lose');   // retrocompatibilidade
   const author  = srcAuthor(r);
   const preparo = srcPreparo(r);   // texto original — nunca parafrasear
 
   if (DRY) {
-    console.log(`\n• ${r.name}  [${author || '?'}]  [cov ${(coverage*100|0)}%]  ${per100.kcal}kcal/100g vs ${sn.kcal||'?'} (dev ${(dev*100|0)}%)  ${active ? (healthy ? '✓fit' : '○ok') : '✗reprovada'}`);
-    if (preparo) console.log(`  📝 Preparo (${preparo.split('\n').length} passos): ${preparo.slice(0,80)}...`);
+    const goalStr = goals.length ? goals.join('+') : '✗fora';
+    console.log(`\n• ${r.name}  [${author || '?'}]  [cov ${(coverage*100|0)}%]  ${per100.kcal}kcal p${Math.round(per100.ptn)}g  ${active ? goalStr : '✗reprovada'}`);
+    if (preparo) console.log(`  📝 ${preparo.split('\n').length} passos`);
     rows.forEach(x => console.log(`    ${x.llm ? '🤖' : '  '} ${x.grams != null ? (x.grams+'g').padEnd(7) : '   ?   '} ${x.matched_name ? '→ '+x.matched_name.slice(0,40) : '✗ '+x.raw.slice(0,40)}`));
-    return { status: 'done', active, healthy };
+    return { status: 'done', active, healthy, goals };
   }
 
   const cols = ['slug','url','name','author_name','category','meal','yield_servings','total_grams','coverage','healthy','active',
-    'kcal','ptn','cho','lip','fibras', ...MICRO_KEYS, 'src_kcal','src_ptn','src_cho','src_lip','preparo'];
+    'kcal','ptn','cho','lip','fibras', ...MICRO_KEYS, 'src_kcal','src_ptn','src_cho','src_lip','preparo','goals'];
   const vals = [src.slug, src.url, r.name, author, src.category, src.meal, srcYield(r), Math.round(knownG), +coverage.toFixed(3), healthy, active,
     per100.kcal, per100.ptn, per100.cho, per100.lip, per100.fibras, ...MICRO_KEYS.map(k => per100[k]),
-    sn.kcal, sn.ptn, sn.cho, sn.lip, preparo];
+    sn.kcal, sn.ptn, sn.cho, sn.lip, preparo, goals];
   const ph = vals.map((_, i) => `$${i + 1}`).join(',');
   const up = cols.slice(2).map(c => `${c}=EXCLUDED.${c}`).join(',');
   const ins = await db.query(
@@ -463,7 +502,8 @@ async function ensureSchema() {
       src_kcal NUMERIC, src_ptn NUMERIC, src_cho NUMERIC, src_lip NUMERIC,
       created_at TIMESTAMPTZ DEFAULT NOW())`);
   await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS preparo TEXT`);
-  await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS author_name TEXT`);   // autor original (Receiteria)
+  await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS author_name TEXT`);
+  await db.query(`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS goals TEXT[]`);
   await db.query(`
     CREATE TABLE IF NOT EXISTS recipe_ingredients (
       id SERIAL PRIMARY KEY, recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
@@ -473,21 +513,24 @@ async function ensureSchema() {
 // Recalcula `healthy` sobre o banco (sem re-scrapear), usando nome + ingredientes.
 async function reclassify() {
   await ensureSchema();
-  const { rows } = await db.query(`SELECT id, name, kcal, lip FROM recipes WHERE active`);
+  const { rows } = await db.query(`SELECT id, name, kcal, lip, ptn FROM recipes WHERE active`);
   let changed = 0, fit = 0;
   for (const r of rows) {
     const ing = (await db.query(
       `SELECT matched_name FROM recipe_ingredients WHERE recipe_id=$1 AND matched_name IS NOT NULL`, [r.id]
     )).rows.map(x => x.matched_name);
-    const h = isHealthy(r.name, { kcal: +r.kcal, lip: +r.lip }, ing);
-    const meal = classifyMeal(r.name, ing);
+    const per100 = { kcal: +r.kcal, lip: +r.lip, ptn: +r.ptn };
+    const goals  = computeGoals(r.name, per100, ing);
+    const h      = goals.includes('lose');
+    const meal   = classifyMeal(r.name, ing);
     if (h) fit++;
     const up = await db.query(
-      `UPDATE recipes SET healthy=$2, meal=$3 WHERE id=$1 AND (healthy IS DISTINCT FROM $2 OR meal IS DISTINCT FROM $3)`,
-      [r.id, h, meal]);
+      `UPDATE recipes SET healthy=$2, goals=$3, meal=$4 WHERE id=$1
+       AND (healthy IS DISTINCT FROM $2 OR goals IS DISTINCT FROM $3 OR meal IS DISTINCT FROM $4)`,
+      [r.id, h, goals, meal]);
     changed += up.rowCount;
   }
-  console.log(`✓ reclassificadas: ${changed} alteradas | fit agora = ${fit}/${rows.length}`);
+  console.log(`✓ reclassificadas: ${changed} alteradas | fit(lose) = ${fit}/${rows.length}`);
 }
 
 // Gera MODO DE PREPARO próprio (LLM) a partir do nome + ingredientes decompostos.
@@ -552,9 +595,15 @@ async function prep() {
 async function stats() {
   await ensureSchema();
   const s = await db.query(`SELECT status, count(*) FROM recipe_sources GROUP BY status ORDER BY status`);
-  const r = await db.query(`SELECT count(*) tot, count(*) FILTER (WHERE active) ok, count(*) FILTER (WHERE healthy) fit, round(avg(coverage) FILTER (WHERE active)*100) cov FROM recipes`);
+  const r = await db.query(`SELECT count(*) tot, count(*) FILTER (WHERE active) ok,
+    count(*) FILTER (WHERE 'lose'=ANY(goals)) lose,
+    count(*) FILTER (WHERE 'maintain'=ANY(goals)) maintain,
+    count(*) FILTER (WHERE 'gain'=ANY(goals)) gain,
+    round(avg(coverage) FILTER (WHERE active)*100) cov FROM recipes`);
+  const row = r.rows[0];
   console.log('recipe_sources:', s.rows.map(x => `${x.status}=${x.count}`).join('  '));
-  console.log('recipes:', `total=${r.rows[0].tot}  confiáveis=${r.rows[0].ok}  fit=${r.rows[0].fit}  cobertura média(ativas)=${r.rows[0].cov || 0}%`);
+  console.log('recipes:', `total=${row.tot}  confiáveis=${row.ok}  cobertura=${row.cov||0}%`);
+  console.log('  goals → lose:', row.lose, ' | maintain:', row.maintain, ' | gain:', row.gain);
 }
 
 (async () => {

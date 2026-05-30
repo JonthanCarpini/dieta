@@ -806,7 +806,7 @@ router.post('/patients/:id/generate-plan', verifyPatientAccess, async (req, res)
     const config = await plannerV2.buildClinicalConfig(db, patientId, req.body || {});
 
     const pool = await generator.fetchFoodPool(db, config.exclusions);
-    pool._recipes = await generator.fetchRecipePool(db, config.exclusions);
+    pool._recipes = await generator.fetchRecipePool(db, config.exclusions, config.objetivo);
     const { plan_data, summary } = generator.generatePlan(pool, config);
 
     // Micros: gera apenas o relatório de adequação (sem compensação automática — V2 usa alertas)

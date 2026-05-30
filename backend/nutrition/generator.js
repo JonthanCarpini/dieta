@@ -177,18 +177,22 @@ const RECIPE_MEAL_MAP = {
 const RECIPE_USABLE = new Set(['almoco', 'jantar', 'lanche_manha', 'lanche_tarde']);
 // Carrega receitas confiáveis (active+healthy) com ingredientes já casados na TACO.
 // Cada receita traz ingredientes {food:{id,nome,per100}, grams} → escalável e com micros.
-async function fetchRecipePool(db, exclusions) {
+// Filtra receitas pelo objetivo do paciente (goals[])
+// objetivo: 'lose' | 'maintain' | 'gain' — se null, usa todas as ativas
+async function fetchRecipePool(db, exclusions, objetivo) {
   const cols = MICRO_KEYS.map(k => 'a.' + k).join(', ');
   let rows;
   try {
+    const params = objetivo ? [objetivo] : [];
     rows = (await db.query(`
       SELECT r.id, r.name, r.meal, r.yield_servings, r.preparo, r.author_name, r.url AS source_url,
              ri.alimento_id, ri.grams, a.nome, a.kcal, a.ptn, a.cho, a.lip, a.fibras, ${cols}
       FROM recipes r
       JOIN recipe_ingredients ri ON ri.recipe_id = r.id AND ri.alimento_id IS NOT NULL AND ri.grams > 0
       JOIN alimentos a ON a.id = ri.alimento_id
-      WHERE r.active AND r.healthy
-      ORDER BY r.id`)).rows;
+      WHERE r.active AND (r.goals IS NOT NULL AND array_length(r.goals, 1) > 0)
+        ${objetivo ? `AND $1 = ANY(r.goals)` : ''}
+      ORDER BY r.id`, params)).rows;
   } catch (_) { return []; }
   const map = new Map();
   for (const r of rows) {
