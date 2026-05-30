@@ -38,10 +38,10 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 - **Cadastro & Foto de Perfil (`app/(auth)/register.tsx`):**
   - Adicionado campo de Telefone obrigatório com máscara e validação no formato `(xx)xxxxx-xxxx`.
   - Seletor de imagem (via `expo-image-picker`) integrado diretamente no topo do cadastro para definir a foto de perfil inicial.
-- **Anamnese - Trava Calórica de Segurança e Velocidades Dinâmicas (`app/onboarding.tsx`):**
-  - Adicionada trava de segurança na seleção de velocidade de perda de peso. O layout foi reorganizado para que o Nível de Atividade Física seja preenchido antes da Velocidade.
-  - A velocidade "Intenso" passou a ser calculada dinamicamente com base no limite seguro exato de calorias (GET - floor), e a velocidade "Pesado" passou a ser exatamente 20% acima do limite (bloqueada de forma segura com alerta e cadeado 🔒).
-  - Seletor de velocidade exibe opções filtradas por duplicidade e ordenadas de forma crescente. Se os dados biométricos não estiverem completos, exibe mensagem orientando o preenchimento prévio.
+- **Anamnese - Velocidades Dinâmicas Baseadas na TMB (`app/onboarding.tsx`):**
+  - O layout foi reorganizado para que o Nível de Atividade Física seja preenchido antes da Velocidade.
+  - A seleção de velocidade de perda de peso foi reestruturada para ser calculada diretamente a partir de limites metabólicos: Muito Leve (consumo médio entre GET e TMB), Leve (consumo igual à TMB), Moderado (10% abaixo da TMB), Intenso (20% abaixo da TMB) e Pesado (30% abaixo da TMB).
+  - O peso perdido por semana é estimado a partir do déficit calórico de cada opção, sem restrições ou bloqueios, garantindo que o usuário visualize a taxa de emagrecimento real correspondente a esses percentuais.
 - **Rebuild do APK:**
   - APK reconstruído com sucesso em modo de release (`npx expo run:android --variant release`).
 - **Meus Exames (`app/exams.tsx`):**
@@ -120,4 +120,4 @@ Este arquivo é a fonte única da verdade para sincronização entre múltiplos 
 
 ---
 
-*Última atualização: 30 de Maio de 2026 — Antigravity (IDE Antigravity) — Ajuste da ordem do layout de onboarding, velocidades de perda de peso calculadas de forma dinâmica (Intenso no limite seguro, Pesado 20% acima e travado) e rebuild do APK*
+*Última atualização: 30 de Maio de 2026 — Antigravity (IDE Antigravity) — Ajuste das velocidades de perda de peso para serem calculadas dinamicamente com base na TMB (Muito Leve, Leve, Moderado, Intenso e Pesado) e rebuild bem-sucedido do APK*

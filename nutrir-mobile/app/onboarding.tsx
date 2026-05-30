@@ -116,12 +116,12 @@ export default function OnboardingScreen() {
   const [speed, setSpeed] = useState<string>('');   // kg/semana
   const [activity, setActivity] = useState<string>('');
 
-  const getSafetyInfo = (spdVal: string) => {
+  const getMetabolicRates = () => {
     const w = parseFloat(weight);
     const h = parseFloat(height);
     const act = parseFloat(activity);
     if (isNaN(w) || isNaN(h) || isNaN(act) || !gender || !birthdateValid()) {
-      return { isBlocked: false, expectedKcal: 0, floor: 0 };
+      return { tmb: 0, get: 0 };
     }
 
     const [dd, mm, yyyy] = birthdate.split('/').map(Number);
@@ -147,54 +147,7 @@ export default function OnboardingScreen() {
     }
 
     const get = tmb * act;
-    const minAbsoluto = gender === 'male' ? 1500 : 1200;
-    const floor = Math.max(tmb, minAbsoluto);
-
-    const deficit = parseFloat(spdVal) * 1100;
-    const expectedKcal = Math.round(get - deficit);
-
-    return {
-      isBlocked: expectedKcal < floor,
-      expectedKcal,
-      floor: Math.round(floor),
-    };
-  };
-
-  const getMaxSafeSpeed = () => {
-    const w = parseFloat(weight);
-    const h = parseFloat(height);
-    const act = parseFloat(activity);
-    if (isNaN(w) || isNaN(h) || isNaN(act) || !gender || !birthdateValid()) {
-      return 1.0;
-    }
-
-    const [dd, mm, yyyy] = birthdate.split('/').map(Number);
-    const birth = new Date(yyyy, mm - 1, dd);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-
-    const imc = w / ((h / 100) ** 2);
-    const isAthlete = act >= 1.725;
-    let tmb = 0;
-    if (isAthlete) {
-      tmb = 24.8 * w + 10;
-    } else if (imc >= 25 || imc < 18.5) {
-      tmb = gender === 'male'
-        ? 9.99 * w + 6.25 * h - 4.92 * age + 5
-        : 9.99 * w + 6.25 * h - 4.92 * age - 161;
-    } else {
-      tmb = gender === 'male'
-        ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * age
-        : 447.593 + 9.247 * w + 3.098 * h - 4.330 * age;
-    }
-
-    const get = tmb * act;
-    const minAbsoluto = gender === 'male' ? 1500 : 1200;
-    const floor = Math.max(tmb, minAbsoluto);
-
-    return Math.max(0.1, (get - floor) / 1100);
+    return { tmb, get };
   };
 
   const isBiometricsComplete = () => {
@@ -204,15 +157,9 @@ export default function OnboardingScreen() {
     return !isNaN(w) && !isNaN(h) && !isNaN(act) && !!gender && birthdateValid();
   };
 
-  // Reseta velocidade de perda se ela se tornar perigosa após alteração de dados biométricos
+  // Reseta velocidade se os dados biométricos mudarem, já que as opções são calculadas dinamicamente
   useEffect(() => {
-    if (speed && goal === 'lose') {
-      const maxSafe = getMaxSafeSpeed();
-      const safety = getSafetyInfo(speed);
-      if (safety.isBlocked || parseFloat(speed) > maxSafe + 0.01) {
-        setSpeed('');
-      }
-    }
+    setSpeed('');
   }, [weight, height, birthdate, gender, activity, goal]);
 
   // Máscara DD/MM/AAAA
@@ -491,78 +438,94 @@ export default function OnboardingScreen() {
                     !isBiometricsComplete() ? (
                       <View style={s.infoBox}>
                         <Text style={[s.infoText, { color: colors.textSecondary }]}>
-                          Preencha seus dados biométricos e nível de atividade física acima para calcular os limites seguros de perda de peso.
+                          Preencha seus dados biométricos e nível de atividade física acima para calcular as velocidades de perda de peso personalizadas.
                         </Text>
                       </View>
                     ) : (
                       (() => {
-                        const maxSafe = getMaxSafeSpeed();
-                        const intenseSpeed = parseFloat(maxSafe.toFixed(2));
-                        const heavySpeed = parseFloat((maxSafe * 1.2).toFixed(2));
+                        const { tmb, get } = getMetabolicRates();
+                        if (tmb === 0 || get === 0) return null;
 
-                        const rawLoseOptions = [
-                          { val: '0.25', level: 'Muito leve',   label: '0,25 kg / semana', desc: '~275 kcal/dia de déficit', orderVal: 0.25 },
-                          { val: '0.5',  level: 'Leve',         label: '0,5 kg / semana',  desc: '~550 kcal/dia de déficit', orderVal: 0.5 },
-                          { val: '0.75', level: 'Moderado',     label: '0,75 kg / semana', desc: '~825 kcal/dia de déficit', orderVal: 0.75 },
-                          { val: intenseSpeed.toString(), level: 'Intenso',      label: `${intenseSpeed.toString().replace('.', ',')} kg / semana`,    desc: `~${Math.round(intenseSpeed * 1100)} kcal/dia de déficit · Limite seguro`, orderVal: intenseSpeed },
-                          { val: heavySpeed.toString(),  level: 'Pesado ⚠️',    label: `${heavySpeed.toString().replace('.', ',')} kg / semana`,  desc: `~${Math.round(heavySpeed * 1100)} kcal/dia de déficit`, orderVal: heavySpeed },
+                        // 1. Muito Leve: acima da TMB -> consumo = (GET + TMB) / 2
+                        const muitoLeveIntake = Math.round((get + tmb) / 2);
+                        const muitoLeveDeficit = Math.round(get - muitoLeveIntake);
+                        const muitoLeveSpeed = Math.max(0.01, muitoLeveDeficit / 1100);
+
+                        // 2. Leve: igual à TMB -> consumo = TMB
+                        const leveIntake = Math.round(tmb);
+                        const leveDeficit = Math.round(get - leveIntake);
+                        const leveSpeed = Math.max(0.01, leveDeficit / 1100);
+
+                        // 3. Moderado: 10% abaixo da TMB -> consumo = TMB * 0.9
+                        const moderadoIntake = Math.round(tmb * 0.9);
+                        const moderadoDeficit = Math.round(get - moderadoIntake);
+                        const moderadoSpeed = Math.max(0.01, moderadoDeficit / 1100);
+
+                        // 4. Intenso: 20% abaixo da TMB -> consumo = TMB * 0.8
+                        const intensoIntake = Math.round(tmb * 0.8);
+                        const intensoDeficit = Math.round(get - intensoIntake);
+                        const intensoSpeed = Math.max(0.01, intensoDeficit / 1100);
+
+                        // 5. Pesado: 30% abaixo da TMB -> consumo = TMB * 0.7
+                        const pesadoIntake = Math.round(tmb * 0.7);
+                        const pesadoDeficit = Math.round(get - pesadoIntake);
+                        const pesadoSpeed = Math.max(0.01, pesadoDeficit / 1100);
+
+                        const loseOptions = [
+                          {
+                            val: muitoLeveSpeed.toFixed(2),
+                            level: 'Muito leve',
+                            label: `${muitoLeveSpeed.toFixed(2).replace('.', ',')} kg / semana`,
+                            desc: `~${muitoLeveDeficit} kcal/dia de déficit · Consumo de ~${muitoLeveIntake} kcal/dia`,
+                          },
+                          {
+                            val: leveSpeed.toFixed(2),
+                            level: 'Leve',
+                            label: `${leveSpeed.toFixed(2).replace('.', ',')} kg / semana`,
+                            desc: `~${leveDeficit} kcal/dia de déficit · Consumo de ~${leveIntake} kcal/dia (TMB)`,
+                          },
+                          {
+                            val: moderadoSpeed.toFixed(2),
+                            level: 'Moderado',
+                            label: `${moderadoSpeed.toFixed(2).replace('.', ',')} kg / semana`,
+                            desc: `~${moderadoDeficit} kcal/dia de déficit · Consumo de ~${moderadoIntake} kcal/dia`,
+                          },
+                          {
+                            val: intensoSpeed.toFixed(2),
+                            level: 'Intenso',
+                            label: `${intensoSpeed.toFixed(2).replace('.', ',')} kg / semana`,
+                            desc: `~${intensoDeficit} kcal/dia de déficit · Consumo de ~${intensoIntake} kcal/dia`,
+                          },
+                          {
+                            val: pesadoSpeed.toFixed(2),
+                            level: 'Pesado',
+                            label: `${pesadoSpeed.toFixed(2).replace('.', ',')} kg / semana`,
+                            desc: `~${pesadoDeficit} kcal/dia de déficit · Consumo de ~${pesadoIntake} kcal/dia`,
+                          },
                         ];
 
-                        const seen = new Set<number>();
-                        const uniqueLoseOptions: typeof rawLoseOptions = [];
-                        for (const item of rawLoseOptions) {
-                          const roundedVal = parseFloat(item.orderVal.toFixed(2));
-                          if (item.level === 'Intenso' || item.level === 'Pesado ⚠️') {
-                            const idx = uniqueLoseOptions.findIndex(x => Math.abs(x.orderVal - item.orderVal) < 0.06);
-                            if (idx !== -1) {
-                              uniqueLoseOptions.splice(idx, 1);
-                            }
-                            uniqueLoseOptions.push(item);
-                            seen.add(roundedVal);
-                          } else {
-                            if (![...seen].some(val => Math.abs(val - item.orderVal) < 0.06)) {
-                              uniqueLoseOptions.push(item);
-                              seen.add(roundedVal);
-                            }
-                          }
-                        }
-
-                        uniqueLoseOptions.sort((a, b) => a.orderVal - b.orderVal);
-
-                        return uniqueLoseOptions.map(o => {
-                          const safety = getSafetyInfo(o.val);
-                          const isBlocked = safety.isBlocked || parseFloat(o.val) > intenseSpeed + 0.01;
+                        return loseOptions.map(o => {
                           return (
-                            <TouchableOpacity key={o.val}
+                            <TouchableOpacity key={o.level}
                               style={[
                                 ob.btn,
                                 speed === o.val && ob.sel,
-                                o.level.includes('Pesado') && speed !== o.val && ob.warn,
-                                isBlocked && { opacity: 0.35, borderColor: colors.border }
+                                o.level === 'Pesado' && speed !== o.val && ob.warn
                               ]}
-                              onPress={() => {
-                                if (isBlocked) {
-                                  Alert.alert(
-                                    'Bloqueio de Segurança',
-                                    `Esta opção reduziria seu consumo diário para ~${safety.expectedKcal} kcal, o que é abaixo do limite metabólico seguro de ${safety.floor} kcal para o seu perfil.\n\nPor favor, selecione uma velocidade de perda de peso mais lenta.`
-                                  );
-                                  return;
-                                }
-                                setSpeed(o.val);
-                              }}
-                              activeOpacity={isBlocked ? 1 : 0.8}>
+                              onPress={() => setSpeed(o.val)}
+                              activeOpacity={0.8}>
                               <View style={s.speedRow}>
-                                <Text style={[ob.text, speed === o.val && ob.selText, isBlocked && { textDecorationLine: 'line-through' }]}>
-                                  {o.label} {isBlocked && '🔒'}
+                                <Text style={[ob.text, speed === o.val && ob.selText]}>
+                                  {o.label}
                                 </Text>
-                                <View style={[s.levelBadge, speed === o.val && s.levelBadgeSel, isBlocked && { backgroundColor: '#333' }]}>
-                                  <Text style={[s.levelText, speed === o.val && s.levelTextSel, isBlocked && { color: colors.textMuted }]}>
-                                    {isBlocked ? 'Bloqueado' : o.level}
+                                <View style={[s.levelBadge, speed === o.val && s.levelBadgeSel]}>
+                                  <Text style={[s.levelText, speed === o.val && s.levelTextSel]}>
+                                    {o.level}
                                   </Text>
                                 </View>
                               </View>
                               <Text style={[s.speedDesc, speed === o.val && { color: colors.accentGreen + 'CC' }]}>
-                                {isBlocked ? `Calorias estimadas (${safety.expectedKcal} kcal) ficariam abaixo do limite seguro de ${safety.floor} kcal.` : o.desc}
+                                {o.desc}
                               </Text>
                             </TouchableOpacity>
                           );
