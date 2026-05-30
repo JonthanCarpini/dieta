@@ -473,12 +473,12 @@ export function loadGeneratedPlan(data, patientId) {
         updateBuilderClinicalBanner(patientId);
     });
 
-    _renderGenReport(data.summary || [], data.adequacy, data.config);
+    _renderGenReport(data.summary || [], data.adequacy, data.config, data.alerts, data.anamnesisStatus, data.clinicalSource);
     if (window.lucide) window.lucide.createIcons();
 }
 
 // Renderiza banner de rascunho + painel de adequação no topo do builder
-function _renderGenReport(summary, adequacy, config) {
+function _renderGenReport(summary, adequacy, config, alerts, anamnesisStatus, clinicalSource) {
     const box = document.getElementById('builder-gen-report');
     if (!box) return;
     if (!adequacy) { box.innerHTML = ''; return; }
@@ -505,17 +505,48 @@ function _renderGenReport(summary, adequacy, config) {
         return `<span style="font-size:10.5px;color:var(--text-2);">${_DOW_LABEL[s.dow]} <strong style="color:${col};">${s.kcal}</strong></span>`;
     }).join(' · ');
 
+    // Alertas clínicos V2 (déficit perigoso, protocolos ativos, etc.)
+    const alertsHtml = (alerts || []).map(a => {
+        const isError = a.level === 'error';
+        const col  = isError ? '#f87171' : '#f5c14d';
+        const bg   = isError ? 'rgba(248,113,113,.10)' : 'rgba(245,193,77,.10)';
+        const icon = isError ? 'alert-octagon' : 'alert-triangle';
+        return `<div style="background:${bg};border:1px solid ${col}44;border-radius:8px;padding:8px 12px;display:flex;gap:8px;align-items:flex-start;">
+            <i data-lucide="${icon}" style="width:14px;height:14px;color:${col};flex-shrink:0;margin-top:2px;"></i>
+            <div><strong style="color:${col};font-size:11.5px;">${a.label}</strong><br>
+            <span style="font-size:11px;color:var(--text-1);line-height:1.4;">${a.message}</span></div>
+        </div>`;
+    }).join('');
+
+    // Status da anamnese
+    const anamLabels = {
+        ausente:              ['⚠️', 'Anamnese ausente — plano gerado sem dados clínicos completos', '#f87171'],
+        incompleta:           ['⚠️', 'Anamnese incompleta — revise os dados do paciente', '#f5c14d'],
+        completa_proxy:       ['✓', 'Anamnese completa (sem exames — usando respostas proxy)', '#94a3b8'],
+        completa_sem_exames:  ['✓', 'Anamnese completa (sem exames laboratoriais)', '#94a3b8'],
+        completa_com_exames:  ['✓', 'Anamnese completa com exames laboratoriais', '#4ade80'],
+    };
+    const [aIcon, aLabel, aColor] = anamLabels[anamnesisStatus] || anamLabels.ausente;
+    const srcInfo = clinicalSource
+        ? `GET: ${clinicalSource.get} · Exames: ${clinicalSource.markers}`
+        : '';
+
     box.innerHTML = `
+        ${alertsHtml ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">${alertsHtml}</div>` : ''}
         <div style="background:var(--accent-dim);border:1px solid rgba(245,193,77,.25);border-radius:10px;padding:12px 14px;margin:10px 0;">
             <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px;">
-                <i data-lucide="sparkles" style="width:15px;height:15px;"></i> Rascunho gerado por IA — revise e ajuste antes de salvar
+                <i data-lucide="sparkles" style="width:15px;height:15px;"></i> Rascunho gerado — revise e ajuste antes de salvar
             </div>
-            <div style="font-size:12px;color:var(--text-2);">kcal/dia (alvo ${config?.kcal || '—'}): ${kcalChips}</div>
+            <div style="font-size:12px;color:var(--text-2);">kcal/dia (alvo ${config?.kcal || '—'} · GET ${config?.kcalGet || '—'}): ${kcalChips}</div>
+            ${srcInfo ? `<div style="font-size:10.5px;color:var(--text-2);margin-top:4px;">${srcInfo}</div>` : ''}
+        </div>
+        <div style="background:var(--bg-surface);border:1px solid ${aColor}44;border-radius:8px;padding:6px 12px;margin-bottom:8px;font-size:11px;color:${aColor};">
+            ${aIcon} ${aLabel}
         </div>
         <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                 <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">Adequação de Micronutrientes (média semanal)</span>
-                <span style="font-size:11px;color:var(--text-2);">${adequacy.summary.ok}/${adequacy.summary.total} OK · ${adequacy.summary.swaps} ajustes</span>
+                <span style="font-size:11px;color:var(--text-2);">${adequacy.summary.ok}/${adequacy.summary.total} OK</span>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:6px;">${adequacy.micros.map(chip).join('')}</div>
             ${adequacy.floorAlerts?.length ? `<div style="margin-top:8px;font-size:11px;color:#f5c14d;"><i data-lucide="alert-triangle" style="width:11px;height:11px;display:inline;vertical-align:middle;"></i> Piso diário abaixo: ${adequacy.floorAlerts.map(f => f.label.replace(/\s*\(.*\)/, '') + ' (' + f.daysBelow.length + 'd)').join(', ')}</div>` : ''}

@@ -765,58 +765,65 @@ router.delete('/foods/:id', async (req, res) => {
 // ==========================================
 // GERADOR DE CARDÁPIO (Fase 2 — kcal + macros)
 // ==========================================
-const planner   = require('../nutrition/planner');
+const planner    = require('../nutrition/planner');
+const plannerV2  = require('../nutrition/planner_v2');
 const generator = require('../nutrition/generator');
 const limits    = require('../nutrition/limits');
 const micros    = require('../nutrition/micros');
 
 // POST /professional/patients/:id/generate-plan — gera rascunho (NÃO salva)
+// V2: usa planner_v2 (GET + exames + anamnese + protocolos clínicos)
 router.post('/patients/:id/generate-plan', verifyPatientAccess, async (req, res) => {
   const patientId = parseInt(req.params.id);
   try {
-    const profRes = await db.query('SELECT * FROM profiles WHERE user_id = $1', [patientId]);
-    const profile = profRes.rows[0] || {};
+    // Cria tabelas de anamnese se ainda não existem (migração silenciosa)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patient_anamnesis (
+        patient_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        meal_count      INTEGER DEFAULT 5,
+        meal_times      JSONB,
+        eats_out        VARCHAR(20),
+        cooking_level   VARCHAR(20),
+        conditions      TEXT[],
+        restrictions    TEXT[],
+        avoids_text     TEXT,
+        prefers_text    TEXT,
+        medications     TEXT,
+        completed_at    TIMESTAMPTZ,
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+      )`).catch(() => {});
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patient_exam_proxy (
+        patient_id        INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        cholesterol_high  BOOLEAN,
+        uric_acid_high    BOOLEAN,
+        glucose_high      BOOLEAN,
+        kidney_stones     BOOLEAN,
+        answered_at       TIMESTAMPTZ DEFAULT NOW()
+      )`).catch(() => {});
 
-    // Último GET salvo (tabela criada sob demanda — pode não existir)
-    let latestEnergyCalc = null;
-    try {
-      const ec = await db.query(
-        'SELECT get_value FROM energy_calculations WHERE patient_id = $1 ORDER BY calculated_at DESC LIMIT 1',
-        [patientId]
-      );
-      latestEnergyCalc = ec.rows[0] || null;
-    } catch (_) { /* tabela ainda não existe */ }
-
-    // clinical vive no próprio profiles (comorbidities, intolerances, dietary_restrictions, notes)
-    const config = planner.buildGenerationConfig({
-      profile, latestEnergyCalc, clinical: profile, overrides: req.body || {},
-    });
+    // V2: síntese clínica completa (GET + exames + protocolos + anamnese)
+    const config = await plannerV2.buildClinicalConfig(db, patientId, req.body || {});
 
     const pool = await generator.fetchFoodPool(db, config.exclusions);
-    pool._recipes = await generator.fetchRecipePool(db, config.exclusions);   // Fase 9c — receitas
+    pool._recipes = await generator.fetchRecipePool(db, config.exclusions);
     const { plan_data, summary } = generator.generatePlan(pool, config);
 
-    // Fase 3 — compensação semanal de micronutrientes (pode desligar com micro=false)
+    // Micros: gera apenas o relatório de adequação (sem compensação automática — V2 usa alertas)
+    const profRes = await db.query('SELECT age, gender FROM profiles WHERE user_id=$1', [patientId]);
+    const profile = profRes.rows[0] || {};
     const dri = limits.getDRI(profile.age, profile.gender);
-    let adequacy = null, swapLog = [];
-    if (req.body?.micro !== false) {
-      const r = micros.compensateMicros(plan_data, pool, config, dri);
-      swapLog = r.swapLog;
-      // recomputa o resumo de kcal/dia após os swaps
-      plan_data.days.forEach((d, i) => {
-        const t = generator.sumTotals(d.meals.flatMap(m => m.items));
-        if (summary[i]) {
-          summary[i].kcal = Math.round(t.calories); summary[i].protein = Math.round(t.protein);
-          summary[i].carbs = Math.round(t.carbs); summary[i].fat = Math.round(t.fat);
-          summary[i].devKcalPct = config.kcal ? Math.round((t.calories - config.kcal) / config.kcal * 100) : 0;
-        }
-      });
-    }
-    adequacy = micros.buildAdequacyReport(plan_data, dri, swapLog);
+    const adequacy = micros.buildAdequacyReport(plan_data, dri, []);
 
     res.json({
       plan_data, config, summary, adequacy,
-      poolSizes: Object.fromEntries(Object.entries(pool).map(([k, v]) => [k, v.length])),
+      alerts: config.alerts || [],
+      protocols: config.protocols || {},
+      anamnesisStatus: config.anamnesisStatus,
+      clinicalSource: config.clinicalSource,
+      poolSizes: Object.fromEntries(
+        Object.entries(pool).filter(([k]) => k !== '_recipes' && !k.startsWith('_')).map(([k, v]) => [k, Array.isArray(v) ? v.length : Object.keys(v).length])
+      ),
     });
   } catch (err) {
     console.error('generate-plan:', err);

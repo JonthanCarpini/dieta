@@ -1,0 +1,230 @@
+'use strict';
+/**
+ * planner_v2.js — V2: síntese clínica completa.
+ *
+ * Conecta as três camadas que o V1 ignorava:
+ *   1. energy_calculations  → GET real do paciente → meta calórica segura
+ *   2. patient_exam_markers → marcadores anormais → protocolos alimentares
+ *   3. patient_anamnesis    → estilo de vida, condições, restrições, nº de refeições
+ *   +  patient_exam_proxy   → substituto quando não há exames recentes
+ *
+ * buildClinicalConfig(db, patientId, overrides) → config completo para generatePlan
+ *
+ * Compatível com generator.js existente (mesmo formato de saída do planner.js V1),
+ * com campos adicionais: protocols, alerts, clinicalSource.
+ */
+
+const planner = require('./planner');
+const { resolveProtocols } = require('./protocols');
+
+const round = n => Math.round(n);
+
+// ── Limites mínimos absolutos de kcal (segurança) ────────────────────────────
+const MIN_KCAL = { male: 1500, female: 1200, default: 1200 };
+
+// ── Fator de déficit por objetivo ─────────────────────────────────────────────
+const DEFICIT_FACTOR = {
+  lose:     0.80,   // 20% de déficit sobre o GET
+  maintain: 1.00,
+  gain:     1.10,
+};
+
+// ── Distribuição de refeições por nº de refeições/dia ─────────────────────────
+// Respeita a anamnese: se o paciente faz só 3 refeições, não gerar 6.
+const DIST_BY_MEAL_COUNT = {
+  3: { cafe_da_manha: 0.30, almoco: 0.42, jantar: 0.28 },
+  4: { cafe_da_manha: 0.27, lanche_manha: 0.08, almoco: 0.38, jantar: 0.27 },
+  5: { cafe_da_manha: 0.25, lanche_manha: 0.06, almoco: 0.36, lanche_tarde: 0.06, jantar: 0.27 },
+  6: { cafe_da_manha: 0.25, lanche_manha: 0.06, almoco: 0.36, lanche_tarde: 0.06, jantar: 0.21, ceia: 0.06 },
+};
+const DEFAULT_MEAL_DIST = DIST_BY_MEAL_COUNT[6];
+
+async function buildClinicalConfig(db, patientId, overrides = {}) {
+  // ── 1. Buscar todos os dados do paciente ──────────────────────────────────
+  const [profileRes, calcRes, markersRes, anamnesisRes, proxyRes] = await Promise.all([
+    db.query('SELECT * FROM profiles WHERE user_id=$1', [patientId]),
+    db.query('SELECT * FROM energy_calculations WHERE patient_id=$1 ORDER BY calculated_at DESC LIMIT 1', [patientId]),
+    db.query('SELECT marker_name, numeric_value, unit, status FROM patient_exam_markers WHERE patient_id=$1', [patientId])
+      .catch(() => ({ rows: [] })),
+    db.query('SELECT * FROM patient_anamnesis WHERE patient_id=$1', [patientId])
+      .catch(() => ({ rows: [] })),
+    db.query('SELECT * FROM patient_exam_proxy WHERE patient_id=$1', [patientId])
+      .catch(() => ({ rows: [] })),
+  ]);
+
+  const profile   = profileRes.rows[0]   || {};
+  const energyCalc = calcRes.rows[0]     || null;
+  const markers    = markersRes.rows      || [];
+  const anamnesis  = anamnesisRes.rows[0] || null;
+  const proxy      = proxyRes.rows[0]     || null;
+
+  // ── 2. GET real e meta calórica segura ────────────────────────────────────
+  const get = energyCalc && Number(energyCalc.get_value) > 0
+    ? Number(energyCalc.get_value)
+    : planner.computeFallbackGet(profile);
+  const tmb = energyCalc && Number(energyCalc.tmb) > 0
+    ? Number(energyCalc.tmb)
+    : get / (Number(profile.activity) || 1.4);
+
+  const objetivo = overrides.objetivo || profile.goal || 'maintain';
+
+  // ── 3. Resolver protocolos clínicos ───────────────────────────────────────
+  const protocols = resolveProtocols({
+    markers,
+    comorbidities: [profile.comorbidities, profile.notes].filter(Boolean).join(' '),
+    proxy,
+    anamnesis_conditions: anamnesis ? (anamnesis.conditions || []) : [],
+  });
+
+  // ── 4. Meta calórica: déficit seguro respeitando protocolos ──────────────
+  const baseFactor  = DEFICIT_FACTOR[objetivo] || 1.0;
+  // protocolo pode restringir o déficit (ex: gota → máximo 12%)
+  const safeFactor  = objetivo === 'lose' ? Math.max(baseFactor, protocols.deficitCap) : baseFactor;
+  const safeKcal    = round(get * safeFactor);
+  const minKcal     = MIN_KCAL[profile.gender] || MIN_KCAL.default;
+  const flooredKcal = Math.max(safeKcal, minKcal, round(tmb));   // nunca abaixo da TMB
+
+  // Override manual do nutricionista (do formulário) tem precedência, mas gera alerta
+  const requestedKcal = Number(overrides.kcal) > 0 ? round(Number(overrides.kcal)) : null;
+  const finalKcal     = requestedKcal || flooredKcal;
+
+  // ── 5. Alertas de déficit ─────────────────────────────────────────────────
+  const alerts = [...(protocols.alerts || [])];
+
+  if (requestedKcal && requestedKcal < flooredKcal * 0.80) {
+    const devPct = round((flooredKcal - requestedKcal) / flooredKcal * 100);
+    alerts.push({
+      level: 'error',
+      protocol: 'kcal_deficit',
+      label: 'Déficit calórico elevado',
+      message: `A meta solicitada (${requestedKcal} kcal) está ${devPct}% abaixo da meta segura calculada (${flooredKcal} kcal, baseada no GET de ${round(get)} kcal). ${protocols.ids.includes('baixa_purina') ? 'Para pacientes com Gota, déficit acima de 12% aumenta risco de crise aguda por elevação do ácido úrico.' : 'Déficits muito agressivos podem causar perda de massa muscular e outros efeitos adversos.'}`,
+    });
+  } else if (requestedKcal && requestedKcal < flooredKcal * 0.95) {
+    const devPct = round((flooredKcal - requestedKcal) / flooredKcal * 100);
+    alerts.push({
+      level: 'warning',
+      protocol: 'kcal_deficit',
+      label: 'Meta calórica abaixo do recomendado',
+      message: `A meta solicitada (${requestedKcal} kcal) está ${devPct}% abaixo da meta segura calculada (${flooredKcal} kcal). Considere ajustar.`,
+    });
+  }
+
+  if (finalKcal <= tmb * 1.05) {
+    alerts.push({
+      level: 'warning',
+      protocol: 'tmb_floor',
+      label: 'Meta próxima da TMB',
+      message: `Meta calórica (${finalKcal} kcal) está próxima ou abaixo da TMB (${round(tmb)} kcal). Plano muito restritivo pode comprometer a saúde metabólica.`,
+    });
+  }
+
+  // ── 6. Macros ─────────────────────────────────────────────────────────────
+  // Splits terapêuticos (sobrepõem o padrão quando há protocolo ativo)
+  let macroSplit = overrides.macroSplit || planner.MACRO_SPLITS[objetivo] || planner.MACRO_SPLITS.maintain;
+  if (protocols.ids.includes('baixo_ig') || protocols.ids.includes('renal')) {
+    // diabetes/renal: proteína mais alta, carbo moderado
+    macroSplit = { protein: 0.30, carbs: 0.40, fat: 0.30 };
+  }
+  if (protocols.ids.includes('renal')) {
+    // renal: limitar proteína (usa peso ideal se disponível)
+    macroSplit = { protein: 0.20, carbs: 0.50, fat: 0.30 };
+  }
+  const macroTargets = planner.macroTargetsFromKcal(finalKcal, macroSplit);
+
+  // ── 7. Distribuição de refeições ──────────────────────────────────────────
+  const mealCount = anamnesis && anamnesis.meal_count
+    ? Math.min(6, Math.max(3, Number(anamnesis.meal_count)))
+    : 6;
+  const mealDistribution = overrides.mealDistribution
+    || DIST_BY_MEAL_COUNT[mealCount]
+    || DEFAULT_MEAL_DIST;
+
+  // Horários da anamnese (se disponíveis)
+  const mealTimesDB = (anamnesis && anamnesis.meal_times) || {};
+  const MEAL_KEYS_ORDER = ['cafe_da_manha','lanche_manha','almoco','lanche_tarde','jantar','ceia'];
+  const mealTimes = { ...planner.MEAL_TIMES };
+  const timeMap = {
+    cafe:   'cafe_da_manha', lanche_manha: 'lanche_manha',
+    almoco: 'almoco',        lanche_tarde: 'lanche_tarde',
+    jantar: 'jantar',        ceia: 'ceia',
+  };
+  for (const [k, mk] of Object.entries(timeMap)) {
+    if (mealTimesDB[k]) mealTimes[mk] = mealTimesDB[k];
+  }
+
+  const perMeal = {};
+  for (const [meal, frac] of Object.entries(mealDistribution)) {
+    perMeal[meal] = {
+      label:     planner.MEAL_LABELS[meal] || meal,
+      time:      mealTimes[meal] || '12:00',
+      fraction:  frac,
+      kcal:      round(finalKcal * frac),
+      protein_g: round(macroTargets.protein_g * frac),
+      carbs_g:   round(macroTargets.carbs_g   * frac),
+      fat_g:     round(macroTargets.fat_g     * frac),
+    };
+  }
+
+  // ── 8. Exclusões clínicas: V1 (intolerâncias/dieta) + V2 (protocolos) ────
+  const v1Excl = planner.buildClinicalExclusions({
+    intolerances:         profile.intolerances,
+    dietary_restrictions: profile.dietary_restrictions,
+    // aversões da anamnese como exclusões adicionais
+    ...(anamnesis && anamnesis.restrictions ? { dietary_restrictions: [profile.dietary_restrictions, anamnesis.restrictions.join(', ')].filter(Boolean).join('; ') } : {}),
+  });
+  // keywords extras das aversões livres da anamnese
+  if (anamnesis && anamnesis.avoids_text) {
+    anamnesis.avoids_text.split(/[,;]+/).forEach(w => {
+      const k = w.trim().toLowerCase();
+      if (k.length > 2) v1Excl.keywords.push(k);
+    });
+  }
+  if (Array.isArray(overrides.excludedKeywords)) {
+    overrides.excludedKeywords.forEach(k => { if (k) v1Excl.keywords.push(String(k).toLowerCase()); });
+  }
+  // mescla protocolos V2
+  const exclusions = {
+    keywords:    [...new Set([...v1Excl.keywords, ...protocols.keywords])],
+    grupos:      [...new Set([...v1Excl.grupos,   ...protocols.grupos])],
+    matchedRules: v1Excl.matchedRules,
+    protocolIds:  protocols.ids,
+  };
+
+  // ── 9. Status da anamnese ─────────────────────────────────────────────────
+  const anamnesisStatus = !anamnesis ? 'ausente'
+    : !anamnesis.completed_at ? 'incompleta'
+    : markers.length > 0 ? 'completa_com_exames'
+    : proxy ? 'completa_proxy'
+    : 'completa_sem_exames';
+
+  return {
+    objetivo,
+    kcal:          finalKcal,
+    kcalSafe:      flooredKcal,
+    kcalGet:       round(get),
+    kcalTmb:       round(tmb),
+    macroSplit,
+    macroTargets,
+    mealCount,
+    mealDistribution,
+    perMeal,
+    exclusions,
+    protocols: {
+      ids:        protocols.ids,
+      priorities: protocols.priorities,
+    },
+    alerts,
+    anamnesisStatus,
+    clinicalSource: {
+      get:      energyCalc ? `energy_calculations (${energyCalc.formula_name}, ${energyCalc.calculated_at})` : 'fallback_mifflin',
+      markers:  markers.length > 0 ? `${markers.length} marcadores de exames` : (proxy ? 'respostas proxy' : 'nenhum'),
+      anamnese: anamnesisStatus,
+    },
+    meta: {
+      hasExplicitMacros: false,
+      kcalSource: energyCalc ? 'energy_calc' : (Number(profile.target_calories) > 0 ? 'profile_target' : 'fallback_mifflin'),
+    },
+  };
+}
+
+module.exports = { buildClinicalConfig, DIST_BY_MEAL_COUNT };
