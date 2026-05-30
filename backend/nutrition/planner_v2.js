@@ -19,6 +19,23 @@ const { resolveProtocols } = require('./protocols');
 
 const round = n => Math.round(n);
 
+// ── Harris-Benedict revisada (1984) ───────────────────────────────────────────
+// Fórmula padrão do sistema. Usada automaticamente quando não há registro em
+// energy_calculations — mesmo resultado que o nutricionista obteria manualmente.
+// Homem: 88.362 + 13.397×P + 4.799×A - 5.677×I
+// Mulher: 447.593 + 9.247×P + 3.098×A - 4.330×I
+function harrisBenedict1984(profile) {
+  const w   = Number(profile.weight)   || 70;
+  const h   = Number(profile.height)   || 170;
+  const age = Number(profile.age)      || 30;
+  const act = Number(profile.activity) || 1.375;
+  const male = profile.gender === 'male';
+  const tmb = male
+    ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * age
+    : 447.593 + 9.247 * w + 3.098 * h - 4.330 * age;
+  return { tmb: round(tmb), get: round(tmb * act) };
+}
+
 // ── Limites mínimos absolutos de kcal (segurança) ────────────────────────────
 const MIN_KCAL = { male: 1500, female: 1200, default: 1200 };
 
@@ -77,13 +94,20 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
   const anamnesis  = anamnesisRes.rows[0] || null;
   const proxy      = proxyRes.rows[0]     || null;
 
-  // ── 2. GET real e meta calórica segura ────────────────────────────────────
+  // ── 2. GET real — prioridade: cálculo salvo → Harris-Benedict automático ──
+  // Para pacientes sem cálculo manual: usa Harris-Benedict 1984 diretamente,
+  // mesma fórmula que o nutricionista usaria — resultado idêntico, não é uma
+  // aproximação grosseira como o Mifflin que era usado antes.
+  const hb = harrisBenedict1984(profile);
   const get = energyCalc && Number(energyCalc.get_value) > 0
     ? Number(energyCalc.get_value)
-    : planner.computeFallbackGet(profile);
+    : hb.get;
   const tmb = energyCalc && Number(energyCalc.tmb) > 0
     ? Number(energyCalc.tmb)
-    : get / (Number(profile.activity) || 1.4);
+    : hb.tmb;
+  const getSource = energyCalc
+    ? `${energyCalc.formula_name || 'Cálculo salvo'} (${new Date(energyCalc.calculated_at).toLocaleDateString('pt-BR')})`
+    : 'Harris-Benedict 1984 (automático — preencha o cálculo energético para salvar)';
 
   const objetivo = overrides.objetivo || profile.goal || 'maintain';
 
@@ -241,7 +265,7 @@ async function buildClinicalConfig(db, patientId, overrides = {}) {
     alerts,
     anamnesisStatus,
     clinicalSource: {
-      get:      energyCalc ? `energy_calculations (${energyCalc.formula_name}, ${energyCalc.calculated_at})` : 'fallback_mifflin',
+      get:      getSource,
       markers:  markers.length > 0 ? `${markers.length} marcadores de exames` : (proxy ? 'respostas proxy' : 'nenhum'),
       anamnese: anamnesisStatus,
     },

@@ -92,6 +92,7 @@ function OptionBtn({ label, selected, onPress }: { label: string; selected: bool
 const ob = StyleSheet.create({
   btn:  { paddingVertical: 12, paddingHorizontal: 16, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
   sel:  { borderColor: colors.accentGreen, backgroundColor: colors.accentGreen + '15' },
+  warn: { borderColor: colors.accentYellow + '60' },   // 1.5 kg/semana — aviso
   text: { fontSize: 15, color: colors.textSecondary },
   selText: { color: colors.textPrimary, fontWeight: '600' },
 });
@@ -378,20 +379,26 @@ export default function OnboardingScreen() {
                   </Text>
                   {(goal === 'lose'
                     ? [
-                        { val: '0.25', label: '0,25 kg / semana', desc: 'Muito gradual — ~275 kcal/dia de déficit' },
-                        { val: '0.5',  label: '0,5 kg / semana',  desc: 'Leve — ~550 kcal/dia de déficit' },
-                        { val: '0.75', label: '0,75 kg / semana', desc: 'Moderado — ~825 kcal/dia de déficit' },
-                        { val: '1.0',  label: '1 kg / semana',    desc: 'Intenso — ~1.100 kcal/dia de déficit' },
+                        { val: '0.25', level: 'Muito leve',   label: '0,25 kg / semana', desc: '~275 kcal/dia de déficit' },
+                        { val: '0.5',  level: 'Leve',         label: '0,5 kg / semana',  desc: '~550 kcal/dia de déficit' },
+                        { val: '0.75', level: 'Moderado',     label: '0,75 kg / semana', desc: '~825 kcal/dia de déficit' },
+                        { val: '1.0',  level: 'Intenso',      label: '1 kg / semana',    desc: '~1.100 kcal/dia de déficit' },
+                        { val: '1.5',  level: 'Pesado ⚠️',    label: '1,5 kg / semana',  desc: '~1.650 kcal/dia de déficit · Limite seguro' },
                       ]
                     : [
-                        { val: '0.25', label: '0,25 kg / semana', desc: 'Lento e limpo — ~275 kcal/dia de superávit' },
-                        { val: '0.5',  label: '0,5 kg / semana',  desc: 'Moderado — ~550 kcal/dia de superávit' },
+                        { val: '0.25', level: 'Leve',     label: '0,25 kg / semana', desc: '~275 kcal/dia de superávit' },
+                        { val: '0.5',  level: 'Moderado', label: '0,5 kg / semana',  desc: '~550 kcal/dia de superávit · Recomendado' },
                       ]
                   ).map(o => (
                     <TouchableOpacity key={o.val}
-                      style={[ob.btn, speed === o.val && ob.sel]}
+                      style={[ob.btn, speed === o.val && ob.sel, o.val === '1.5' && speed !== '1.5' && ob.warn]}
                       onPress={() => setSpeed(o.val)} activeOpacity={0.8}>
-                      <Text style={[ob.text, speed === o.val && ob.selText]}>{o.label}</Text>
+                      <View style={s.speedRow}>
+                        <Text style={[ob.text, speed === o.val && ob.selText]}>{o.label}</Text>
+                        <View style={[s.levelBadge, speed === o.val && s.levelBadgeSel]}>
+                          <Text style={[s.levelText, speed === o.val && s.levelTextSel]}>{o.level}</Text>
+                        </View>
+                      </View>
                       <Text style={[s.speedDesc, speed === o.val && { color: colors.accentGreen + 'CC' }]}>{o.desc}</Text>
                     </TouchableOpacity>
                   ))}
@@ -583,6 +590,11 @@ const s = StyleSheet.create({
   fieldError: { fontSize: 11, color: colors.accentRed, marginTop: 2, marginBottom: 4 },
   fieldHint:  { fontSize: 12, color: colors.textMuted, marginBottom: 8, lineHeight: 18 },
   speedDesc:  { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  speedRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  levelBadge: { backgroundColor: colors.border, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
+  levelBadgeSel: { backgroundColor: colors.accentGreen + '25' },
+  levelText:  { fontSize: 10, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  levelTextSel: { color: colors.accentGreen },
 
   uploadBox:    { marginTop: spacing.md, gap: spacing.sm },
   uploadBtn:    { backgroundColor: colors.surface, borderRadius: radius.md, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.accentGreen + '50', borderStyle: 'dashed' },
